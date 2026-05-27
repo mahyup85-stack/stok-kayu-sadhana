@@ -812,13 +812,16 @@ async function handleMutasiSubmit(e) {
     };
 
     const { error } = await api.from('stok_kayu').insert([payload]);
-    if (!error) {
-        alert("Data tersimpan!");
-        startApp(); // Refresh data
-    } else {
-        alert("Gagal: " + error.message);
-    }
+if (!error) {
+    alert("Data tersimpan!");
+    // Reset form input secara manual agar bersih
+    e.target.reset(); 
+    // Cukup panggil fetchData untuk memperbarui tabel dashboard secara bersih
+    fetchData(); 
+} else {
+    alert("Gagal: " + error.message);
 }
+
 function showView(viewId) {
     // ... kode sembunyi/tampil Anda ...
     document.querySelectorAll('.view-section, [id^="view-"]').forEach(s => s.classList.add('hidden'));
