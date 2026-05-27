@@ -821,6 +821,7 @@ if (!error) {
 } else {
     alert("Gagal: " + error.message);
 }
+}
 
 function showView(viewId) {
     // ... kode sembunyi/tampil Anda ...
