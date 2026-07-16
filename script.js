@@ -797,32 +797,39 @@ function switchView(v) {
         renderRekapSaldo();
     }
 }
-
-
 async function handleMutasiSubmit(e) {
     e.preventDefault();
-    const payload = {
-        tanggal: document.getElementById("input-date").value,
-        keterangan: document.getElementById("input-ket").value,
-        jenis_kayu: document.getElementById("input-jenis").value,
-        tpk: document.getElementById("input-tpk").value, // Pastikan ambil dari ID baru
-        petak: document.getElementById("input-petak").value || "-",
-        masuk_m3: parseFloat(document.getElementById("input-in").value) || 0,
-        keluar_m3: parseFloat(document.getElementById("input-out").value) || 0
-    };
+    
+    try {
+        showLoading(true); // Tampilkan loading overlay
 
-    const { error } = await api.from('stok_kayu').insert([payload]);
-if (!error) {
-    alert("Data tersimpan!");
-    // Reset form input secara manual agar bersih
-    e.target.reset(); 
-    // Cukup panggil fetchData untuk memperbarui tabel dashboard secara bersih
-    fetchData(); 
-} else {
-    alert("Gagal: " + error.message);
-}
-}
+        const payload = {
+            tanggal: document.getElementById("input-date").value,
+            keterangan: document.getElementById("input-ket").value,
+            jenis_kayu: document.getElementById("input-jenis").value,
+            tpk: document.getElementById("input-tpk").value, 
+            petak: document.getElementById("input-petak").value || "-",
+            masuk_m3: parseFloat(document.getElementById("input-in").value) || 0,   // Tetap masuk_m3
+            keluar_m3: parseFloat(document.getElementById("input-out").value) || 0  // Tetap keluar_m3
+        };
 
+        const { error } = await api.from('stok_kayu').insert([payload]);
+        
+        // Jika ada error (termasuk error schema cache), lempar ke blok catch di bawah
+        if (error) throw error; 
+
+        // Jika berhasil lolos tanpa error:
+        alert("Data Berhasil Disimpan!");
+        e.target.reset(); 
+        await fetchData(); 
+
+    } catch (err) {
+        console.error("Gagal memproses data:", err.message);
+        alert("Gagal memproses data: " + err.message);
+    } finally {
+        showLoading(false); // Matikan loading overlay
+    }
+}
 function showView(viewId) {
     // ... kode sembunyi/tampil Anda ...
     document.querySelectorAll('.view-section, [id^="view-"]').forEach(s => s.classList.add('hidden'));
