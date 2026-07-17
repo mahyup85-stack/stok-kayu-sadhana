@@ -615,20 +615,30 @@ function save() {
     localStorage.setItem("sadhana_master", JSON.stringify(state.master)); // Samakan dengan key load
 }
 async function saveData() {
-    const tanggalInput = document.getElementById('input-tanggal').value; // Hasilnya sudah YYYY-MM-DD
+    const tanggalInput = document.getElementById('input-date')?.value || new Date().toISOString().split('T')[0];
+    const ket = document.getElementById('input-ket')?.value || "";
+    const jenis = document.getElementById('input-jenis')?.value || "";
+    const tpk = document.getElementById("input-tpk")?.value || "";
+    const petak = document.getElementById('input-petak')?.value || "-";
+    const masuk = parseFloat(document.getElementById('input-in')?.value) || 0;
+    const keluar = parseFloat(document.getElementById('input-out')?.value) || 0;
 
     const payload = {
         tanggal: tanggalInput,
         keterangan: ket,
-        jenis_kayu: jenis, // Pastikan di Supabase namanya 'jenis_kayu' bukan 'jenis'
-        tpk: he_lotim,      // Pastikan di Supabase namanya 'tpk' bukan 'he_lotim'
+        jenis_kayu: jenis, 
+        tpk: tpk,      
         petak: petak,
         masuk_m3: masuk,
         keluar_m3: keluar
     };
 
-    const { error } = await api.from('stok_kayu').insert([payload]);
-    if (error) console.error("Gagal simpan:", error.message);
+    try {
+        const { error } = await api.from('stok_kayu').insert([payload]);
+        if (error) throw error;
+    } catch (err) {
+        console.error("Gagal simpan via saveData:", err.message);
+    }
 }
 // Fungsi untuk memastikan tanggal selalu YYYY-MM-DD
 function formatTanggalDB(dateString) {
