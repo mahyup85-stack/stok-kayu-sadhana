@@ -2108,16 +2108,17 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById('stock-form').addEventListener('submit', async (e) => {
         e.preventDefault();
 
-        // Ambil semua data dari input form
         const editId = document.getElementById('edit-id').value;
+        
+        // ✅ PERBAIKAN: Ubah 'masuk' -> 'masuk_m3' dan 'keluar' -> 'keluar_m3'
         const formData = {
             tanggal: document.getElementById('input-date').value,
             keterangan: document.getElementById('input-ket').value,
             jenis_kayu: document.getElementById('input-jenis').value,
             tpk: document.getElementById('input-tpk').value,
             petak: document.getElementById('input-petak').value,
-            masuk: parseFloat(document.getElementById('input-in').value) || 0,
-            keluar: parseFloat(document.getElementById('input-out').value) || 0
+            masuk_m3: parseFloat(document.getElementById('input-in').value) || 0,
+            keluar_m3: parseFloat(document.getElementById('input-out').value) || 0
         };
 
         try {
@@ -2139,7 +2140,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
                 if (error) throw error;
                 alert("Data berhasil disimpan!");
-                e.target.reset(); // Kosongkan form
+                if (e.target && typeof e.target.reset === 'function') {
+                    e.target.reset(); // Kosongkan form
+                }
             }
 
             // Refresh data di tabel setelah simpan/update
