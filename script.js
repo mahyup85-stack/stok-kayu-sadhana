@@ -807,24 +807,32 @@ function switchView(v) {
         renderRekapSaldo();
     }
 }
-// 1. Tambahkan variabel flag di luar fungsi (di bagian atas/sebelum fungsi ini)
 let isSubmitting = false;
 
 async function handleMutasiSubmit(e) {
-    e.preventDefault();
+    // 1. Mencegah submit bawaan form
+    if (e && e.preventDefault) e.preventDefault();
     
-    // 2. CEK: Jika sedang dalam proses simpan, HENTIKAN eksekusi kedua!
-    if (isSubmitting) return;
+    // 2. Hentikan eksekusi listener lain jika fungsi ini terdaftar berulang kali
+    if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
 
-    // Ambil elemen tombol submit
-    const submitBtn = e.target.querySelector('button[type="submit"]');
+    // 3. CEK UTAMA: Jika sedang dalam proses simpan, langsung hentikan!
+    if (isSubmitting) return false;
+
+    // Ambil elemen form & tombol submit
+    const formElement = e.target || document.getElementById("form-stok");
+    const submitBtn = formElement ? formElement.querySelector('button[type="submit"]') : null;
 
     try {
-        // 3. TANDAI BAHWA PROSES MULAI BERJALAN & DISABLE TOMBOL
+        // KUNCI PROSES DI AWAL
         isSubmitting = true;
-        if (submitBtn) submitBtn.disabled = true;
+        
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerText = "Menyimpan...";
+        }
 
-        showLoading(true); // Tampilkan loading overlay
+        if (typeof showLoading === "function") showLoading(true);
 
         const payload = {
             tanggal: document.getElementById("input-date").value,
@@ -838,23 +846,31 @@ async function handleMutasiSubmit(e) {
 
         const { error } = await api.from('stok_kayu').insert([payload]);
         
-        // Jika ada error, lempar ke blok catch di bawah
         if (error) throw error; 
 
-        // Jika berhasil lolos tanpa error:
         alert("Data Berhasil Disimpan!");
-        e.target.reset(); 
-        await fetchData(); 
+        
+        if (formElement && typeof formElement.reset === "function") {
+            formElement.reset(); 
+        }
+
+        if (typeof fetchData === "function") {
+            await fetchData(); 
+        }
 
     } catch (err) {
         console.error("Gagal memproses data:", err.message);
         alert("Gagal memproses data: " + err.message);
     } finally {
-        showLoading(false); // Matikan loading overlay
+        if (typeof showLoading === "function") showLoading(false);
         
-        // 4. KEMBALIKAN STATUS SETELAH PROSES SELESAI
+        // BUKA KEMBALI KUNCI SETELAH PROSES SELESAI
         isSubmitting = false;
-        if (submitBtn) submitBtn.disabled = false;
+        
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerText = "Simpan";
+        }
     }
 }
 function showView(viewId) {
@@ -2336,3 +2352,8 @@ window.addEventListener('load', () => {
     }
 });
 window.renderRekapRincian = renderRekapRincian;
+// Pasang ini di baris paling bawah file script.js Anda
+const formStok = document.getElementById("form-stok"); // Ganti 'form-stok' jika ID form Anda beda
+if (formStok) {
+    formStok.onsubmit = handleMutasiSubmit;
+}
