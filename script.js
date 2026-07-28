@@ -807,10 +807,23 @@ function switchView(v) {
         renderRekapSaldo();
     }
 }
+// 1. Tambahkan variabel flag di luar fungsi (di bagian atas/sebelum fungsi ini)
+let isSubmitting = false;
+
 async function handleMutasiSubmit(e) {
     e.preventDefault();
     
+    // 2. CEK: Jika sedang dalam proses simpan, HENTIKAN eksekusi kedua!
+    if (isSubmitting) return;
+
+    // Ambil elemen tombol submit
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+
     try {
+        // 3. TANDAI BAHWA PROSES MULAI BERJALAN & DISABLE TOMBOL
+        isSubmitting = true;
+        if (submitBtn) submitBtn.disabled = true;
+
         showLoading(true); // Tampilkan loading overlay
 
         const payload = {
@@ -819,13 +832,13 @@ async function handleMutasiSubmit(e) {
             jenis_kayu: document.getElementById("input-jenis").value,
             tpk: document.getElementById("input-tpk").value, 
             petak: document.getElementById("input-petak").value || "-",
-            masuk_m3: parseFloat(document.getElementById("input-in").value) || 0,   // Tetap masuk_m3
-            keluar_m3: parseFloat(document.getElementById("input-out").value) || 0  // Tetap keluar_m3
+            masuk_m3: parseFloat(document.getElementById("input-in").value) || 0,
+            keluar_m3: parseFloat(document.getElementById("input-out").value) || 0
         };
 
         const { error } = await api.from('stok_kayu').insert([payload]);
         
-        // Jika ada error (termasuk error schema cache), lempar ke blok catch di bawah
+        // Jika ada error, lempar ke blok catch di bawah
         if (error) throw error; 
 
         // Jika berhasil lolos tanpa error:
@@ -838,6 +851,10 @@ async function handleMutasiSubmit(e) {
         alert("Gagal memproses data: " + err.message);
     } finally {
         showLoading(false); // Matikan loading overlay
+        
+        // 4. KEMBALIKAN STATUS SETELAH PROSES SELESAI
+        isSubmitting = false;
+        if (submitBtn) submitBtn.disabled = false;
     }
 }
 function showView(viewId) {
