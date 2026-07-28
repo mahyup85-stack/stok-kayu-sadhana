@@ -807,55 +807,39 @@ function switchView(v) {
         renderRekapSaldo();
     }
 }
-let isSubmitting = false;
+let isSubmitting=false;
 
+// 1. FUNGSI HANDLER SUBMIT
 async function handleMutasiSubmit(e) {
-    // 1. Mencegah submit bawaan form
-    if (e && e.preventDefault) e.preventDefault();
-    
-    // 2. Hentikan eksekusi listener lain jika fungsi ini terdaftar berulang kali
-    if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
+    if (e) e.preventDefault();
 
-    // 3. CEK UTAMA: Jika sedang dalam proses simpan, langsung hentikan!
     if (isSubmitting) return false;
 
-    // Ambil elemen form & tombol submit
-    const formElement = e.target || document.getElementById("form-stok");
-    const submitBtn = formElement ? formElement.querySelector('button[type="submit"]') : null;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
 
     try {
-        // KUNCI PROSES DI AWAL
         isSubmitting = true;
-        
-        if (submitBtn) {
-            submitBtn.disabled = true;
-            submitBtn.innerText = "Menyimpan...";
-        }
-
+        if (submitBtn) submitBtn.disabled = true;
         if (typeof showLoading === "function") showLoading(true);
 
         const payload = {
             tanggal: document.getElementById("input-date").value,
             keterangan: document.getElementById("input-ket").value,
             jenis_kayu: document.getElementById("input-jenis").value,
-            tpk: document.getElementById("input-tpk").value, 
+            tpk: document.getElementById("input-tpk").value,
             petak: document.getElementById("input-petak").value || "-",
             masuk_m3: parseFloat(document.getElementById("input-in").value) || 0,
             keluar_m3: parseFloat(document.getElementById("input-out").value) || 0
         };
 
         const { error } = await api.from('stok_kayu').insert([payload]);
-        
-        if (error) throw error; 
+        if (error) throw error;
 
         alert("Data Berhasil Disimpan!");
-        
-        if (formElement && typeof formElement.reset === "function") {
-            formElement.reset(); 
-        }
+        e.target.reset();
 
         if (typeof fetchData === "function") {
-            await fetchData(); 
+            await fetchData();
         }
 
     } catch (err) {
@@ -863,15 +847,29 @@ async function handleMutasiSubmit(e) {
         alert("Gagal memproses data: " + err.message);
     } finally {
         if (typeof showLoading === "function") showLoading(false);
-        
-        // BUKA KEMBALI KUNCI SETELAH PROSES SELESAI
         isSubmitting = false;
-        
-        if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.innerText = "Simpan";
-        }
+        if (submitBtn) submitBtn.disabled = false;
     }
+}
+
+// 2. FUNGSI INISIALISASI FORM (PEMBERSIH EVENT GANDA)
+function setupFormMutasi() {
+    const formElement = document.getElementById("form-stok"); // Sesuaikan ID form Anda
+    if (!formElement) return;
+
+    // TRIK PAMUNGKAS: Clone elemen form untuk MEMBUANG SEMUA event listener ganda yang menempel sebelumnya
+    const newForm = formElement.cloneNode(true);
+    formElement.parentNode.replaceChild(newForm, formElement);
+
+    // Pasang HANYA 1 event listener bersih ke form baru
+    newForm.onsubmit = handleMutasiSubmit;
+}
+
+// Jalankan pembersihan & pemasangan event saat halaman siap
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setupFormMutasi);
+} else {
+    setupFormMutasi();
 }
 function showView(viewId) {
     // ... kode sembunyi/tampil Anda ...
@@ -2352,8 +2350,4 @@ window.addEventListener('load', () => {
     }
 });
 window.renderRekapRincian = renderRekapRincian;
-// Pasang ini di baris paling bawah file script.js Anda
-const formStok = document.getElementById("form-stok"); // Ganti 'form-stok' jika ID form Anda beda
-if (formStok) {
-    formStok.onsubmit = handleMutasiSubmit;
-}
+
