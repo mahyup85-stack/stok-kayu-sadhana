@@ -1,3 +1,11 @@
+// HELPER: Menghilangkan -0.00 dan memformat angka ke 2 desimal
+const formatSaldo = (val) => {
+    if (val === null || val === undefined || isNaN(val)) return "0.00";
+    // Trik aritmatika (+ 0) mengubah -0 menjadi 0 positif sebelum dibulatkan
+    const rounded = Math.round(Number(val) * 100) / 100 + 0;
+    return rounded.toFixed(2);
+};
+
 let api;
 
 // 2. State Management
@@ -218,8 +226,8 @@ function renderDashboardTable(dataToRender = null) {
             <td>${d.jenis_kayu}</td>
             <td>${d.tpk}</td>
             <td>${d.petak || '-'}</td>
-            <td class="text-right">${(d.masuk_m3 || 0).toFixed(2)}</td>
-            <td class="text-right">${(d.keluar_m3 || 0).toFixed(2)}</td>
+            <td class="text-right">${formatSaldo(d.masuk_m3)}</td>
+            <td class="text-right">${formatSaldo(d.keluar_m3)}</td>
             <td>
                 <div style="display: flex; gap: 2px; justify-content: center; align-items: center;">
                     <button onclick="editData('${d.id}')" class="btn-action" title="Edit">✏️</button>
@@ -1486,7 +1494,7 @@ window.renderRekapSaldo = function () {
         return;
     }
 
-    let html = rows.map((r, index) => {
+    let html = rows.map((r) => {
         const sBap = r.saldoAwal + r.bap - r.lhp;
         const sLhp = r.saldoAwal + r.lhp - r.kirim;
 
@@ -1497,30 +1505,31 @@ window.renderRekapSaldo = function () {
         gTotalSaldoBap += sBap;
         gTotalSaldoLhp += sLhp;
 
+        // BUBUHKAN formatSaldo() DI SINI
         return `
             <tr>
                 <td>${r.jenis}</td>
                 <td>${r.tpk}</td>
                 <td class="text-center">${r.petak}</td>
-                <td class="text-right">${r.saldoAwal.toFixed(2)}</td>
-                <td class="text-right">${r.bap.toFixed(2)}</td>
-                <td class="text-right">${r.lhp.toFixed(2)}</td>
-                <td class="text-right">${r.kirim.toFixed(2)}</td>
-                <td class="text-right" style="font-weight:bold">${sBap.toFixed(2)}</td>
-                <td class="text-right" style="font-weight:bold">${sLhp.toFixed(2)}</td>
+                <td class="text-right">${formatSaldo(r.saldoAwal)}</td>
+                <td class="text-right">${formatSaldo(r.bap)}</td>
+                <td class="text-right">${formatSaldo(r.lhp)}</td>
+                <td class="text-right">${formatSaldo(r.kirim)}</td>
+                <td class="text-right" style="font-weight:bold">${formatSaldo(sBap)}</td>
+                <td class="text-right" style="font-weight:bold">${formatSaldo(sLhp)}</td>
             </tr>`;
     }).join('');
 
-    // 4. Baris Total Keseluruhan
+    // 4. Baris Total Keseluruhan (BUBUHKAN formatSaldo() JUGA DI SINI)
     html += `
         <tr style="background-color: #f3f4f6; font-weight: bold; border-top: 2px solid #374151;">
             <td colspan="3" class="text-center">TOTAL KESELURUHAN</td>
-            <td class="text-right">${gTotalAwal.toFixed(2)}</td>
-            <td class="text-right">${gTotalBap.toFixed(2)}</td>
-            <td class="text-right">${gTotalLhp.toFixed(2)}</td>
-            <td class="text-right">${gTotalKirim.toFixed(2)}</td>
-            <td class="text-right">${gTotalSaldoBap.toFixed(2)}</td>
-            <td class="text-right">${gTotalSaldoLhp.toFixed(2)}</td>
+            <td class="text-right">${formatSaldo(gTotalAwal)}</td>
+            <td class="text-right">${formatSaldo(gTotalBap)}</td>
+            <td class="text-right">${formatSaldo(gTotalLhp)}</td>
+            <td class="text-right">${formatSaldo(gTotalKirim)}</td>
+            <td class="text-right">${formatSaldo(gTotalSaldoBap)}</td>
+            <td class="text-right">${formatSaldo(gTotalSaldoLhp)}</td>
         </tr>
     `;
 
