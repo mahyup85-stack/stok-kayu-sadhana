@@ -279,10 +279,25 @@ window.changePage = function (page) {
 };
 
 // Pasang ke window agar aman jika dipanggil dengan window.state
+// 1. Ekspos state ke window (kode kamu yang sudah ada)
 window.state = state;
+
+// 2. SISIPKAN/PASTIKAN konversiKayu ada di dalam objek state
+if (window.state) {
+    window.state.konversiKayu = {}; // Menyiapkan wadah untuk data konversi
+}
+
+// 3. Helper loader (kode kamu yang sudah ada)
 function showLoading(isLoading) {
     const loader = document.getElementById('loading-overlay');
     if (loader) isLoading ? loader.classList.remove('hidden') : loader.classList.add('hidden');
+}
+
+// 4. SISIPKAN helper fungsi hitung konversi di sini
+function hitungKonversi(jenisKayu, volumeM3) {
+    // Ambil faktor konversi dari state (jika tidak ada/belum diisi, default = 1)
+    const faktor = (window.state && window.state.konversiKayu) ? (window.state.konversiKayu[jenisKayu] || 1) : 1;
+    return volumeM3 * faktor;
 }
 
 function updateYearDropdowns() {
@@ -533,21 +548,36 @@ function renderFilterSaldo() {
         console.log("✅ Dropdown Saldo terisi.");
     }
 }
+
 async function loadDataMaster() {
     try {
         const { data, error } = await api.from('master_data').select('*');
         if (error) throw error;
 
-        // Pisahkan data ke state
+        // 1. Pisahkan data ke state (Kode Lama Kamu)
         state.master.jenis_kayu = data.filter(d => d.type === 'jenis_kayu' || d.type === 'jenis-kayu');
         state.master.tpk = data.filter(d => d.type === 'tpk');
+
+        // 2. TAMBAHAN BARU: Simpan Mapping Konversi Kayu
+        state.konversiKayu = {};
+        state.master.jenis_kayu.forEach(item => {
+            // Ambil nama jenis kayu (misal item.nama atau item.nilai)
+            const namaJenis = item.nama || item.nilai || item.jenis_kayu;
+            // Ambil faktor konversi (default 1 jika kolom di Supabase belum diisi)
+            const faktor = parseFloat(item.faktor_konversi || item.konversi || 1);
+
+            if (namaJenis) {
+                state.konversiKayu[namaJenis] = faktor;
+            }
+        });
 
         console.log("✅ Data Master Berhasil Dimuat:", {
             jenis_kayu: state.master.jenis_kayu.length,
             tpk: state.master.tpk.length
         });
+        console.log("📊 Mapping Konversi Kayu:", state.konversiKayu);
 
-        // PANGGIL FUNGSI RENDER (Bukan variabelnya)
+        // 3. PANGGIL FUNGSI RENDER (Kode Lama Kamu)
         renderAllDropdowns();   // Untuk Form Input
         renderFilterSaldo();    // Untuk Ringkasan Saldo
 
@@ -1350,6 +1380,14 @@ function renderTable() {
         </tr>
     `).join("");
 }
+
+// 💡 Helper fungsi untuk menghitung hasil konversi (Bisa ditaruh di atas fungsi ini)
+function hitungKonversi(jenisKayu, volumeM3) {
+    if (!window.state || !window.state.konversiKayu) return volumeM3;
+    const faktor = window.state.konversiKayu[jenisKayu] || 1;
+    return volumeM3 * faktor;
+}
+
 window.renderRekapSaldo = function () {
     const tableBody = document.getElementById("rekap-table-body");
     if (!tableBody) return;
@@ -1381,7 +1419,7 @@ window.renderRekapSaldo = function () {
         const [y, m] = d.tanggal.split("-");
         const periodeData = parseInt(y) * 100 + parseInt(m);
 
-        // IGNORE / ABAIKAN DATA DI ATAS PERIODE "SAMPAI"
+        // ABAIKAN DATA DI ATAS PERIODE "SAMPAI"
         if (periodeData > periodeAkhir) return;
 
         const key = `${d.jenis_kayu}-${d.tpk}-${d.petak || 'Tanpa Petak'}`;
@@ -1411,34 +1449,41 @@ window.renderRekapSaldo = function () {
         }
     });
 
-    // 3. Filter Baris Kosong & Hitung Total
+    // 3. Filter Baris Kosong
     let rows = Object.values(ringkasan);
 
     // Saring hanya petak yang memiliki aktivitas/saldo aktif
     rows = rows.filter(r => {
         const sBap = r.saldoAwal + r.bap - r.lhp;
         const sLhp = r.saldoAwal + r.lhp - r.kirim;
-        // Tampilkan hanya jika ada nilai (tidak serba nol)
         return (r.saldoAwal !== 0 || r.bap !== 0 || r.lhp !== 0 || r.kirim !== 0 || sBap !== 0 || sLhp !== 0);
     });
 
     if (rows.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="9" class="text-center">Tidak ada data untuk periode ini</td></tr>';
+        // Colspan diubah ke 10 karena ada penambahan kolom konversi
+        tableBody.innerHTML = '<tr><td colspan="10" class="text-center">Tidak ada data untuk periode ini</td></tr>';
         return;
     }
 
-    let gTotalAwal = 0, gTotalBap = 0, gTotalLhp = 0, gTotalKirim = 0, gTotalSaldoBap = 0, gTotalSaldoLhp = 0;
+    // 4. Render Data & Hitung Grand Total (Termasuk Konversi)
+    let gTotalAwal = 0, gTotalBap = 0, gTotalLhp = 0, gTotalKirim = 0;
+    let gTotalSaldoBap = 0, gTotalSaldoLhp = 0, gTotalKonversi = 0;
 
     let html = rows.map((r) => {
         const sBap = r.saldoAwal + r.bap - r.lhp;
         const sLhp = r.saldoAwal + r.lhp - r.kirim;
 
+        // 💡 Hitung nilai konversi berdasarkan Saldo LHP (M³)
+        const hasilKonversi = hitungKonversi(r.jenis, sLhp);
+
+        // Akumulasi Grand Total
         gTotalAwal += r.saldoAwal;
         gTotalBap += r.bap;
         gTotalLhp += r.lhp;
         gTotalKirim += r.kirim;
         gTotalSaldoBap += sBap;
         gTotalSaldoLhp += sLhp;
+        gTotalKonversi += hasilKonversi;
 
         return `
             <tr>
@@ -1451,10 +1496,12 @@ window.renderRekapSaldo = function () {
                 <td class="text-right">${formatSaldo(r.kirim)}</td>
                 <td class="text-right" style="font-weight:bold">${formatSaldo(sBap)}</td>
                 <td class="text-right" style="font-weight:bold">${formatSaldo(sLhp)}</td>
+                <!-- 💡 Kolom Baru: Hasil Konversi -->
+                <td class="text-right" style="font-weight:bold; color: #059669;">${formatSaldo(hasilKonversi)}</td>
             </tr>`;
     }).join('');
 
-    // 4. Baris Total Keseluruhan
+    // 5. Baris Total Keseluruhan
     html += `
         <tr style="background-color: #f3f4f6; font-weight: bold; border-top: 2px solid #374151;">
             <td colspan="3" class="text-center">TOTAL KESELURUHAN</td>
@@ -1464,6 +1511,8 @@ window.renderRekapSaldo = function () {
             <td class="text-right">${formatSaldo(gTotalKirim)}</td>
             <td class="text-right">${formatSaldo(gTotalSaldoBap)}</td>
             <td class="text-right">${formatSaldo(gTotalSaldoLhp)}</td>
+            <!-- 💡 Total Hasil Konversi -->
+            <td class="text-right" style="color: #059669;">${formatSaldo(gTotalKonversi)}</td>
         </tr>
     `;
 
@@ -2241,6 +2290,39 @@ function populateAllDropdowns(sumberData = [], masterData = {}) {
     updateYearDropdowns();
 
 }
+
+function hitungKonversiForm() {
+    // 1. Ambil nilai jenis kayu yang dipilih
+    const jenis = document.getElementById('select-jenis-kayu')?.value;
+    if (!jenis) return;
+
+    // 2. Ambil nilai input SM (Masuk atau Keluar)
+    const smMasuk = parseFloat(document.getElementById('input-masuk-sm')?.value || 0);
+    const smKeluar = parseFloat(document.getElementById('input-keluar-sm')?.value || 0);
+    const totalSM = smMasuk || smKeluar; // Ambil nilai yang diisi
+
+    // 3. Ambil faktor konversi SM -> M3 dari state (default 1 jika belum diisi)
+    const faktor = (window.state && window.state.konversiKayu) ? (window.state.konversiKayu[jenis] || 1) : 1;
+
+    // 4. Hitung konversi dari SM ke M3
+    const hasilM3 = totalSM * faktor;
+
+    // 5. Isi hasil ke kolom M3 (Masuk/Keluar/Readonly Display)
+    const inputM3Masuk = document.getElementById('input-masuk-m3');
+    const inputM3Keluar = document.getElementById('input-keluar-m3');
+    const displayKonversi = document.getElementById('input-hasil-konversi');
+
+    if (smMasuk > 0 && inputM3Masuk) {
+        inputM3Masuk.value = hasilM3.toFixed(2);
+    }
+    if (smKeluar > 0 && inputM3Keluar) {
+        inputM3Keluar.value = hasilM3.toFixed(2);
+    }
+    if (displayKonversi) {
+        displayKonversi.value = hasilM3.toFixed(2);
+    }
+}
+
 // Jalankan aplikasi otomatis saat halaman dibuka
 // --- HANLDER UTAMA SUBMIT FORM (PREVENT DOUBLE SUBMIT) ---
 isSubmitting = false;
@@ -2255,12 +2337,19 @@ async function handleStockSubmit(e) {
     const editId = document.getElementById('edit-id')?.value;
     const submitBtn = e.target.querySelector('button[type="submit"]');
 
+    // 💡 Pastikan sebelum submit, konversi dihitung ulang agar nilainya akurat
+    hitungKonversiForm();
+
     const formData = {
         tanggal: document.getElementById('input-date').value,
         keterangan: document.getElementById('input-ket').value,
         jenis_kayu: document.getElementById('input-jenis').value,
         tpk: document.getElementById('input-tpk').value,
         petak: document.getElementById('input-petak').value || "-",
+        
+        // Ambil nilai SM & M3 hasil kalkulasi
+        masuk_sm: parseFloat(document.getElementById('input-in-sm')?.value) || 0,
+        keluar_sm: parseFloat(document.getElementById('input-out-sm')?.value) || 0,
         masuk_m3: parseFloat(document.getElementById('input-in').value) || 0,
         keluar_m3: parseFloat(document.getElementById('input-out').value) || 0
     };
