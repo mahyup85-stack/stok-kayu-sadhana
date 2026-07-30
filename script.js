@@ -2283,62 +2283,98 @@ function exportRincianExcel() {
 window.updatePetakByTPK = updatePetakByTPK;
 window.applyRekapFilter = applyRekapFilter;
 window.switchView = switchView;
+
 document.addEventListener("DOMContentLoaded", () => {
     if (state.isLoggedIn) {
-        startApp();
-        
+        if (typeof startApp === 'function') startApp();
     } else {
-        initLoginHandler();
+        if (typeof initLoginHandler === 'function') initLoginHandler();
     }
-    // Letakkan di bagian bawah script.js
-    document.getElementById('stock-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
 
-        const editId = document.getElementById('edit-id').value;
-        
-        // ✅ PERBAIKAN: Ubah 'masuk' -> 'masuk_m3' dan 'keluar' -> 'keluar_m3'
-        const formData = {
-            tanggal: document.getElementById('input-date').value,
-            keterangan: document.getElementById('input-ket').value,
-            jenis_kayu: document.getElementById('input-jenis').value,
-            tpk: document.getElementById('input-tpk').value,
-            petak: document.getElementById('input-petak').value,
-            masuk_m3: parseFloat(document.getElementById('input-in').value) || 0,
-            keluar_m3: parseFloat(document.getElementById('input-out').value) || 0
-        };
+    // Helper aman untuk mengambil value elemen HTML tanpa crash saat elemen null
+    const getVal = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.value : '';
+    };
 
-        try {
-            if (editId) {
-                // --- PROSES UPDATE ---
-                const { error } = await api
-                    .from('stok_kayu')
-                    .update(formData)
-                    .eq('id', editId);
+    // Event Listener untuk Stock Form (Dipasang dengan Pengecekan)
+    const stockForm = document.getElementById('stock-form');
+    if (stockForm) {
+        stockForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
 
-                if (error) throw error;
-                alert("Data berhasil diperbarui!");
-                cancelEdit(); // Kembalikan form ke mode simpan
-            } else {
-                // --- PROSES SIMPAN BARU ---
-                const { error } = await api
-                    .from('stok_kayu')
-                    .insert([formData]);
+            const editId = getVal('edit-id');
+            const jenisKayu = getVal('input-jenis');
 
-                if (error) throw error;
-                alert("Data berhasil disimpan!");
-                if (e.target && typeof e.target.reset === 'function') {
-                    e.target.reset(); // Kosongkan form
+            // 1. Ambil nilai SM dari input HTML baru (input-in-sm & input-out-sm)
+            const inSM = parseFloat(getVal('input-in-sm')) || 0;
+            const outSM = parseFloat(getVal('input-out-sm')) || 0;
+
+            // 2. Cari Faktor Konversi dari Master Data Jenis Kayu
+            let faktorKonversi = 1;
+            if (state.master && state.master['jenis_kayu']) {
+                const itemKayu = state.master['jenis_kayu'].find(k => k.name === jenisKayu);
+                if (itemKayu && itemKayu.konversi) {
+                    faktorKonversi = parseFloat(itemKayu.konversi);
                 }
             }
 
-            // Refresh data di tabel setelah simpan/update
-            fetchData();
+            // 3. Hitung Otomatis Nilai M³ (SM * Faktor Konversi)
+            const inM3 = inSM * faktorKonversi;
+            const outM3 = outSM * faktorKonversi;
 
-        } catch (err) {
-            console.error("Kesalahan database:", err.message);
-            alert("Gagal memproses data: " + err.message);
-        }
-    });
+            // 4. Siapkan Data Payload ke Supabase
+            const formData = {
+                tanggal: getVal('input-date'),
+                keterangan: getVal('input-ket'),
+                jenis_kayu: jenisKayu,
+                tpk: getVal('input-tpk'),
+                petak: getVal('input-petak'),
+                masuk_sm: inSM,
+                keluar_sm: outSM,
+                masuk_m3: inM3,   // Hasil konversi M³
+                keluar_m3: outM3   // Hasil konversi M³
+            };
+
+            try {
+                if (typeof showLoading === 'function') showLoading(true);
+
+                if (editId) {
+                    // --- PROSES UPDATE ---
+                    const { error } = await api
+                        .from('stok_kayu') // atau 'mutasi_stok' sesuaikan nama tabelmu
+                        .update(formData)
+                        .eq('id', editId);
+
+                    if (error) throw error;
+                    alert("Data berhasil diperbarui!");
+                    if (typeof cancelEdit === 'function') cancelEdit();
+                } else {
+                    // --- PROSES SIMPAN BARU ---
+                    const { error } = await api
+                        .from('stok_kayu')
+                        .insert([formData]);
+
+                    if (error) throw error;
+                    alert(`Data berhasil disimpan!\nIn: ${inSM} SM (${inM3.toFixed(2)} M³) | Faktor: ${faktorKonversi}`);
+                    
+                    if (e.target && typeof e.target.reset === 'function') {
+                        e.target.reset();
+                    }
+                }
+
+                // Refresh data di tabel
+                if (typeof fetchData === 'function') fetchData();
+                if (typeof loadMutasiData === 'function') loadMutasiData();
+
+            } catch (err) {
+                console.error("Kesalahan database:", err.message);
+                alert("Gagal memproses data: " + err.message);
+            } finally {
+                if (typeof showLoading === 'function') showLoading(false);
+            }
+        });
+    }
 });
 
 window.sinkronisasiFilterRincian = function () {
