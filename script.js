@@ -362,7 +362,7 @@ function renderDashboardTable(dataToRender = null) {
         paginatedData = data.slice(startIndex, endIndex); // Tetap pakai pagination
     }
 
-    // Render baris tabel
+    // Render baris tabel (Tombol Aksi Diperbarui)
     tableBody.innerHTML = paginatedData.map(d => `
         <tr>
             <td class="text-center">
@@ -376,14 +376,24 @@ function renderDashboardTable(dataToRender = null) {
             <td class="text-right">${formatSaldo(d.masuk_m3)}</td>
             <td class="text-right">${formatSaldo(d.keluar_m3)}</td>
             <td>
-                <div style="display: flex; gap: 2px; justify-content: center; align-items: center;">
-                    <button onclick="editData('${d.id}')" class="btn-action" title="Edit">✏️</button>
-                    <button onclick="deleteData('${d.id}')" class="btn-action btn-danger" title="Hapus">🗑️</button>
+                <div style="display: flex; gap: 4px; justify-content: center; align-items: center;">
+                    <button type="button" onclick="event.stopPropagation(); window.editData('${d.id}')" class="btn-action" title="Edit">✏️</button>
+                    <button type="button" onclick="event.stopPropagation(); window.deleteData('${d.id}')" class="btn-action btn-danger" title="Hapus">🗑️</button>
                 </div>
             </td>
         </tr>
     `).join('');
 
+    // Sembunyikan kontrol pagination jika di halaman Kelola Sandi/Backup
+    const container = document.getElementById("pagination-container");
+    if (container) {
+        container.style.display = isNoPagination ? "none" : "block";
+    }
+
+    if (!isNoPagination) {
+        renderPaginationControls();
+    }
+}
     // Sembunyikan kontrol pagination jika di halaman Kelola Sandi/Backup
     const container = document.getElementById("pagination-container");
     if (container) {
