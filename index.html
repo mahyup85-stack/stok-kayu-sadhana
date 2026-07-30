@@ -987,8 +987,11 @@
         
         <form id="master-form" style="margin-bottom: 15px;" onsubmit="handleMasterSubmit(event)">
             <div style="display: flex; flex-direction: column; gap: 10px;">
-                <input type="text" id="master-input-nama" placeholder="Nama Baru..." required style="width: 100%;" />
-                <input type="number" id="master-input-konversi" step="0.0001" placeholder="Faktor Konversi ke M³ (Khusus Jenis Kayu)" style="width: 100%;" />
+                <input type="text" id="master-input-nama" placeholder="Nama Jenis Kayu / TPK..." required style="width: 100%;" />
+                
+                <!-- Input Faktor Konversi (Otomatis tersembunyi jika pilih TPK) -->
+                <input type="number" id="master-input-konversi" step="0.0001" value="1" placeholder="Faktor Konversi (misal: 0.59)" style="width: 100%;" />
+                
                 <button type="submit" class="btn-primary" style="width: 100%;">Tambah / Update</button>
             </div>
         </form>
@@ -997,14 +1000,13 @@
             <table style="width: 100%;">
                 <thead>
                     <tr>
+                        <th style="padding: 8px; text-align: center;">No</th>
                         <th style="padding: 8px; text-align: left;">Nama</th>
                         <th style="padding: 8px; text-align: center;">Faktor</th>
                         <th style="padding: 8px; text-align: center;">Aksi</th>
                     </tr>
                 </thead>
-                <tbody id="master-list-body">
-                    <!-- Data master dinamik dari JavaScript -->
-                </tbody>
+                <tbody id="master-list-body"></tbody>
             </table>
         </div>
 

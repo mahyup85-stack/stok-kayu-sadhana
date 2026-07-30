@@ -141,25 +141,32 @@ window.renderMasterList = function () {
 };
 
 // 4. Handle Submit Tambah Data
+// ==========================================
+// 1. SIMPAN MASTER DATA (TERMASUK FAKTOR KONVERSI)
+// ==========================================
 window.handleMasterSubmit = async function (event) {
     event.preventDefault();
 
-    const inputEl = document.getElementById('master-input-nama') || document.getElementById('master-input');
+    const inputNama = document.getElementById('master-input-nama') || document.getElementById('master-input');
+    const inputKonversi = document.getElementById('master-input-konversi');
     const type = state.currentMasterType;
 
-    if (!inputEl || !inputEl.value.trim()) {
+    if (!inputNama || !inputNama.value.trim()) {
         alert("Nama tidak boleh kosong!");
         return;
     }
 
-    const name = inputEl.value.trim();
+    const name = inputNama.value.trim();
+    // Jika type jenis_kayu, ambil nilai konversi. Jika TPK, default = 1
+    const konversi = (type === 'jenis_kayu' && inputKonversi) ? parseFloat(inputKonversi.value) || 1 : 1;
 
     try {
         if (typeof showLoading === 'function') showLoading(true);
 
+        // Simpan 'name', 'type', dan 'konversi' ke Supabase
         const { data, error } = await api
             .from('master_data')
-            .insert([{ name: name, type: type }])
+            .insert([{ name: name, type: type, konversi: konversi }])
             .select();
 
         if (error) throw error;
@@ -169,17 +176,109 @@ window.handleMasterSubmit = async function (event) {
         
         state.master[type].push(data[0]);
 
-        inputEl.value = "";
+        inputNama.value = "";
+        if (inputKonversi) inputKonversi.value = "1";
         renderMasterList();
 
-        // Update dropdown form
         if (type === 'tpk' && typeof renderTPKDropdown === 'function') renderTPKDropdown();
         if (type !== 'tpk' && typeof renderJenisKayuDropdown === 'function') renderJenisKayuDropdown();
 
-        alert(`Berhasil menambahkan "${name}"`);
+        alert(`Berhasil menambahkan "${name}" (Faktor: ${konversi})`);
     } catch (err) {
         console.error(err);
-        alert("Gagal menyimpan: " + err.message);
+        alert("Gagal menyimpan master: " + err.message);
+    } finally {
+        if (typeof showLoading === 'function') showLoading(false);
+    }
+};
+
+// ==========================================
+// 2. RENDER LIST MASTER
+// ==========================================
+window.renderMasterList = function () {
+    const listEl = document.getElementById('master-list-body') || document.getElementById('master-list');
+    const type = state.currentMasterType;
+
+    if (!listEl) return;
+
+    const masterData = (state.master && state.master[type]) ? state.master[type] : [];
+
+    if (masterData.length === 0) {
+        listEl.innerHTML = '<tr><td colspan="4" class="text-center" style="padding:10px; color:#888;">Tidak ada data</td></tr>';
+        return;
+    }
+
+    listEl.innerHTML = masterData.map((item, index) => `
+        <tr>
+            <td style="padding:8px; text-align:center;">${index + 1}</td>
+            <td style="padding:8px;">${item.name}</td>
+            <td style="padding:8px; text-align:center;">${item.konversi || 1}</td>
+            <td style="padding:8px; text-align:center;">
+                <button type="button" onclick="deleteMasterItem('${item.id}')" style="background:none; border:none; cursor:pointer;">🗑️</button>
+            </td>
+        </tr>
+    `).join('');
+};
+
+// ==========================================
+// 3. LOGIKA INPUT MUTASI (SM KHUSUS DIKONVERSI KE M³)
+// ==========================================
+window.handleStockSubmit = async function (event) {
+    event.preventDefault();
+
+    const date = document.getElementById('input-date').value;
+    const ket = document.getElementById('input-ket').value;
+    const jenis = document.getElementById('input-jenis').value;
+    const tpk = document.getElementById('input-tpk').value;
+    const petak = document.getElementById('input-petak').value;
+    
+    // Ambil Input Satuan SM
+    const inSM = parseFloat(document.getElementById('input-in-sm').value) || 0;
+    const outSM = parseFloat(document.getElementById('input-out-sm').value) || 0;
+
+    // CARI FAKTOR KONVERSI DARI MASTER JENIS KAYU
+    let faktorKonversi = 1;
+    if (state.master && state.master['jenis_kayu']) {
+        const itemKayu = state.master['jenis_kayu'].find(k => k.name === jenis);
+        if (itemKayu && itemKayu.konversi) {
+            faktorKonversi = parseFloat(itemKayu.konversi);
+        }
+    }
+
+    // HITUNG NILAI M3 ( Nilai SM * Faktor Konversi )
+    // Contoh: 5 SM * 0.59 = 2.95 M3
+    const inM3 = inSM * faktorKonversi;
+    const outM3 = outSM * faktorKonversi;
+
+    const payload = {
+        tanggal: date,
+        keterangan: ket,
+        jenis_kayu: jenis,
+        tpk: tpk,
+        petak: petak,
+        masuk_sm: inSM,
+        keluar_sm: outSM,
+        masuk_m3: inM3,   // Nilai M3 yang sudah dikonversi
+        keluar_m3: outM3   // Nilai M3 yang sudah dikonversi
+    };
+
+    try {
+        if (typeof showLoading === 'function') showLoading(true);
+
+        const { data, error } = await api
+            .from('mutasi_stok')
+            .insert([payload]);
+
+        if (error) throw error;
+
+        alert(`Data Berhasil Disimpan!\nMasuk: ${inSM} SM = ${inM3.toFixed(2)} M³ (Faktor: ${faktorKonversi})`);
+        
+        // Reset Form & Refresh Tabel
+        document.getElementById('stock-form').reset();
+        if (typeof loadMutasiData === 'function') loadMutasiData();
+
+    } catch (err) {
+        alert("Gagal menyimpan mutasi: " + err.message);
     } finally {
         if (typeof showLoading === 'function') showLoading(false);
     }
