@@ -1187,13 +1187,12 @@ function logout() {
 }
 
 // ==========================================
-// FUNGSI GLOBAL EDIT DATA
+// 1. FUNGSI EDIT DATA (Mengubah Form ke Mode Update)
 // ==========================================
 window.editData = function(id) {
-    console.log("Mengedit data ID:", id);
+    const cleanId = String(id).trim();
+    const item = state.mutasiData ? state.mutasiData.find(d => String(d.id).trim() === cleanId) : null;
     
-    // 1. Cari data di memori/state berdasarkan ID
-    const item = state.mutasiData ? state.mutasiData.find(d => d.id == id) : null;
     if (!item) {
         alert("Data tidak ditemukan!");
         return;
@@ -1204,7 +1203,7 @@ window.editData = function(id) {
         if (el) el.value = value || '';
     };
 
-    // 2. Hitung balik nilai SM dari M³ (M³ / Faktor Konversi)
+    // Cari faktor konversi
     let faktorKonversi = 1;
     const jenis = (item.jenis_kayu || '').trim().toLowerCase();
     
@@ -1220,7 +1219,7 @@ window.editData = function(id) {
     const valInM3 = parseFloat(item.masuk_m3) || 0;
     const valOutM3 = parseFloat(item.keluar_m3) || 0;
 
-    // 3. Masukkan data lama ke Form Input
+    // 1. Isi Form dengan data lama
     setVal('edit-id', item.id);
     setVal('input-date', item.tanggal);
     setVal('input-ket', item.keterangan);
@@ -1230,73 +1229,50 @@ window.editData = function(id) {
     setVal('input-in-sm', valInM3 > 0 ? (valInM3 / faktorKonversi) : 0);
     setVal('input-out-sm', valOutM3 > 0 ? (valOutM3 / faktorKonversi) : 0);
 
-    // 4. Ubah tampilan judul & tombol mode edit
+    // 2. 🔄 UBAH TOMBOL & JUDUL KE MODE UPDATE
     const titleEl = document.getElementById('form-mode-title');
     if (titleEl) titleEl.innerText = "Edit Data Mutasi";
 
     const btnSubmit = document.getElementById('btn-submit');
-    if (btnSubmit) btnSubmit.innerText = "Update Data";
+    if (btnSubmit) {
+        btnSubmit.innerText = "Update Data"; // Mengubah teks Simpan -> Update Data
+        btnSubmit.classList.add('btn-warning'); // (Opsional) Tambah style jika ada
+    }
 
     const btnCancel = document.getElementById('btn-cancel-edit');
-    if (btnCancel) btnCancel.classList.remove('hidden');
+    if (btnCancel) btnCancel.classList.remove('hidden'); // Memunculkan tombol Batal
 
-    // 5. Scroll otomatis ke posisi form input
+    // 3. Scroll halus ke bagian form
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-// ==========================================
-// FUNGSI GLOBAL HAPUS DATA
-// ==========================================
-window.deleteData = async function(id) {
-    if (!confirm("Apakah Anda yakin ingin menghapus data ini?")) return;
-
-    try {
-        if (typeof showLoading === 'function') showLoading(true);
-
-        const { error } = await api
-            .from('stok_kayu')
-            .delete()
-            .eq('id', id);
-
-        if (error) throw error;
-
-        alert("Data berhasil dihapus!");
-        
-        // Memuat ulang data dari database
-        if (typeof loadMutasiData === 'function') loadMutasiData();
-        if (typeof fetchData === 'function') fetchData();
-
-    } catch (err) {
-        console.error("Gagal menghapus:", err);
-        alert("Gagal menghapus data: " + err.message);
-    } finally {
-        if (typeof showLoading === 'function') showLoading(false);
-    }
-};
 
 // ==========================================
-// FUNGSI BATAL EDIT
+// 2. FUNGSI BATAL EDIT (Kembali ke Mode Simpan)
 // ==========================================
 window.cancelEdit = function() {
+    const stockForm = document.getElementById('stock-form');
+    if (stockForm) stockForm.reset();
+
     const setVal = (elementId, value) => {
         const el = document.getElementById(elementId);
         if (el) el.value = value;
     };
 
+    // Reset ID dan Nilai Input
     setVal('edit-id', '');
-    setVal('input-ket', '');
-    setVal('input-petak', '');
     setVal('input-in-sm', 0);
     setVal('input-out-sm', 0);
 
+    // 🔄 KEMBALIKAN TOMBOL & JUDUL KE MODE INPUT BARU
     const titleEl = document.getElementById('form-mode-title');
     if (titleEl) titleEl.innerText = "Input Mutasi";
 
     const btnSubmit = document.getElementById('btn-submit');
-    if (btnSubmit) btnSubmit.innerText = "Simpan";
+    if (btnSubmit) btnSubmit.innerText = "Simpan"; // Mengembalikan teks ke Simpan
 
     const btnCancel = document.getElementById('btn-cancel-edit');
-    if (btnCancel) btnCancel.classList.add('hidden');
+    if (btnCancel) btnCancel.classList.add('hidden'); // Sembunyikan tombol Batal
 };
 
 // ==========================================
@@ -2636,8 +2612,6 @@ async function handleStockSubmit(e) {
 
 // Eksport fungsi ke global jika dipanggil via onclick
 window.renderRekapRincian = renderRekapRincian;
-window.editData = editData;
-window.deleteData = deleteData;
 
 document.addEventListener('DOMContentLoaded', () => {
     const stockForm = document.getElementById('stock-form');
