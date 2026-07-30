@@ -1271,15 +1271,20 @@ window.editData = function(id) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-// ==========================================
-// FUNGSI HAPUS SATUAN (DELETE)
-// ==========================================
-window.deleteData = async function (id) {
+
+window.deleteData = async function(id) {
+    if (!id) {
+        alert("ID data tidak ditemukan!");
+        return;
+    }
+
+    // Tampilkan konfirmasi ke pengguna
     if (!confirm("Apakah Anda yakin ingin menghapus data ini?")) return;
 
     try {
         if (typeof showLoading === 'function') showLoading(true);
 
+        // Hapus baris data berdasarkan ID dari tabel 'stok_kayu'
         const { error } = await api
             .from('stok_kayu')
             .delete()
@@ -1289,11 +1294,12 @@ window.deleteData = async function (id) {
 
         alert("Data berhasil dihapus!");
 
-        // Refresh data tabel
+        // Refresh/muat ulang tabel setelah berhasil menghapus
+        if (typeof loadMutasiData === 'function') await loadMutasiData();
         if (typeof fetchData === 'function') await fetchData();
 
     } catch (err) {
-        console.error("Gagal Hapus Data:", err);
+        console.error("Gagal menghapus data:", err);
         alert("Gagal menghapus data: " + err.message);
     } finally {
         if (typeof showLoading === 'function') showLoading(false);
@@ -2732,7 +2738,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (e.target && typeof e.target.reset === 'function') e.target.reset();
-                if (typeof cancelEdit === 'function') cancelEdit();
+                if (typeof cancelEdit === 'function') cancelEdit();                           
                 if (typeof loadMutasiData === 'function') loadMutasiData();
                 if (typeof fetchData === 'function') fetchData();
 
