@@ -2589,13 +2589,12 @@ async function handleStockSubmit(e) {
 window.renderRekapRincian = renderRekapRincian;
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Pasang event listener form mutasi secara aman (VERSI BARU)
     const stockForm = document.getElementById('stock-form');
     if (stockForm) {
         stockForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            // Helper aman untuk mengambil nilai input
+            // Helper aman untuk ambil value
             const getVal = (id) => {
                 const el = document.getElementById(id);
                 return el ? el.value : '';
@@ -2607,6 +2606,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const jenis = getVal('input-jenis');
             const tpk = getVal('input-tpk');
             const petak = getVal('input-petak');
+            
+            // Ambil input SM dari UI Form
             const inSM = parseFloat(getVal('input-in-sm')) || 0;
             const outSM = parseFloat(getVal('input-out-sm')) || 0;
 
@@ -2619,41 +2620,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // Hitung konversi M³
+            // Hitung hasil konversi ke M³
             const inM3 = inSM * faktorKonversi;
             const outM3 = outSM * faktorKonversi;
 
+            // 💡 SESUAIKAN DENGAN NAMA KOLOM SUPABASE KAMU
+            // Memasukkan hasil hitungan M³ ke kolom masuk_m3 dan keluar_m3
             const payload = {
                 tanggal: date,
                 keterangan: ket,
                 jenis_kayu: jenis,
                 tpk: tpk,
                 petak: petak,
-                masuk_sm: inSM,
-                keluar_sm: outSM,
-                masuk_m3: inM3,
-                keluar_m3: outM3
+                masuk_m3: inM3,   // Simpan hasil hitungan M³
+                keluar_m3: outM3   // Simpan hasil hitungan M³
             };
 
             try {
                 if (typeof showLoading === 'function') showLoading(true);
 
                 if (editId) {
-                    // UPDATE DATA
-                    const { error } = await api.from('mutasi_stok').update(payload).eq('id', editId);
+                    // UPDATE ke tabel 'stok_kayu'
+                    const { error } = await api.from('stok_kayu').update(payload).eq('id', editId);
                     if (error) throw error;
                     alert("Data berhasil diperbarui!");
                 } else {
-                    // INSERT DATA BARU
-                    const { error } = await api.from('mutasi_stok').insert([payload]);
+                    // INSERT ke tabel 'stok_kayu'
+                    const { error } = await api.from('stok_kayu').insert([payload]);
                     if (error) throw error;
-                    alert(`Data berhasil disimpan!\nKonversi: ${inSM} SM = ${inM3.toFixed(2)} M³`);
+                    alert(`Data berhasil disimpan!\n${inSM} SM x ${faktorKonversi} = ${inM3.toFixed(2)} M³`);
                 }
 
+                if (e.target && typeof e.target.reset === 'function') e.target.reset();
                 if (typeof cancelEdit === 'function') cancelEdit();
                 if (typeof loadMutasiData === 'function') loadMutasiData();
+                if (typeof fetchData === 'function') fetchData();
 
             } catch (err) {
+                console.error("Database Error:", err);
                 alert("Gagal menyimpan data: " + err.message);
             } finally {
                 if (typeof showLoading === 'function') showLoading(false);
@@ -2661,7 +2665,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 2. Jalankan Inisialisasi Aplikasi
     if (state.isLoggedIn) {
         if (typeof startApp === 'function') startApp();
     } else {
