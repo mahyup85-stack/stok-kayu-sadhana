@@ -1186,48 +1186,51 @@ function logout() {
     location.reload();
 }
 
-
+// ==========================================
+// FUNGSI GLOBAL EDIT DATA
+// ==========================================
 window.editData = function(id) {
+    console.log("Mengedit data ID:", id);
+    
+    // 1. Cari data di memori/state berdasarkan ID
     const item = state.mutasiData ? state.mutasiData.find(d => d.id == id) : null;
     if (!item) {
         alert("Data tidak ditemukan!");
         return;
     }
 
-    const setInputValue = (elementId, value) => {
+    const setVal = (elementId, value) => {
         const el = document.getElementById(elementId);
         if (el) el.value = value || '';
     };
 
-    // Cari faktor konversi jenis kayu
+    // 2. Hitung balik nilai SM dari M³ (M³ / Faktor Konversi)
     let faktorKonversi = 1;
+    const jenis = (item.jenis_kayu || '').trim().toLowerCase();
+    
     if (state.master && state.master['jenis_kayu']) {
-        const itemKayu = state.master['jenis_kayu'].find(k => k.name === item.jenis_kayu);
+        const itemKayu = state.master['jenis_kayu'].find(
+            k => k.name && k.name.trim().toLowerCase() === jenis
+        );
         if (itemKayu && itemKayu.konversi) {
             faktorKonversi = parseFloat(itemKayu.konversi);
         }
     }
 
-    // Hitung estimasi SM kembali (Nilai M³ / Faktor Konversi)
     const valInM3 = parseFloat(item.masuk_m3) || 0;
     const valOutM3 = parseFloat(item.keluar_m3) || 0;
-    
-    const estimatedInSM = valInM3 > 0 ? (valInM3 / faktorKonversi) : 0;
-    const estimatedOutSM = valOutM3 > 0 ? (valOutM3 / faktorKonversi) : 0;
 
-    // Isi form
-    setInputValue('edit-id', item.id);
-    setInputValue('input-date', item.tanggal);
-    setInputValue('input-ket', item.keterangan);
-    setInputValue('input-jenis', item.jenis_kayu);
-    setInputValue('input-tpk', item.tpk);
-    setInputValue('input-petak', item.petak);
-    
-    // ✅ MASUKKAN HASIL HITUNGAN SM KE INPUT FORM
-    setInputValue('input-in-sm', estimatedInSM);
-    setInputValue('input-out-sm', estimatedOutSM);
+    // 3. Masukkan data lama ke Form Input
+    setVal('edit-id', item.id);
+    setVal('input-date', item.tanggal);
+    setVal('input-ket', item.keterangan);
+    setVal('input-jenis', item.jenis_kayu);
+    setVal('input-tpk', item.tpk);
+    setVal('input-petak', item.petak);
+    setVal('input-in-sm', valInM3 > 0 ? (valInM3 / faktorKonversi) : 0);
+    setVal('input-out-sm', valOutM3 > 0 ? (valOutM3 / faktorKonversi) : 0);
 
-    // Ubah Judul & Tombol Form ke Mode Edit
+    // 4. Ubah tampilan judul & tombol mode edit
     const titleEl = document.getElementById('form-mode-title');
     if (titleEl) titleEl.innerText = "Edit Data Mutasi";
 
@@ -1237,16 +1240,54 @@ window.editData = function(id) {
     const btnCancel = document.getElementById('btn-cancel-edit');
     if (btnCancel) btnCancel.classList.remove('hidden');
 
+    // 5. Scroll otomatis ke posisi form input
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-// Fungsi Batal Edit
-window.cancelEdit = function() {
-    const form = document.getElementById('stock-form');
-    if (form) form.reset();
+// ==========================================
+// FUNGSI GLOBAL HAPUS DATA
+// ==========================================
+window.deleteData = async function(id) {
+    if (!confirm("Apakah Anda yakin ingin menghapus data ini?")) return;
 
-    const editIdEl = document.getElementById('edit-id');
-    if (editIdEl) editIdEl.value = '';
+    try {
+        if (typeof showLoading === 'function') showLoading(true);
+
+        const { error } = await api
+            .from('stok_kayu')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+
+        alert("Data berhasil dihapus!");
+        
+        // Memuat ulang data dari database
+        if (typeof loadMutasiData === 'function') loadMutasiData();
+        if (typeof fetchData === 'function') fetchData();
+
+    } catch (err) {
+        console.error("Gagal menghapus:", err);
+        alert("Gagal menghapus data: " + err.message);
+    } finally {
+        if (typeof showLoading === 'function') showLoading(false);
+    }
+};
+
+// ==========================================
+// FUNGSI BATAL EDIT
+// ==========================================
+window.cancelEdit = function() {
+    const setVal = (elementId, value) => {
+        const el = document.getElementById(elementId);
+        if (el) el.value = value;
+    };
+
+    setVal('edit-id', '');
+    setVal('input-ket', '');
+    setVal('input-petak', '');
+    setVal('input-in-sm', 0);
+    setVal('input-out-sm', 0);
 
     const titleEl = document.getElementById('form-mode-title');
     if (titleEl) titleEl.innerText = "Input Mutasi";
@@ -1258,85 +1299,63 @@ window.cancelEdit = function() {
     if (btnCancel) btnCancel.classList.add('hidden');
 };
 
-// AGAR BISA DIPANGGIL OLEH TOMBOL DI HTML
-window.cancelEdit = function () {
-    console.log("Membatalkan edit...");
-    const form = document.getElementById('stock-form');
-    if (form) form.reset();
-
-    document.getElementById('edit-id').value = "";
-    document.getElementById('form-mode-title').innerText = "Input Mutasi";
-
-    const btnSubmit = document.getElementById('btn-submit');
-    btnSubmit.innerText = "Simpan";
-    btnSubmit.style.backgroundColor = "";
-
-    document.getElementById('btn-cancel-edit').classList.add('hidden');
-};
-
-// 1. Fungsi Hapus Baris Tunggal
-// Gunakan window agar tombol HTML bisa "melihat" fungsi ini
-window.deleteData = async function (id) {
-    console.log("Proses Hapus ID:", id);
-
-    if (!confirm("Hapus data ini secara permanen?")) return;
-
-    try {
-        showLoading(true);
-
-        // Eksekusi hapus ke cloud
-        const { error } = await api
-            .from('stok_kayu')
-            .delete()
-            .eq('id', id);
-
-        if (error) throw error;
-
-        alert("Data berhasil dihapus!");
-
-        // Refresh data dan tabel otomatis
-        await fetchData();
-
-    } catch (err) {
-        console.error("Gagal Hapus:", err.message);
-        alert("Gagal menghapus: " + err.message);
-    } finally {
-        showLoading(false);
-    }
-};
+// ==========================================
+// 1. FUNGSI HAPUS MASSAL (deleteSelected)
+// ==========================================
 window.deleteSelected = async function () {
-    // Ambil semua checkbox yang dicentang
-    const checkboxes = document.querySelectorAll('.data-checkbox:checked');
-    const idsToDelete = Array.from(checkboxes).map(cb => cb.getAttribute('data-id'));
+    // 💡 Diperbaiki: Mengambil checkbox dengan class '.row-checkbox' yang dicentang
+    const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+    
+    // 💡 Diperbaiki: Mengambil value id (bisa via cb.value atau cb.getAttribute('data-id'))
+    const idsToDelete = Array.from(checkboxes).map(cb => cb.value || cb.getAttribute('data-id'));
 
     if (idsToDelete.length === 0) {
         alert("Pilih data yang ingin dihapus terlebih dahulu.");
         return;
     }
 
-    if (!confirm(`Hapus ${idsToDelete.length} data terpilih?`)) return;
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${idsToDelete.length} data terpilih?`)) return;
 
     try {
-        showLoading(true);
+        if (typeof showLoading === 'function') showLoading(true);
+
         const { error } = await api
             .from('stok_kayu')
             .delete()
-            .in('id', idsToDelete); // Menghapus semua ID yang ada di dalam list
+            .in('id', idsToDelete); // Menghapus massal berdasarkan array ID
 
         if (error) throw error;
 
-        alert("Data terpilih berhasil dihapus!");
-        await fetchData();
+        alert(`${idsToDelete.length} data terpilih berhasil dihapus!`);
+        
+        // Uncheck header 'Select All' jika ada
+        const selectAllHeader = document.getElementById('select-all-header');
+        if (selectAllHeader) selectAllHeader.checked = false;
+
+        // Refresh data tabel
+        if (typeof fetchData === 'function') await fetchData();
+        if (typeof loadMutasiData === 'function') await loadMutasiData();
+
     } catch (err) {
+        console.error("Gagal Hapus Massal:", err);
         alert("Gagal menghapus massal: " + err.message);
     } finally {
-        showLoading(false);
+        if (typeof showLoading === 'function') showLoading(false);
     }
 };
-function toggleSelectAll(source) {
+
+// ==========================================
+// 2. FUNGSI TOGGLE SELECT ALL (toggleSelectAll)
+// ==========================================
+// Pasang fungsi ini di script.js (bisa di luar DOMContentLoaded)
+window.toggleSelectAll = function(source) {
+    // Ambil semua checkbox baris yang punya class 'row-checkbox'
     const checkboxes = document.querySelectorAll('.row-checkbox');
-    checkboxes.forEach(cb => cb.checked = source.checked);
-}
+    checkboxes.forEach(cb => {
+        cb.checked = source.checked;
+    });
+};
+
 // RENDER UI & TABLES
 function renderUI() {
     // 1. Definisikan variabel dengan benar
@@ -1531,21 +1550,19 @@ function renderFilteredTable(filteredData) {
     // Update info jumlah data ditemukan
     console.log(`Ditemukan: ${filteredData.length} baris`);
 }
-// ==========================================
-// CONTOH FUNGSI RENDER TABEL YANG BENAR
-// ==========================================
+
 function renderMutasiTable(data) {
-    const tbody = document.getElementById('mutasi-tbody'); // Sesuaikan dengan ID tbody kamu
+    const tbody = document.getElementById('main-table-body'); // SESUAI DENGAN ID HTML KAMU
     if (!tbody) return;
 
     if (!data || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center;">Tidak ada data mutasi</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 15px;">Tidak ada data mutasi</td></tr>`;
         return;
     }
 
     tbody.innerHTML = data.map(item => `
         <tr>
-            <td>
+            <td style="text-align: center;">
                 <input type="checkbox" class="row-checkbox" value="${item.id}">
             </td>
             <td>${item.tanggal || '-'}</td>
@@ -1553,13 +1570,13 @@ function renderMutasiTable(data) {
             <td>${item.jenis_kayu || '-'}</td>
             <td>${item.tpk || '-'}</td>
             <td>${item.petak || '-'}</td>
-            <td>${parseFloat(item.masuk_m3 || 0).toFixed(2)}</td>
-            <td>${parseFloat(item.keluar_m3 || 0).toFixed(2)}</td>
-            <td style="text-align: center;">
+            <td style="text-align: right;">${parseFloat(item.masuk_m3 || 0).toFixed(2)}</td>
+            <td style="text-align: right;">${parseFloat(item.keluar_m3 || 0).toFixed(2)}</td>
+            <td style="text-align: center; white-space: nowrap;">
                 <!-- ✏️ TOMBOL EDIT -->
                 <button type="button" 
                         onclick="editData('${item.id}')" 
-                        class="btn-action btn-edit" 
+                        style="background: #f59e0b; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin-right: 4px;" 
                         title="Edit Data">
                     ✏️
                 </button>
@@ -1567,7 +1584,7 @@ function renderMutasiTable(data) {
                 <!-- 🗑️ TOMBOL HAPUS -->
                 <button type="button" 
                         onclick="deleteData('${item.id}')" 
-                        class="btn-action btn-delete" 
+                        style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;" 
                         title="Hapus Data">
                     🗑️
                 </button>
