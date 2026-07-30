@@ -49,15 +49,34 @@ window.showMasterModal = function(type) {
     // 3. Render list datanya
     renderMasterList();
 };
+
+// ==========================================
+// FUNGSI MASTER DATA (LENGKAP & SINKRON)
+// ==========================================
+
+// 1. Alias agar dipanggil 'showMasterModal' atau 'openMasterModal' tetap jalan
+window.showMasterModal = function (type) {
+    window.openMasterModal(type);
+};
+
 window.openMasterModal = async function (type) {
     state.currentMasterType = type;
+    
     const modal = document.getElementById('master-modal');
-    const title = document.getElementById('master-title');
-    const listEl = document.getElementById('master-list');
+    const title = document.getElementById('modal-title') || document.getElementById('master-title');
+    // Sinkronkan ID target list dengan HTML (master-list-body atau master-list)
+    const listEl = document.getElementById('master-list-body') || document.getElementById('master-list');
 
-    title.innerText = (type === 'tpk') ? 'Kelola Master TPK' : 'Kelola Master Jenis Kayu';
-    listEl.innerHTML = '<tr><td colspan="2" class="text-center">Memuat data...</td></tr>';
+    if (!modal || !listEl) {
+        console.error("Elemen modal atau tabel master tidak ditemukan di HTML!");
+        return;
+    }
 
+    if (title) {
+        title.innerText = (type === 'tpk') ? 'Kelola Master TPK' : 'Kelola Master Jenis Kayu';
+    }
+
+    listEl.innerHTML = '<tr><td colspan="3" class="text-center">Memuat data...</td></tr>';
     modal.classList.remove('hidden');
 
     try {
@@ -70,20 +89,62 @@ window.openMasterModal = async function (type) {
 
         if (error) throw error;
 
-        // SIMPAN KE STATE agar renderMasterList bisa baca
+        // SIMPAN KE STATE
+        if (!state.master) state.master = {};
         state.master[type] = data;
 
         renderMasterList();
     } catch (err) {
         console.error("Gagal load master:", err.message);
-        listEl.innerHTML = '<tr><td colspan="2" class="text-center" style="color:red;">Gagal memuat data</td></tr>';
+        listEl.innerHTML = '<tr><td colspan="3" class="text-center" style="color:red;">Gagal memuat data</td></tr>';
     }
 };
 
+// 2. Fungsi Tutup Modal (Mencegah error 'closeMasterModal is not defined')
+window.closeMasterModal = function () {
+    const modal = document.getElementById('master-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+};
+
+// 3. Render List Master
+window.renderMasterList = function () {
+    const listEl = document.getElementById('master-list-body') || document.getElementById('master-list');
+    const type = state.currentMasterType;
+
+    if (!listEl) return;
+
+    const searchInput = document.getElementById('master-search');
+    const searchTerm = searchInput ? searchInput.value.toLowerCase() : "";
+
+    const masterData = (state.master && state.master[type]) ? state.master[type] : [];
+
+    const filteredData = masterData.filter(item =>
+        item.name && item.name.toLowerCase().includes(searchTerm)
+    );
+
+    if (filteredData.length === 0) {
+        listEl.innerHTML = '<tr><td colspan="3" class="text-center" style="padding:10px; color:#888;">Tidak ada data</td></tr>';
+        return;
+    }
+
+    listEl.innerHTML = filteredData.map((item, index) => `
+        <tr>
+            <td style="padding:8px; border-bottom:1px solid #eee; text-align:center;">${index + 1}</td>
+            <td style="padding:8px; border-bottom:1px solid #eee;">${item.name}</td>
+            <td style="padding:8px; border-bottom:1px solid #eee;" class="text-center">
+                <button type="button" onclick="deleteMasterItem('${item.id}')" style="background:none; border:none; cursor:pointer; font-size:16px;">🗑️</button>
+            </td>
+        </tr>
+    `).join('');
+};
+
+// 4. Handle Submit Tambah Data
 window.handleMasterSubmit = async function (event) {
     event.preventDefault();
 
-    const inputEl = document.getElementById('master-input');
+    const inputEl = document.getElementById('master-input-nama') || document.getElementById('master-input');
     const type = state.currentMasterType;
 
     if (!inputEl || !inputEl.value.trim()) {
@@ -94,9 +155,8 @@ window.handleMasterSubmit = async function (event) {
     const name = inputEl.value.trim();
 
     try {
-        showLoading(true);
+        if (typeof showLoading === 'function') showLoading(true);
 
-        // Simpan ke Supabase menggunakan variabel 'api'
         const { data, error } = await api
             .from('master_data')
             .insert([{ name: name, type: type }])
@@ -104,66 +164,35 @@ window.handleMasterSubmit = async function (event) {
 
         if (error) throw error;
 
-        // Tambahkan ke state agar list langsung terupdate
+        if (!state.master) state.master = {};
         if (!state.master[type]) state.master[type] = [];
+        
         state.master[type].push(data[0]);
 
-        // Reset & Refresh
         inputEl.value = "";
         renderMasterList();
 
-        // Update dropdown di form mutasi
-        if (type === 'tpk') renderTPKDropdown();
-        else renderJenisKayuDropdown();
+        // Update dropdown form
+        if (type === 'tpk' && typeof renderTPKDropdown === 'function') renderTPKDropdown();
+        if (type !== 'tpk' && typeof renderJenisKayuDropdown === 'function') renderJenisKayuDropdown();
 
         alert(`Berhasil menambahkan "${name}"`);
     } catch (err) {
         console.error(err);
         alert("Gagal menyimpan: " + err.message);
     } finally {
-        showLoading(false);
+        if (typeof showLoading === 'function') showLoading(false);
     }
 };
 
-window.renderMasterList = function () {
-    const listEl = document.getElementById('master-list');
-    const type = state.currentMasterType;
-
-    // PERBAIKAN: Gunakan optional chaining atau cek apakah elemennya ada
-    const searchInput = document.getElementById('master-search');
-    const searchTerm = searchInput ? searchInput.value.toLowerCase() : "";
-
-    // Filter data (jika searchInput tidak ada, searchTerm kosong "" dan semua data tampil)
-    const filteredData = (state.master[type] || []).filter(item =>
-        item.name.toLowerCase().includes(searchTerm)
-    );
-
-    // Pastikan tidak ada .slice() agar tampil semua
-    const dataToShow = filteredData;
-
-    listEl.innerHTML = dataToShow.map((item, index) => `
-        <tr>
-            <td style="padding:8px; border-bottom:1px solid #eee;">${index + 1}</td>
-            <td style="padding:8px; border-bottom:1px solid #eee;">${item.name}</td>
-            <td style="padding:8px; border-bottom:1px solid #eee;" class="text-center">
-                <button onclick="deleteMasterItem('${item.id}')" class="btn-action btn-danger">🗑️</button>
-            </td>
-        </tr>
-    `).join('');
-
-    // Sembunyikan pagination saat modal terbuka
-    const paginationContainer = document.getElementById('pagination-container');
-    if (paginationContainer) {
-        paginationContainer.style.display = 'none';
-    }
-};
-
-async function deleteMasterItem(id) {
+// 5. Delete Item
+window.deleteMasterItem = async function (id) {
     const type = state.currentMasterType;
     if (!confirm(`Hapus item ini dari master ${type}?`)) return;
 
     try {
-        showLoading(true);
+        if (typeof showLoading === 'function') showLoading(true);
+        
         const { error } = await api
             .from('master_data')
             .delete()
@@ -171,22 +200,21 @@ async function deleteMasterItem(id) {
 
         if (error) throw error;
 
-        // Filter state lokal agar yang dihapus hilang dari layar
         state.master[type] = state.master[type].filter(item => item.id != id);
 
         renderMasterList();
 
-        // Update dropdown UI di form input
-        if (type === 'tpk') renderTPKDropdown();
-        else renderJenisKayuDropdown();
+        if (type === 'tpk' && typeof renderTPKDropdown === 'function') renderTPKDropdown();
+        if (type !== 'tpk' && typeof renderJenisKayuDropdown === 'function') renderJenisKayuDropdown();
 
         alert("Data berhasil dihapus!");
     } catch (err) {
         alert("Gagal menghapus: " + err.message);
     } finally {
-        showLoading(false);
+        if (typeof showLoading === 'function') showLoading(false);
     }
-}
+};
+
 // Modifikasi fungsi renderDashboardTable
 function renderDashboardTable(dataToRender = null) {
     const tableBody = document.getElementById("main-table-body");
