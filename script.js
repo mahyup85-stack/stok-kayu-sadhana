@@ -223,14 +223,18 @@ window.renderMasterList = function () {
 // ==========================================
 // 3. LOGIKA INPUT MUTASI (SM KHUSUS DIKONVERSI KE M³)
 // ==========================================
+// ==========================================
+// HANDLER SUBMIT (INSERT & UPDATE)
+// ==========================================
 window.handleStockSubmit = async function (event) {
     event.preventDefault();
 
+    const editId = document.getElementById('edit-id').value; // Cek ID untuk mode Edit
     const date = document.getElementById('input-date').value;
     const ket = document.getElementById('input-ket').value;
     const jenis = document.getElementById('input-jenis').value;
     const tpk = document.getElementById('input-tpk').value;
-    const petak = document.getElementById('input-petak').value;
+    const petak = document.getElementById('input-petak').value || '-';
     
     // Ambil Input Satuan SM
     const inSM = parseFloat(document.getElementById('input-in-sm').value) || 0;
@@ -245,8 +249,7 @@ window.handleStockSubmit = async function (event) {
         }
     }
 
-    // HITUNG NILAI M3 ( Nilai SM * Faktor Konversi )
-    // Contoh: 5 SM * 0.59 = 2.95 M3
+    // HITUNG NILAI M3
     const inM3 = inSM * faktorKonversi;
     const outM3 = outSM * faktorKonversi;
 
@@ -256,31 +259,50 @@ window.handleStockSubmit = async function (event) {
         jenis_kayu: jenis,
         tpk: tpk,
         petak: petak,
-        masuk_m3: inM3,   // Nilai M3 yang sudah dikonversi
-        keluar_m3: outM3   // Nilai M3 yang sudah dikonversi
+        masuk_m3: inM3,
+        keluar_m3: outM3
     };
 
     try {
         if (typeof showLoading === 'function') showLoading(true);
 
-        const { data, error } = await api
-            .from('mutasi_stok')
-            .insert([payload]);
+        if (editId) {
+            // MODE UPDATE DATA
+            const { error } = await api
+                .from('stok_kayu')
+                .update(payload)
+                .eq('id', editId);
 
-        if (error) throw error;
+            if (error) throw error;
+            alert("Data Berhasil Diperbarui!");
+        } else {
+            // MODE INSERT DATA BARU
+            const { error } = await api
+                .from('stok_kayu')
+                .insert([payload]);
 
-        alert(`Data Berhasil Disimpan!\nMasuk: ${inSM} SM = ${inM3.toFixed(2)} M³ (Faktor: ${faktorKonversi})`);
-        
-        // Reset Form & Refresh Tabel
-        document.getElementById('stock-form').reset();
-        if (typeof loadMutasiData === 'function') loadMutasiData();
+            if (error) throw error;
+            alert(`Data Berhasil Disimpan!\nMasuk: ${inSM} SM = ${inM3.toFixed(2)} M³ (Faktor: ${faktorKonversi})`);
+        }
+
+        // Reset Form, Kembali ke mode normal & Refresh Tabel
+        cancelEdit();
+        if (typeof fetchData === 'function') await fetchData();
 
     } catch (err) {
-        alert("Gagal menyimpan mutasi: " + err.message);
+        alert("Gagal menyimpan/mengubah mutasi: " + err.message);
     } finally {
         if (typeof showLoading === 'function') showLoading(false);
     }
 };
+
+// Hubungkan Event Listener Form ke handleStockSubmit saat DOM Siap
+document.addEventListener('DOMContentLoaded', () => {
+    const stockForm = document.getElementById('stock-form');
+    if (stockForm) {
+        stockForm.onsubmit = window.handleStockSubmit;
+    }
+});
 
 // 5. Delete Item
 window.deleteMasterItem = async function (id) {
@@ -1189,9 +1211,13 @@ function logout() {
 // ==========================================
 // 1. FUNGSI EDIT DATA (Mengubah Form ke Mode Update)
 // ==========================================
+// ==========================================
+// FUNGSI EDIT DATA
+// ==========================================
 window.editData = function(id) {
     const cleanId = String(id).trim();
-    const item = state.mutasiData ? state.mutasiData.find(d => String(d.id).trim() === cleanId) : null;
+    // PERBAIKAN: Gunakan state.data, bukan state.mutasiData
+    const item = state.data ? state.data.find(d => String(d.id).trim() === cleanId) : null;
     
     if (!item) {
         alert("Data tidak ditemukan!");
@@ -1229,24 +1255,50 @@ window.editData = function(id) {
     setVal('input-in-sm', valInM3 > 0 ? (valInM3 / faktorKonversi) : 0);
     setVal('input-out-sm', valOutM3 > 0 ? (valOutM3 / faktorKonversi) : 0);
 
-    // 2. 🔄 UBAH TOMBOL & JUDUL KE MODE UPDATE
+    // 2. Ubah Tombol & Judul ke Mode Update
     const titleEl = document.getElementById('form-mode-title');
     if (titleEl) titleEl.innerText = "Edit Data Mutasi";
 
     const btnSubmit = document.getElementById('btn-submit');
     if (btnSubmit) {
-        btnSubmit.innerText = "Update Data"; // Mengubah teks Simpan -> Update Data
-        btnSubmit.classList.add('btn-warning'); // (Opsional) Tambah style jika ada
+        btnSubmit.innerText = "Update Data";
     }
 
     const btnCancel = document.getElementById('btn-cancel-edit');
-    if (btnCancel) btnCancel.classList.remove('hidden'); // Memunculkan tombol Batal
+    if (btnCancel) btnCancel.classList.remove('hidden');
 
     // 3. Scroll halus ke bagian form
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
+// ==========================================
+// FUNGSI HAPUS SATUAN (DELETE)
+// ==========================================
+window.deleteData = async function (id) {
+    if (!confirm("Apakah Anda yakin ingin menghapus data ini?")) return;
 
+    try {
+        if (typeof showLoading === 'function') showLoading(true);
+
+        const { error } = await api
+            .from('stok_kayu')
+            .delete()
+            .eq('id', id);
+
+        if (error) throw error;
+
+        alert("Data berhasil dihapus!");
+
+        // Refresh data tabel
+        if (typeof fetchData === 'function') await fetchData();
+
+    } catch (err) {
+        console.error("Gagal Hapus Data:", err);
+        alert("Gagal menghapus data: " + err.message);
+    } finally {
+        if (typeof showLoading === 'function') showLoading(false);
+    }
+};
 // ==========================================
 // 2. FUNGSI BATAL EDIT (Kembali ke Mode Simpan)
 // ==========================================
