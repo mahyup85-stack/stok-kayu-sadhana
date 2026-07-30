@@ -690,67 +690,54 @@
                 </div>
 
             </header>
-            <div class="card sticky-form">
-    <h4 id="form-mode-title" style="margin-bottom: 15px">Input Mutasi</h4>
-    <form id="stock-form" class="form-grid">
-        <input type="hidden" id="edit-id" value="" />
-        
-        <div class="form-group">
-            <label>Tanggal</label>
-            <input type="date" id="input-date" required />
-        </div>
-        
-        <div class="form-group">
-            <label>Keterangan</label>
-            <input type="text" id="input-ket" placeholder="BAP, LHP, atau Kirim" required />
-        </div>
-        
-        <!-- 💡 Ditambahkan event onchange agar konversi langsung terhitung saat jenis kayu dipilih -->
-        <div class="form-group">
-            <label>Jenis Kayu</label>
-            <select id="input-jenis" onchange="hitungKonversiForm()" required></select>
-        </div>
-        
-        <div class="form-group">
-            <label>TPK</label>
-            <select id="input-tpk" required></select>
-        </div>
-        
-        <div class="form-group">
-            <label>Petak</label>
-            <input type="text" id="input-petak" placeholder="Nomor Petak" />
-        </div>
-        
-        <!-- 💡 INPUT BARU: Volume SM (Masuk) -->
-        <div class="form-group">
-            <label>Masuk (SM)</label>
-            <input type="number" id="input-in-sm" step="0.01" value="0" oninput="hitungKonversiForm()" placeholder="0" />
-        </div>
+            <div id="view-dashboard">
+                    <!-- Form Input Mutasi (Hanya SM) -->
+                    <div class="card sticky-form">
+                        <h4 id="form-mode-title" style="margin-bottom: 15px">Input Mutasi</h4>
+                        <form id="stock-form" class="form-grid">
+                            <input type="hidden" id="edit-id" value="" />
+                            
+                            <div class="form-group">
+                                <label>Tanggal</label>
+                                <input type="date" id="input-date" required />
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Keterangan</label>
+                                <input type="text" id="input-ket" placeholder="BAP, LHP, atau Kirim" required />
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Jenis Kayu</label>
+                                <select id="input-jenis" required></select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>TPK</label>
+                                <select id="input-tpk" required></select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Petak</label>
+                                <input type="text" id="input-petak" placeholder="Nomor Petak" />
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Masuk (SM)</label>
+                                <input type="number" id="input-in-sm" step="0.01" value="0" placeholder="0" />
+                            </div>
 
-        <!-- 💡 HASIL KONVERSI AUTOMATIS: Masuk (M³) -->
-        <div class="form-group">
-            <label>Masuk (M³)</label>
-            <input type="number" id="input-in" step="0.0001" value="0" readonly style="background-color: #f3f4f6; font-weight: bold;" />
-        </div>
-        
-        <!-- 💡 INPUT BARU: Volume SM (Keluar) -->
-        <div class="form-group">
-            <label>Keluar (SM)</label>
-            <input type="number" id="input-out-sm" step="0.01" value="0" oninput="hitungKonversiForm()" placeholder="0" />
-        </div>
+                            <div class="form-group">
+                                <label>Keluar (SM)</label>
+                                <input type="number" id="input-out-sm" step="0.01" value="0" placeholder="0" />
+                            </div>
 
-        <!-- 💡 HASIL KONVERSI AUTOMATIS: Keluar (M³) -->
-        <div class="form-group">
-            <label>Keluar (M³)</label>
-            <input type="number" id="input-out" step="0.0001" value="0" readonly style="background-color: #f3f4f6; font-weight: bold;" />
-        </div>
-
-        <div style="display: flex; gap: 8px; align-items: flex-end;">
-            <button type="submit" id="btn-submit" class="btn-primary">Simpan</button>
-            <button type="button" id="btn-cancel-edit" class="btn-outline hidden" onclick="cancelEdit()">Batal</button>
-        </div>
-    </form>
-</div>
+                            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                                <button type="submit" id="btn-submit" class="btn-primary">Simpan</button>
+                                <button type="button" id="btn-cancel-edit" class="btn-outline hidden" onclick="cancelEdit()">Batal</button>
+                            </div>
+                        </form>
+                    </div>
 
                     <div
                         style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; padding: 10px; background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
@@ -993,23 +980,37 @@
                 </div>
                 <div id="pagination-container"></div>
 
-                <div id="master-modal" class="modal-overlay hidden">
-                    <div class="modal-box">
-                        <h3 id="master-title" class="text-center">Kelola Master</h3>
-                        <form id="master-form" style="margin:20px 0" onsubmit="handleMasterSubmit(event)">
-                            <input type="text" id="master-input" placeholder="Nama baru..." required />
-                            <button type="submit" class="btn-primary"
-                                style="width:100%; margin-top:10px">Tambahkan</button>
-                        </form>
-                        <div style="max-height:200px; overflow-y:auto; border:1px solid #eee;">
-                            <table style="width:100%">
-                                <tbody id="master-list"></tbody>
-                            </table>
-                        </div>
-                        <button onclick="document.getElementById('master-modal').classList.add('hidden')"
-                            style="width:100%; margin-top:15px; padding:10px; border:none; cursor:pointer;">Tutup</button>
-                    </div>
-                </div>
+                <!-- MODAL POPUP UNTUK MASTER DATA -->
+<div id="master-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <h3 id="modal-title" class="text-center" style="margin-bottom: 15px;">Kelola Master Data</h3>
+        
+        <form id="master-form" style="margin-bottom: 15px;" onsubmit="handleMasterSubmit(event)">
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <input type="text" id="master-input-nama" placeholder="Nama Baru..." required style="width: 100%;" />
+                <input type="number" id="master-input-konversi" step="0.0001" placeholder="Faktor Konversi ke M³ (Khusus Jenis Kayu)" style="width: 100%;" />
+                <button type="submit" class="btn-primary" style="width: 100%;">Tambah / Update</button>
+            </div>
+        </form>
+
+        <div style="max-height: 200px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 6px;">
+            <table style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th style="padding: 8px; text-align: left;">Nama</th>
+                        <th style="padding: 8px; text-align: center;">Faktor</th>
+                        <th style="padding: 8px; text-align: center;">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="master-list-body">
+                    <!-- Data master dinamik dari JavaScript -->
+                </tbody>
+            </table>
+        </div>
+
+        <button type="button" onclick="closeMasterModal()" class="btn-outline" style="width: 100%; margin-top: 15px;">Tutup</button>
+    </div>
+</div>
 
                 <div id="view-kelola-sandi" class="hidden">
                     <div class="card" style="max-width: 400px; margin: 20px auto;">

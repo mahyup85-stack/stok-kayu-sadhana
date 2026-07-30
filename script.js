@@ -2330,28 +2330,33 @@ isSubmitting = false;
 async function handleStockSubmit(e) {
     e.preventDefault();
 
-    // Mencegah klik ganda / eksekusi bersamaan
     if (isSubmitting) return;
     isSubmitting = true;
 
     const editId = document.getElementById('edit-id')?.value;
     const submitBtn = e.target.querySelector('button[type="submit"]');
 
-    // 💡 Pastikan sebelum submit, konversi dihitung ulang agar nilainya akurat
-    hitungKonversiForm();
+    // 1. Ambil nilai jenis kayu & angka SM yang diinput user
+    const jenis = document.getElementById('input-jenis')?.value;
+    const smMasuk = parseFloat(document.getElementById('input-in-sm')?.value) || 0;
+    const smKeluar = parseFloat(document.getElementById('input-out-sm')?.value) || 0;
 
+    // 2. Cari faktor konversi jenis kayu dari state (default 1 jika tidak ada)
+    const faktor = (window.state && window.state.konversiKayu) ? (window.state.konversiKayu[jenis] || 1) : 1;
+
+    // 3. Hitung hasil M3 secara otomatis di belakang layar
+    const m3Masuk = smMasuk * faktor;
+    const m3Keluar = smKeluar * faktor;
+
+    // 4. Masukkan hasil konversi M3 ke data yang akan dikirim ke Supabase
     const formData = {
         tanggal: document.getElementById('input-date').value,
         keterangan: document.getElementById('input-ket').value,
-        jenis_kayu: document.getElementById('input-jenis').value,
+        jenis_kayu: jenis,
         tpk: document.getElementById('input-tpk').value,
         petak: document.getElementById('input-petak').value || "-",
-        
-        // Ambil nilai SM & M3 hasil kalkulasi
-        masuk_sm: parseFloat(document.getElementById('input-in-sm')?.value) || 0,
-        keluar_sm: parseFloat(document.getElementById('input-out-sm')?.value) || 0,
-        masuk_m3: parseFloat(document.getElementById('input-in').value) || 0,
-        keluar_m3: parseFloat(document.getElementById('input-out').value) || 0
+        masuk_m3: m3Masuk,   // 👈 Hasil konversi SM -> M3
+        keluar_m3: m3Keluar  // 👈 Hasil konversi SM -> M3
     };
 
     try {
@@ -2359,20 +2364,17 @@ async function handleStockSubmit(e) {
         if (submitBtn) submitBtn.disabled = true;
 
         if (editId) {
-            // Mode Update
             const { error } = await api.from('stok_kayu').update(formData).eq('id', editId);
             if (error) throw error;
             alert("Data berhasil diperbarui!");
             if (typeof window.cancelEdit === 'function') window.cancelEdit();
         } else {
-            // Mode Simpan Baru
             const { error } = await api.from('stok_kayu').insert([formData]);
             if (error) throw error;
             alert("Data berhasil disimpan!");
-            e.target.reset(); // Kosongkan form
+            e.target.reset(); // Kosongkan form setelah simpan
         }
 
-        // Refresh data tabel
         if (typeof fetchData === 'function') await fetchData();
 
     } catch (err) {
@@ -2381,7 +2383,7 @@ async function handleStockSubmit(e) {
     } finally {
         if (typeof showLoading === 'function') showLoading(false);
         if (submitBtn) submitBtn.disabled = false;
-        isSubmitting = false; // Reset flag penanda submit
+        isSubmitting = false;
     }
 }
 
