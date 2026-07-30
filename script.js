@@ -382,17 +382,7 @@ function renderDashboardTable(dataToRender = null) {
         </tr>
     `).join('');
 
-    // Sembunyikan kontrol pagination jika di halaman Kelola Sandi/Backup
-    const container = document.getElementById("pagination-container");
-    if (container) {
-        container.style.display = isNoPagination ? "none" : "block";
-    }
-
-    if (!isNoPagination) {
-        renderPaginationControls();
-    }
-}
-    // Sembunyikan kontrol pagination jika di halaman Kelola Sandi/Backup
+    // Sembunyikan/Tampilkan kontrol pagination
     const container = document.getElementById("pagination-container");
     if (container) {
         container.style.display = isNoPagination ? "none" : "block";
