@@ -296,34 +296,6 @@ function updateYearDropdowns() {
     });
 }
 
-window.updatePetakByTPK = function () {
-    // Ambil nilai TPK yang sedang dipilih di filter Rincian
-    const tpkVal = document.getElementById('filter-rincian-tpk').value;
-    const petakEl = document.getElementById('filter-rincian-petak');
-
-    if (!petakEl) return;
-
-    // Bersihkan dropdown petak
-    petakEl.innerHTML = '<option value="">-- Semua Petak --</option>';
-
-    if (!tpkVal) {
-        petakEl.disabled = true;
-        return;
-    }
-
-    // Ambil daftar petak unik yang ada di state.data berdasarkan TPK terpilih
-    const filteredData = state.data.filter(d => d.tpk === tpkVal);
-    const daftarPetak = [...new Set(filteredData.map(d => d.petak).filter(Boolean))].sort();
-
-    if (daftarPetak.length > 0) {
-        daftarPetak.forEach(p => {
-            petakEl.innerHTML += `<option value="${p}">${p}</option>`;
-        });
-        petakEl.disabled = false; // Aktifkan kembali jika ada data
-    } else {
-        petakEl.disabled = true; // Tetap mati jika tidak ada petak untuk TPK tersebut
-    }
-};
 
 function render() {
     // Pastikan data master diambil langsung dari state yang sudah terisi
@@ -461,63 +433,93 @@ window.initSemuaFilter = function () {
 
     console.log("✅ Filter Sinkron. TPK:", daftarTPK.length, "Tahun:", daftarTahun);
 };
-window.updatePetakByTPK = function () {
-    const tpkVal = document.getElementById('filter-tpk').value;
-    const petakSelect = document.getElementById('filter-petak');
+window.updatePetakByTPK = function (tpkSelectId = 'filter-tpk', petakSelectId = 'filter-petak') {
+    const tpkEl = document.getElementById(tpkSelectId);
+    const petakEl = document.getElementById(petakSelectId);
 
-    if (!petakSelect) return;
+    if (!petakEl) return;
 
-    // Reset & Aktifkan
-    petakSelect.innerHTML = '<option value="">-- Semua Petak --</option>';
-    petakSelect.disabled = false;
+    // Reset dropdown petak
+    petakEl.innerHTML = '<option value="">-- Semua Petak --</option>';
 
-    if (!tpkVal || !state.data) return;
+    const tpkVal = tpkEl ? tpkEl.value : '';
 
-    const availablePetaks = [...new Set(state.data
-        .filter(d => String(d.tpk) === String(tpkVal) && d.petak)
-        .map(d => d.petak)
-    )].sort();
+    if (!tpkVal || !state.data) {
+        petakEl.disabled = true;
+        return;
+    }
 
-    availablePetaks.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p;
-        opt.textContent = p;
-        petakSelect.appendChild(opt);
+    // Filter data tanpa peduli spasi & huruf besar/kecil (Paling Aman)
+    const matchingData = state.data.filter(d =>
+        String(d.tpk || "").trim().toLowerCase() === String(tpkVal || "").trim().toLowerCase()
+    );
 
-    });
-    console.log("✅ Petak Ringkasan terisi:", availablePetaks.length);
+    // Ambil daftar petak unik & urutkan
+    const uniquePetaks = [...new Set(matchingData.map(d => d.petak).filter(Boolean))].sort();
+
+    if (uniquePetaks.length > 0) {
+        uniquePetaks.forEach(p => {
+            const opt = document.createElement('option');
+            opt.value = p;
+            opt.textContent = p;
+            petakEl.appendChild(opt);
+        });
+        petakEl.disabled = false;
+    } else {
+        petakEl.disabled = true;
+    }
+};
+
+// --- FUNGSI SPESIFIK UNTUK TABEL RINCIAN (JIKA DIBUTUHKAN DI HTML) ---
+window.updatePetakRincianByTPK = function () {
+    window.updatePetakByTPK('filter-rincian-tpk', 'filter-rincian-petak');
 };
 
 // 2. UNTUK BAGIAN RINCIAN MUTASI
 // Fungsi khusus untuk filter di bagian Rincian Mutasi
 
-async function startApp() {
-    try {
-        showLoading(true);
-        const URL = 'https://fcccuqnyxuwsrddlookt.supabase.co';
-        const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjY2N1cW55eHV3c3JkZGxvb2t0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NDU2NzQsImV4cCI6MjA4NTQyMTY3NH0.w9p0yxWW1CtLm3Gj3uD1z3P1eWQxW_hB288iUwkfCd8'; // Gunakan Key Anda
+// Variable flag untuk mencegah startApp dijalankan bersamaan
+let isAppInitializing = false;
 
-        if (!api) {
+async function startApp() {
+    // 1. CEK FLAG: Jika sedang dalam proses inisialisasi, hentikan eksekusi ganda
+    if (isAppInitializing) {
+        console.warn("⚠️ startApp() sedang berjalan, mengabaikan panggilan duplikat.");
+        return;
+    }
+
+    try {
+        isAppInitializing = true; // Tandai bahwa aplikasi mulai loading
+        showLoading(true);
+
+        const URL = 'https://fcccuqnyxuwsrddlookt.supabase.co';
+        const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjY2N1cW55eHV3c3JkZGxvb2t0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NDU2NzQsImV4cCI6MjA4NTQyMTY3NH0.w9p0yxWW1CtLm3Gj3uD1z3P1eWQxW_hB288iUwkfCd8';
+
+        if (!api && window.supabase) {
             api = window.supabase.createClient(URL, KEY);
         }
 
-        // Menarik data secara paralel
+        // 2. Tarik Data Transaksi & Master secara paralel
         await Promise.all([
             fetchData(),
             loadDataMaster()
         ]);
 
-        if (window.initLiveSearchDashboard) {
+        // 3. Inisialisasi Pencarian Live
+        if (typeof window.initLiveSearchDashboard === 'function') {
             window.initLiveSearchDashboard();
         }
 
         console.log("✅ Aplikasi Siap: Data Transaksi & Master sinkron.");
+
     } catch (err) {
-        console.error("Gagal memulai:", err.message);
+        console.error("❌ Gagal memulai aplikasi:", err.message);
     } finally {
         showLoading(false);
+        isAppInitializing = false; // Reset flag setelah selesai
     }
 }
+
 function renderFilterSaldo() {
     // Definisikan variabelnya di sini agar tidak 'not defined'
     const elFilterJenisSaldo = document.getElementById('filter-jenis');
@@ -554,20 +556,6 @@ async function loadDataMaster() {
     } catch (err) {
         // Jangan biarkan error render menghentikan proses load data
         console.error("❌ Gagal render dropdown master:", err.message);
-    }
-}
-// 5. Render Dropdown (ID HTML harus sesuai: input-tpk & input-jenis)
-function renderAllDropdowns() {
-    const elTPK = document.getElementById("input-tpk");
-    const elJenis = document.getElementById("input-jenis");
-
-    if (elTPK) {
-        elTPK.innerHTML = '<option value="">-- Pilih TPK --</option>' +
-            state.master["tpk"].map(m => `<option value="${m.name}">${m.name}</option>`).join("");
-    }
-    if (elJenis) {
-        elJenis.innerHTML = '<option value="">-- Pilih Jenis --</option>' +
-            state.master["jenis_kayu"].map(m => `<option value="${m.name}">${m.name}</option>`).join("");
     }
 }
 
@@ -684,13 +672,12 @@ async function fetchData() {
         state.filteredData = [...state.data]; // Sinkronkan data filter awal
         state.currentPage = 1; // Reset ke halaman pertama setiap kali refresh data
 
-        // 4. Jalankan inisialisasi filter dropdown
-        if (window.initSemuaFilter) window.initSemuaFilter();
-        if (typeof window.sinkronisasiFilterRincian === 'function') {
-            window.sinkronisasiFilterRincian();
+        // 4. Cukup panggil initSemuaFilter di sini (ia akan mengatur semua filter dropdown secara terpusat)
+        if (typeof window.initSemuaFilter === 'function') {
+            window.initSemuaFilter();
         }
 
-        // 5. PENTING: Render Tabel dengan Pagination
+        // 5. Render Tabel Utama
         renderDashboardTable();
 
         console.log("✅ Data berhasil dimuat. Total:", state.data.length, "baris.");
@@ -703,17 +690,6 @@ async function fetchData() {
         if (document.getElementById(idDari)) document.getElementById(idDari).disabled = false;
         if (document.getElementById(idSampai)) document.getElementById(idSampai).disabled = false;
         showLoading(false);
-    }
-
-
-    // Pastikan ini ada di bagian akhir try blok
-    if (typeof window.sinkronisasiFilterRincian === 'function') {
-        window.sinkronisasiFilterRincian();
-    }
-
-    // Panggil juga pengisi tahun jika diperlukan
-    if (typeof window.updateYearDropdowns === 'function') {
-        window.updateYearDropdowns();
     }
 }
 
@@ -1004,42 +980,6 @@ function getNextId() {
     return maxId + 1;
 }
 
-function initFormSubmitHandler() {
-    const form = document.getElementById("stock-form");
-    if (!form) return;
-
-    form.onsubmit = async (e) => {
-        e.preventDefault();
-        showLoading(true);
-
-        const id = document.getElementById("edit-id").value;
-        const formData = {
-            tanggal: document.getElementById("input-date").value,
-            keterangan: document.getElementById("input-ket").value,
-            jenis_kayu: document.getElementById("input-jenis").value,
-            tpk: document.getElementById("input-tpk").value,
-            petak: document.getElementById("input-petak").value || "-",
-            masuk_m3: parseFloat(document.getElementById("input-in").value) || 0,
-            keluar_m3: parseFloat(document.getElementById("input-out").value) || 0
-        };
-
-        try {
-            if (id) {
-                await api.from('stok_kayu').update(formData).eq('id', id);
-            } else {
-                await api.from('stok_kayu').insert([formData]);
-            }
-            alert("Data Berhasil Disimpan!");
-            form.reset();
-            document.getElementById("edit-id").value = "";
-            await startApp(); // Refresh data
-        } catch (err) {
-            alert("Error: " + err.message);
-        } finally {
-            showLoading(false);
-        }
-    };
-}
 function initLiveSearch() {
     const searchInput = document.getElementById("filter-rincian-ket");
 
@@ -1221,29 +1161,6 @@ function renderUI() {
     }
 }
 
-// Fungsi untuk Filter di RINGKASAN SALDO
-window.updatePetakByTPK = function () {
-    const tpkVal = document.getElementById('filter-tpk').value;
-    const petakEl = document.getElementById('filter-petak');
-
-    if (!petakEl) return;
-    petakEl.innerHTML = '<option value="">-- Semua Petak --</option>';
-
-    // Filter tanpa peduli spasi atau huruf besar/kecil
-    const matchingData = state.data.filter(d =>
-        String(d.tpk || "").trim().toLowerCase() === String(tpkVal || "").trim().toLowerCase()
-    );
-
-    const uniquePetaks = [...new Set(matchingData.map(d => d.petak).filter(p => p))].sort();
-
-    uniquePetaks.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p; opt.textContent = p;
-        petakEl.appendChild(opt);
-    });
-
-    petakEl.disabled = false;
-};
 
 // Fungsi yang sama untuk bagian Rincian (Sesuaikan ID-nya)
 window.updateRincianPetakByTPK = function (isActive) {
@@ -2306,57 +2223,76 @@ function populateAllDropdowns(sumberData = [], masterData = {}) {
 
 }
 // Jalankan aplikasi otomatis saat halaman dibuka
+// --- HANLDER UTAMA SUBMIT FORM (PREVENT DOUBLE SUBMIT) ---
+let isSubmitting = false;
+
+async function handleStockSubmit(e) {
+    e.preventDefault();
+
+    // Mencegah klik ganda / eksekusi bersamaan
+    if (isSubmitting) return;
+    isSubmitting = true;
+
+    const editId = document.getElementById('edit-id')?.value;
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+
+    const formData = {
+        tanggal: document.getElementById('input-date').value,
+        keterangan: document.getElementById('input-ket').value,
+        jenis_kayu: document.getElementById('input-jenis').value,
+        tpk: document.getElementById('input-tpk').value,
+        petak: document.getElementById('input-petak').value || "-",
+        masuk_m3: parseFloat(document.getElementById('input-in').value) || 0,
+        keluar_m3: parseFloat(document.getElementById('input-out').value) || 0
+    };
+
+    try {
+        if (typeof showLoading === 'function') showLoading(true);
+        if (submitBtn) submitBtn.disabled = true;
+
+        if (editId) {
+            // Mode Update
+            const { error } = await api.from('stok_kayu').update(formData).eq('id', editId);
+            if (error) throw error;
+            alert("Data berhasil diperbarui!");
+            if (typeof window.cancelEdit === 'function') window.cancelEdit();
+        } else {
+            // Mode Simpan Baru
+            const { error } = await api.from('stok_kayu').insert([formData]);
+            if (error) throw error;
+            alert("Data berhasil disimpan!");
+            e.target.reset(); // Kosongkan form
+        }
+
+        // Refresh data tabel
+        if (typeof fetchData === 'function') await fetchData();
+
+    } catch (err) {
+        console.error("Gagal memproses data:", err.message);
+        alert("Gagal memproses data: " + err.message);
+    } finally {
+        if (typeof showLoading === 'function') showLoading(false);
+        if (submitBtn) submitBtn.disabled = false;
+        isSubmitting = false; // Reset flag penanda submit
+    }
+}
+
+// --- INISIALISASI TUNGGAL SAAT APLIKASI DIMUAT ---
 document.addEventListener('DOMContentLoaded', () => {
-    startApp();
-});
-// Letakkan di bagian paling bawah file script.js
-document.addEventListener('DOMContentLoaded', () => {
+    // 1. Pasang event listener form HANYA SEKALI
     const stockForm = document.getElementById('stock-form');
     if (stockForm) {
-        stockForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const id = document.getElementById('edit-id').value;
-            const formData = {
-                tanggal: document.getElementById('input-date').value,
-                keterangan: document.getElementById('input-ket').value,
-                jenis_kayu: document.getElementById('input-jenis').value,
-                tpk: document.getElementById('input-tpk').value,
-                petak: document.getElementById('input-petak').value,
-                masuk_m3: parseFloat(document.getElementById('input-in').value) || 0,
-                keluar_m3: parseFloat(document.getElementById('input-out').value) || 0
-            };
-
-            try {
-                showLoading(true);
-                if (id) {
-                    // Mode Update
-                    await api.from('stok_kayu').update(formData).eq('id', id);
-                } else {
-                    // Mode Simpan Baru
-                    await api.from('stok_kayu').insert([formData]);
-                }
-
-                window.cancelEdit(); // Reset form & tombol
-                await fetchData();    // Refresh tampilan tabel
-                alert(id ? "Data diperbarui!" : "Data disimpan!");
-            } catch (err) {
-                alert("Gagal memproses data: " + err.message);
-            } finally {
-                showLoading(false);
-            }
-        });
+        stockForm.onsubmit = handleStockSubmit; 
     }
-});// Letakkan di paling bawah script.js
-window.addEventListener('load', () => {
-    const form = document.getElementById('stock-form');
-    if (form) {
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            // ... logika simpan/update yang tadi ...
-            console.log("Form sedang diproses...");
-        });
+
+    // 2. Jalankan Aplikasi
+    if (state.isLoggedIn) {
+        startApp();
+    } else {
+        if (typeof initLoginHandler === 'function') initLoginHandler();
     }
 });
+
+// Eksport fungsi ke global jika dipanggil via onclick
 window.renderRekapRincian = renderRekapRincian;
 
