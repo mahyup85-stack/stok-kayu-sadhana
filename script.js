@@ -2599,6 +2599,8 @@ async function handleStockSubmit(e) {
 
 // Eksport fungsi ke global jika dipanggil via onclick
 window.renderRekapRincian = renderRekapRincian;
+window.editData = editData;
+window.deleteData = deleteData;
 
 document.addEventListener('DOMContentLoaded', () => {
     const stockForm = document.getElementById('stock-form');
