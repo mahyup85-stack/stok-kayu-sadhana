@@ -334,7 +334,6 @@ window.deleteMasterItem = async function (id) {
     }
 };
 
-// Modifikasi fungsi renderDashboardTable
 function renderDashboardTable(dataToRender = null) {
     const tableBody = document.getElementById("main-table-body");
     if (!tableBody) return;
@@ -349,8 +348,7 @@ function renderDashboardTable(dataToRender = null) {
         return;
     }
 
-    // --- LOGIKA BARU: CEK VIEW SAAT INI ---
-    // Jika di Kelola Sandi atau Backup, kita tidak memotong data (tanpa slice)
+    // --- LOGIKA CEK VIEW SAAT INI ---
     const isNoPagination = (state.view === 'kelola-sandi' || state.view === 'backup-setting');
 
     let paginatedData;
