@@ -1188,31 +1188,65 @@ function logout() {
     location.reload();
 }
 
-window.editData = function (id) {
-    // Gunakan == agar string "1" cocok dengan angka 1
-    const item = state.data.find(d => d.id == id);
-
+// ==========================================
+// FUNGSI EDIT DATA MUTASI (SINKRON DENGAN FORM SM)
+// ==========================================
+window.editData = function(id) {
+    // Cari data berdasarkan ID dari state mutasi
+    const item = state.mutasiData ? state.mutasiData.find(d => d.id == id) : null;
     if (!item) {
         alert("Data tidak ditemukan!");
         return;
     }
 
-    // Pastikan ID elemen ini sesuai dengan yang ada di HTML Anda
-    document.getElementById('edit-id').value = item.id;
-    document.getElementById('input-date').value = item.tanggal;
-    document.getElementById('input-ket').value = item.keterangan;
-    document.getElementById('input-jenis').value = item.jenis_kayu;
-    document.getElementById('input-tpk').value = item.tpk;
-    document.getElementById('input-petak').value = item.petak;
-    document.getElementById('input-in').value = item.masuk_m3;
-    document.getElementById('input-out').value = item.keluar_m3;
+    // Helper aman untuk mengisi nilai ke input tanpa bikin Error kalau ID tidak ada
+    const setInputValue = (elementId, value) => {
+        const el = document.getElementById(elementId);
+        if (el) el.value = value || '';
+    };
 
-    // MUNCIULKAN TOMBOL UPDATE
-    document.getElementById('btn-submit').innerText = "Perbarui Data";
-    document.getElementById('btn-cancel-edit').classList.remove('hidden');
+    // Isi form dengan data lama
+    setInputValue('edit-id', item.id);
+    setInputValue('input-date', item.tanggal);
+    setInputValue('input-ket', item.keterangan);
+    setInputValue('input-jenis', item.jenis_kayu);
+    setInputValue('input-tpk', item.tpk);
+    setInputValue('input-petak', item.petak);
+    
+    // Isi input SM (Masuk & Keluar)
+    setInputValue('input-in-sm', item.masuk_sm || 0);
+    setInputValue('input-out-sm', item.keluar_sm || 0);
 
-    // Scroll otomatis ke atas (ke form)
+    // Ubah tampilan UI Form ke Mode Edit
+    const titleEl = document.getElementById('form-mode-title');
+    if (titleEl) titleEl.innerText = "Edit Data Mutasi";
+
+    const btnSubmit = document.getElementById('btn-submit');
+    if (btnSubmit) btnSubmit.innerText = "Update Data";
+
+    const btnCancel = document.getElementById('btn-cancel-edit');
+    if (btnCancel) btnCancel.classList.remove('hidden');
+
+    // Scroll ke atas menuju form
     window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+
+// Fungsi Batal Edit
+window.cancelEdit = function() {
+    const form = document.getElementById('stock-form');
+    if (form) form.reset();
+
+    const editIdEl = document.getElementById('edit-id');
+    if (editIdEl) editIdEl.value = '';
+
+    const titleEl = document.getElementById('form-mode-title');
+    if (titleEl) titleEl.innerText = "Input Mutasi";
+
+    const btnSubmit = document.getElementById('btn-submit');
+    if (btnSubmit) btnSubmit.innerText = "Simpan";
+
+    const btnCancel = document.getElementById('btn-cancel-edit');
+    if (btnCancel) btnCancel.classList.add('hidden');
 };
 
 // AGAR BISA DIPANGGIL OLEH TOMBOL DI HTML
@@ -2514,22 +2548,87 @@ async function handleStockSubmit(e) {
     }
 }
 
-// --- INISIALISASI TUNGGAL SAAT APLIKASI DIMUAT ---
-document.addEventListener('DOMContentLoaded', () => {
-    // 1. Pasang event listener form HANYA SEKALI
-    const stockForm = document.getElementById('stock-form');
-    if (stockForm) {
-        stockForm.onsubmit = handleStockSubmit; 
-    }
-
-    // 2. Jalankan Aplikasi
-    if (state.isLoggedIn) {
-        startApp();
-    } else {
-        if (typeof initLoginHandler === 'function') initLoginHandler();
-    }
-});
 
 // Eksport fungsi ke global jika dipanggil via onclick
 window.renderRekapRincian = renderRekapRincian;
 
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Pasang event listener form mutasi secara aman (VERSI BARU)
+    const stockForm = document.getElementById('stock-form');
+    if (stockForm) {
+        stockForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // Helper aman untuk mengambil nilai input
+            const getVal = (id) => {
+                const el = document.getElementById(id);
+                return el ? el.value : '';
+            };
+
+            const editId = getVal('edit-id');
+            const date = getVal('input-date');
+            const ket = getVal('input-ket');
+            const jenis = getVal('input-jenis');
+            const tpk = getVal('input-tpk');
+            const petak = getVal('input-petak');
+            const inSM = parseFloat(getVal('input-in-sm')) || 0;
+            const outSM = parseFloat(getVal('input-out-sm')) || 0;
+
+            // Cari faktor konversi dari master jenis kayu
+            let faktorKonversi = 1;
+            if (state.master && state.master['jenis_kayu']) {
+                const itemKayu = state.master['jenis_kayu'].find(k => k.name === jenis);
+                if (itemKayu && itemKayu.konversi) {
+                    faktorKonversi = parseFloat(itemKayu.konversi);
+                }
+            }
+
+            // Hitung konversi M³
+            const inM3 = inSM * faktorKonversi;
+            const outM3 = outSM * faktorKonversi;
+
+            const payload = {
+                tanggal: date,
+                keterangan: ket,
+                jenis_kayu: jenis,
+                tpk: tpk,
+                petak: petak,
+                masuk_sm: inSM,
+                keluar_sm: outSM,
+                masuk_m3: inM3,
+                keluar_m3: outM3
+            };
+
+            try {
+                if (typeof showLoading === 'function') showLoading(true);
+
+                if (editId) {
+                    // UPDATE DATA
+                    const { error } = await api.from('mutasi_stok').update(payload).eq('id', editId);
+                    if (error) throw error;
+                    alert("Data berhasil diperbarui!");
+                } else {
+                    // INSERT DATA BARU
+                    const { error } = await api.from('mutasi_stok').insert([payload]);
+                    if (error) throw error;
+                    alert(`Data berhasil disimpan!\nKonversi: ${inSM} SM = ${inM3.toFixed(2)} M³`);
+                }
+
+                if (typeof cancelEdit === 'function') cancelEdit();
+                if (typeof loadMutasiData === 'function') loadMutasiData();
+
+            } catch (err) {
+                alert("Gagal menyimpan data: " + err.message);
+            } finally {
+                if (typeof showLoading === 'function') showLoading(false);
+            }
+        });
+    }
+
+    // 2. Jalankan Inisialisasi Aplikasi
+    if (state.isLoggedIn) {
+        if (typeof startApp === 'function') startApp();
+    } else {
+        if (typeof initLoginHandler === 'function') initLoginHandler();
+    }
+});
