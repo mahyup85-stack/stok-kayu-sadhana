@@ -1354,27 +1354,36 @@ window.renderRekapSaldo = function () {
     const tableBody = document.getElementById("rekap-table-body");
     if (!tableBody) return;
 
-    // 1. Ambil Nilai Filter Periode
-    const fBulan = document.getElementById("filter-dari-bulan")?.value;
-    const fTahun = document.getElementById("filter-dari-tahun")?.value;
+    // 1. Ambil Nilai Filter Periode (DARI & SAMPAI)
+    const fBulanDari = document.getElementById("filter-dari-bulan")?.value || 1;
+    const fTahunDari = document.getElementById("filter-dari-tahun")?.value || 2026;
+    const fBulanSampai = document.getElementById("filter-sampai-bulan")?.value || 12;
+    const fTahunSampai = document.getElementById("filter-sampai-tahun")?.value || 2026;
+
     const filterTPK = document.getElementById("filter-tpk")?.value;
     const filterJenis = document.getElementById("filter-jenis")?.value;
     const filterPetak = document.getElementById("filter-petak")?.value;
 
-    // Nilai pembanding periode (YYYYMM)
-    const periodeMulai = (fTahun && fBulan) ? parseInt(fTahun) * 100 + parseInt(fBulan) : 0;
+    // Format YYYYMM untuk perbandingan presisi
+    const periodeMulai = parseInt(fTahunDari) * 100 + parseInt(fBulanDari);
+    const periodeAkhir = parseInt(fTahunSampai) * 100 + parseInt(fBulanSampai);
 
     const ringkasan = {};
 
-    // 2. Proses SEMUA data untuk memisahkan Saldo Awal vs Mutasi Berjalan
+    // 2. Proses data sesuai batasan periode
     state.data.forEach(d => {
-        // Filter Kategori (TPK, Jenis, Petak) harus selalu dicek
+        // Filter Kategori (TPK, Jenis, Petak)
         if (filterTPK && d.tpk !== filterTPK) return;
         if (filterJenis && d.jenis_kayu !== filterJenis) return;
         if (filterPetak && d.petak !== filterPetak) return;
 
+        if (!d.tanggal) return;
         const [y, m] = d.tanggal.split("-");
         const periodeData = parseInt(y) * 100 + parseInt(m);
+
+        // IGNORE / ABAIKAN DATA DI ATAS PERIODE "SAMPAI"
+        if (periodeData > periodeAkhir) return;
+
         const key = `${d.jenis_kayu}-${d.tpk}-${d.petak || 'Tanpa Petak'}`;
 
         if (!ringkasan[key]) {
@@ -1387,12 +1396,12 @@ window.renderRekapSaldo = function () {
         const m3 = parseFloat(d.masuk_m3 || d.keluar_m3 || 0);
 
         if (periodeData < periodeMulai) {
-            // MASUK KE SALDO AWAL (Data sebelum bulan filter)
+            // MASUK KE SALDO AWAL (Data murni sebelum periode DARI)
             const masuk = parseFloat(d.masuk_m3 || 0);
             const keluar = parseFloat(d.keluar_m3 || 0);
             ringkasan[key].saldoAwal += (masuk - keluar);
         } else {
-            // MASUK KE MUTASI BERJALAN (Data dalam/setelah bulan filter)
+            // MASUK KE MUTASI BERJALAN (Hanya antara periode DARI s/d SAMPAI)
             if (d.masuk_m3 > 0) {
                 if (d.keterangan?.toUpperCase().includes('BAP')) ringkasan[key].bap += m3;
                 else ringkasan[key].lhp += m3;
@@ -1402,14 +1411,23 @@ window.renderRekapSaldo = function () {
         }
     });
 
-    // 3. Render dan Hitung Grand Total
-    const rows = Object.values(ringkasan);
-    let gTotalAwal = 0, gTotalBap = 0, gTotalLhp = 0, gTotalKirim = 0, gTotalSaldoBap = 0, gTotalSaldoLhp = 0;
+    // 3. Filter Baris Kosong & Hitung Total
+    let rows = Object.values(ringkasan);
+
+    // Saring hanya petak yang memiliki aktivitas/saldo aktif
+    rows = rows.filter(r => {
+        const sBap = r.saldoAwal + r.bap - r.lhp;
+        const sLhp = r.saldoAwal + r.lhp - r.kirim;
+        // Tampilkan hanya jika ada nilai (tidak serba nol)
+        return (r.saldoAwal !== 0 || r.bap !== 0 || r.lhp !== 0 || r.kirim !== 0 || sBap !== 0 || sLhp !== 0);
+    });
 
     if (rows.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="10" class="text-center">Tidak ada data</td></tr>';
+        tableBody.innerHTML = '<tr><td colspan="9" class="text-center">Tidak ada data untuk periode ini</td></tr>';
         return;
     }
+
+    let gTotalAwal = 0, gTotalBap = 0, gTotalLhp = 0, gTotalKirim = 0, gTotalSaldoBap = 0, gTotalSaldoLhp = 0;
 
     let html = rows.map((r) => {
         const sBap = r.saldoAwal + r.bap - r.lhp;
@@ -1422,7 +1440,6 @@ window.renderRekapSaldo = function () {
         gTotalSaldoBap += sBap;
         gTotalSaldoLhp += sLhp;
 
-        // BUBUHKAN formatSaldo() DI SINI
         return `
             <tr>
                 <td>${r.jenis}</td>
@@ -1437,7 +1454,7 @@ window.renderRekapSaldo = function () {
             </tr>`;
     }).join('');
 
-    // 4. Baris Total Keseluruhan (BUBUHKAN formatSaldo() JUGA DI SINI)
+    // 4. Baris Total Keseluruhan
     html += `
         <tr style="background-color: #f3f4f6; font-weight: bold; border-top: 2px solid #374151;">
             <td colspan="3" class="text-center">TOTAL KESELURUHAN</td>
@@ -1452,6 +1469,7 @@ window.renderRekapSaldo = function () {
 
     tableBody.innerHTML = html;
 };
+
 window.renderRekapTable = function () {
     console.log("Memulai Render Tabel Rekap...");
 
@@ -1605,6 +1623,7 @@ function getProcessedRekapData() {
         fDariB, fDariT, fSampaiB, fSampaiT
     };
 }
+
 function renderHistoriMutasi() {
     const tableBody = document.getElementById("dashboard-table-body");
     if (!tableBody) return;
