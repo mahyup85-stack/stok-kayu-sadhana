@@ -1186,12 +1186,7 @@ function logout() {
     location.reload();
 }
 
-// ==========================================
-// FUNGSI EDIT DATA MUTASI (SINKRON DENGAN FORM SM)
-// ==========================================
-// ==========================================
-// FUNGSI EDIT DATA (DI-ADAPTASI DENGAN M3)
-// ==========================================
+
 window.editData = function(id) {
     const item = state.mutasiData ? state.mutasiData.find(d => d.id == id) : null;
     if (!item) {
@@ -1536,24 +1531,49 @@ function renderFilteredTable(filteredData) {
     // Update info jumlah data ditemukan
     console.log(`Ditemukan: ${filteredData.length} baris`);
 }
-function renderTable() {
-    const tbody = document.getElementById("tabel-mutasi-body");
+// ==========================================
+// CONTOH FUNGSI RENDER TABEL YANG BENAR
+// ==========================================
+function renderMutasiTable(data) {
+    const tbody = document.getElementById('mutasi-tbody'); // Sesuaikan dengan ID tbody kamu
     if (!tbody) return;
 
-    if (state.data.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" align="center">Belum ada data mutasi</td></tr>';
+    if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center;">Tidak ada data mutasi</td></tr>`;
         return;
     }
 
-    tbody.innerHTML = state.data.map(item => `
+    tbody.innerHTML = data.map(item => `
         <tr>
-            <td>${item.tanggal}</td>
-            <td>${item.jenis_kayu}</td>
-            <td>${item.tpk}</td>
-            <td align="right">${item.masuk_m3.toFixed(2)}</td>
-            <td align="right">${item.keluar_m3.toFixed(2)}</td>
+            <td>
+                <input type="checkbox" class="row-checkbox" value="${item.id}">
+            </td>
+            <td>${item.tanggal || '-'}</td>
+            <td>${item.keterangan || '-'}</td>
+            <td>${item.jenis_kayu || '-'}</td>
+            <td>${item.tpk || '-'}</td>
+            <td>${item.petak || '-'}</td>
+            <td>${parseFloat(item.masuk_m3 || 0).toFixed(2)}</td>
+            <td>${parseFloat(item.keluar_m3 || 0).toFixed(2)}</td>
+            <td style="text-align: center;">
+                <!-- ✏️ TOMBOL EDIT -->
+                <button type="button" 
+                        onclick="editData('${item.id}')" 
+                        class="btn-action btn-edit" 
+                        title="Edit Data">
+                    ✏️
+                </button>
+                
+                <!-- 🗑️ TOMBOL HAPUS -->
+                <button type="button" 
+                        onclick="deleteData('${item.id}')" 
+                        class="btn-action btn-delete" 
+                        title="Hapus Data">
+                    🗑️
+                </button>
+            </td>
         </tr>
-    `).join("");
+    `).join('');
 }
 
 // 💡 Helper fungsi untuk menghitung hasil konversi (Bisa ditaruh di atas fungsi ini)
