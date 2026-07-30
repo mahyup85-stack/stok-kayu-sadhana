@@ -2057,7 +2057,7 @@ window.switchView = switchView;
 document.addEventListener("DOMContentLoaded", () => {
     if (state.isLoggedIn) {
         startApp();
-        initFormSubmitHandler();
+        
     } else {
         initLoginHandler();
     }
