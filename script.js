@@ -738,7 +738,7 @@ if (state.isLoggedIn) {
     if (loginScr) loginScr.classList.add("hidden");
     if (appCont) appCont.classList.remove("hidden");
     renderUI();
-    initFormSubmitHandler();
+    
 }
 
 
