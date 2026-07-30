@@ -2224,7 +2224,7 @@ function populateAllDropdowns(sumberData = [], masterData = {}) {
 }
 // Jalankan aplikasi otomatis saat halaman dibuka
 // --- HANLDER UTAMA SUBMIT FORM (PREVENT DOUBLE SUBMIT) ---
-let isSubmitting = false;
+isSubmitting = false;
 
 async function handleStockSubmit(e) {
     e.preventDefault();
