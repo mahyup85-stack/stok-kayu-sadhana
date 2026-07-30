@@ -256,8 +256,6 @@ window.handleStockSubmit = async function (event) {
         jenis_kayu: jenis,
         tpk: tpk,
         petak: petak,
-        masuk_sm: inSM,
-        keluar_sm: outSM,
         masuk_m3: inM3,   // Nilai M3 yang sudah dikonversi
         keluar_m3: outM3   // Nilai M3 yang sudah dikonversi
     };
@@ -1191,21 +1189,38 @@ function logout() {
 // ==========================================
 // FUNGSI EDIT DATA MUTASI (SINKRON DENGAN FORM SM)
 // ==========================================
+// ==========================================
+// FUNGSI EDIT DATA (DI-ADAPTASI DENGAN M3)
+// ==========================================
 window.editData = function(id) {
-    // Cari data berdasarkan ID dari state mutasi
     const item = state.mutasiData ? state.mutasiData.find(d => d.id == id) : null;
     if (!item) {
         alert("Data tidak ditemukan!");
         return;
     }
 
-    // Helper aman untuk mengisi nilai ke input tanpa bikin Error kalau ID tidak ada
     const setInputValue = (elementId, value) => {
         const el = document.getElementById(elementId);
         if (el) el.value = value || '';
     };
 
-    // Isi form dengan data lama
+    // Cari faktor konversi jenis kayu
+    let faktorKonversi = 1;
+    if (state.master && state.master['jenis_kayu']) {
+        const itemKayu = state.master['jenis_kayu'].find(k => k.name === item.jenis_kayu);
+        if (itemKayu && itemKayu.konversi) {
+            faktorKonversi = parseFloat(itemKayu.konversi);
+        }
+    }
+
+    // Hitung estimasi SM kembali (Nilai M³ / Faktor Konversi)
+    const valInM3 = parseFloat(item.masuk_m3) || 0;
+    const valOutM3 = parseFloat(item.keluar_m3) || 0;
+    
+    const estimatedInSM = valInM3 > 0 ? (valInM3 / faktorKonversi) : 0;
+    const estimatedOutSM = valOutM3 > 0 ? (valOutM3 / faktorKonversi) : 0;
+
+    // Isi form
     setInputValue('edit-id', item.id);
     setInputValue('input-date', item.tanggal);
     setInputValue('input-ket', item.keterangan);
@@ -1213,11 +1228,11 @@ window.editData = function(id) {
     setInputValue('input-tpk', item.tpk);
     setInputValue('input-petak', item.petak);
     
-    // Isi input SM (Masuk & Keluar)
-    setInputValue('input-in-sm', item.masuk_sm || 0);
-    setInputValue('input-out-sm', item.keluar_sm || 0);
+    // ✅ MASUKKAN HASIL HITUNGAN SM KE INPUT FORM
+    setInputValue('input-in-sm', estimatedInSM);
+    setInputValue('input-out-sm', estimatedOutSM);
 
-    // Ubah tampilan UI Form ke Mode Edit
+    // Ubah Judul & Tombol Form ke Mode Edit
     const titleEl = document.getElementById('form-mode-title');
     if (titleEl) titleEl.innerText = "Edit Data Mutasi";
 
@@ -1227,7 +1242,6 @@ window.editData = function(id) {
     const btnCancel = document.getElementById('btn-cancel-edit');
     if (btnCancel) btnCancel.classList.remove('hidden');
 
-    // Scroll ke atas menuju form
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
@@ -2330,8 +2344,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 jenis_kayu: jenisKayu,
                 tpk: getVal('input-tpk'),
                 petak: getVal('input-petak'),
-                masuk_sm: inSM,
-                keluar_sm: outSM,
                 masuk_m3: inM3,   // Hasil konversi M³
                 keluar_m3: outM3   // Hasil konversi M³
             };
