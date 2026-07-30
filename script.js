@@ -2603,10 +2603,12 @@ window.renderRekapRincian = renderRekapRincian;
 document.addEventListener('DOMContentLoaded', () => {
     const stockForm = document.getElementById('stock-form');
     if (stockForm) {
+        stockForm.onsubmit = null; // Mencegah pemicuan ganda
+
         stockForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            // Helper aman untuk ambil value
+            // Helper aman untuk ambil value dari HTML
             const getVal = (id) => {
                 const el = document.getElementById(id);
                 return el ? el.value : '';
@@ -2619,14 +2621,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const tpk = getVal('input-tpk');
             const petak = getVal('input-petak');
             
-            // Ambil input SM dari UI Form
+            // Ambil input SM dari Form HTML
             const inSM = parseFloat(getVal('input-in-sm')) || 0;
             const outSM = parseFloat(getVal('input-out-sm')) || 0;
 
-            // Cari faktor konversi dari master jenis kayu
+            // Cari faktor konversi dari master jenis kayu (Aman Case-Insensitive)
             let faktorKonversi = 1;
             if (state.master && state.master['jenis_kayu']) {
-                const itemKayu = state.master['jenis_kayu'].find(k => k.name === jenis);
+                const itemKayu = state.master['jenis_kayu'].find(
+                    k => k.name && k.name.trim().toLowerCase() === jenis.trim().toLowerCase()
+                );
                 if (itemKayu && itemKayu.konversi) {
                     faktorKonversi = parseFloat(itemKayu.konversi);
                 }
@@ -2636,16 +2640,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const inM3 = inSM * faktorKonversi;
             const outM3 = outSM * faktorKonversi;
 
-            // 💡 SESUAIKAN DENGAN NAMA KOLOM SUPABASE KAMU
-            // Memasukkan hasil hitungan M³ ke kolom masuk_m3 dan keluar_m3
+            // Payload HANYA mengirim kolom yang ada di database Supabase (masuk_m3 & keluar_m3)
             const payload = {
                 tanggal: date,
                 keterangan: ket,
                 jenis_kayu: jenis,
                 tpk: tpk,
                 petak: petak,
-                masuk_m3: inM3,   // Simpan hasil hitungan M³
-                keluar_m3: outM3   // Simpan hasil hitungan M³
+                masuk_m3: inM3,
+                keluar_m3: outM3
             };
 
             try {
