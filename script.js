@@ -63,24 +63,27 @@ window.openMasterModal = async function (type) {
     state.currentMasterType = type;
     
     const modal = document.getElementById('master-modal');
-    const title = document.getElementById('modal-title') || document.getElementById('master-title');
-    // Sinkronkan ID target list dengan HTML (master-list-body atau master-list)
-    const listEl = document.getElementById('master-list-body') || document.getElementById('master-list');
+    const title = document.getElementById('modal-title');
+    const listEl = document.getElementById('master-list-body');
+    const konversiInput = document.getElementById('master-input-konversi');
 
-    if (!modal || !listEl) {
-        console.error("Elemen modal atau tabel master tidak ditemukan di HTML!");
-        return;
-    }
+    if (!modal || !listEl) return;
+
+    const isTPK = (type === 'tpk');
 
     if (title) {
-        title.innerText = (type === 'tpk') ? 'Kelola Master TPK' : 'Kelola Master Jenis Kayu';
+        title.innerText = isTPK ? 'Kelola Master TPK' : 'Kelola Master Jenis Kayu';
     }
 
-    listEl.innerHTML = '<tr><td colspan="3" class="text-center">Memuat data...</td></tr>';
+    // 🔴 Sembunyikan Input Konversi jika TPK
+    if (konversiInput) {
+        konversiInput.style.display = isTPK ? 'none' : 'block';
+    }
+
+    listEl.innerHTML = `<tr><td colspan="${isTPK ? 3 : 4}" class="text-center">Memuat data...</td></tr>`;
     modal.classList.remove('hidden');
 
     try {
-        // AMBIL DATA DARI SUPABASE
         const { data, error } = await api
             .from('master_data')
             .select('*')
@@ -89,14 +92,13 @@ window.openMasterModal = async function (type) {
 
         if (error) throw error;
 
-        // SIMPAN KE STATE
         if (!state.master) state.master = {};
         state.master[type] = data;
 
         renderMasterList();
     } catch (err) {
         console.error("Gagal load master:", err.message);
-        listEl.innerHTML = '<tr><td colspan="3" class="text-center" style="color:red;">Gagal memuat data</td></tr>';
+        listEl.innerHTML = `<tr><td colspan="${isTPK ? 3 : 4}" class="text-center" style="color:red;">Gagal memuat data</td></tr>`;
     }
 };
 
@@ -108,87 +110,49 @@ window.closeMasterModal = function () {
     }
 };
 
-// 3. Render List Master
-function renderMasterList() {
-    const type = state.currentMasterType;
-    const listEl = document.getElementById('master-list-body') || document.getElementById('master-list');
-    const thFaktor = document.getElementById('th-faktor'); // ID elemen <th>Faktor</th> pada tabel
-    const isTPK = (type === 'tpk');
 
-    if (!listEl) return;
-
-    // Sembunyikan/tampilkan header tabel kolom "Faktor" jika ada elemen <th> nya
-    if (thFaktor) {
-        thFaktor.style.display = isTPK ? 'none' : 'table-cell';
-    }
-
-    const items = (state.master && state.master[type]) ? state.master[type] : [];
-
-    if (items.length === 0) {
-        listEl.innerHTML = '<tr><td colspan="4" class="text-center">Belum ada data</td></tr>';
-        return;
-    }
-
-    listEl.innerHTML = items.map((item, idx) => `
-        <tr>
-            <td class="text-center">${idx + 1}</td>
-            <td>${item.name}</td>
-            <!-- Tampilkan kolom konversi HANYA jika bukan TPK -->
-            ${!isTPK ? `<td class="text-center">${item.konversi || 1}</td>` : ''}
-            <td class="text-center">
-                <button type="button" onclick="deleteMaster('${item.id}')" class="btn-action btn-danger" title="Hapus">🗑️</button>
-            </td>
-        </tr>
-    `).join('');
-}
-
-// 4. Handle Submit Tambah Data
-// ==========================================
-// 1. SIMPAN MASTER DATA (TERMASUK FAKTOR KONVERSI)
-// ==========================================
 window.handleMasterSubmit = async function (event) {
     event.preventDefault();
 
-    const inputNama = document.getElementById('master-input-nama') || document.getElementById('master-input');
-    const inputKonversi = document.getElementById('master-input-konversi');
-    const type = state.currentMasterType;
+    const type = state.currentMasterType; // 'tpk' atau 'jenis_kayu'
+    const nameInput = document.getElementById('master-input-nama');
+    const konversiInput = document.getElementById('master-input-konversi');
 
-    if (!inputNama || !inputNama.value.trim()) {
+    const nameVal = nameInput ? nameInput.value.trim() : '';
+    // Jika type adalah TPK, set nilai konversi ke null
+    const konversiVal = (type === 'tpk') ? null : (parseFloat(konversiInput.value) || 1);
+
+    if (!nameVal) {
         alert("Nama tidak boleh kosong!");
         return;
     }
 
-    const name = inputNama.value.trim();
-    // Jika type jenis_kayu, ambil nilai konversi. Jika TPK, default = 1
-    const konversi = (type === 'jenis_kayu' && inputKonversi) ? parseFloat(inputKonversi.value) || 1 : 1;
-
     try {
         if (typeof showLoading === 'function') showLoading(true);
 
-        // Simpan 'name', 'type', dan 'konversi' ke Supabase
-        const { data, error } = await api
+        const payload = {
+            type: type,
+            name: nameVal,
+            konversi: konversiVal
+        };
+
+        const { error } = await api
             .from('master_data')
-            .insert([{ name: name, type: type, konversi: konversi }])
-            .select();
+            .insert([payload]);
 
         if (error) throw error;
 
-        if (!state.master) state.master = {};
-        if (!state.master[type]) state.master[type] = [];
-        
-        state.master[type].push(data[0]);
+        // Reset form
+        nameInput.value = '';
+        if (konversiInput) konversiInput.value = '1';
 
-        inputNama.value = "";
-        if (inputKonversi) inputKonversi.value = "1";
-        renderMasterList();
+        // Refresh list master
+        await window.openMasterModal(type);
+        alert("Data berhasil disimpan!");
 
-        if (type === 'tpk' && typeof renderTPKDropdown === 'function') renderTPKDropdown();
-        if (type !== 'tpk' && typeof renderJenisKayuDropdown === 'function') renderJenisKayuDropdown();
-
-        alert(`Berhasil menambahkan "${name}" (Faktor: ${konversi})`);
     } catch (err) {
-        console.error(err);
-        alert("Gagal menyimpan master: " + err.message);
+        console.error("Gagal menyimpan master data:", err);
+        alert("Gagal menyimpan data: " + err.message);
     } finally {
         if (typeof showLoading === 'function') showLoading(false);
     }
@@ -200,34 +164,37 @@ window.handleMasterSubmit = async function (event) {
 window.renderMasterList = function () {
     const listEl = document.getElementById('master-list-body') || document.getElementById('master-list');
     const type = state.currentMasterType;
+    const thFaktor = document.getElementById('th-faktor');
+    const isTPK = (type === 'tpk');
 
     if (!listEl) return;
 
+    // Sembunyikan Header Kolom "Faktor" jika yang dibuka adalah TPK
+    if (thFaktor) {
+        thFaktor.style.display = isTPK ? 'none' : 'table-cell';
+    }
+
     const masterData = (state.master && state.master[type]) ? state.master[type] : [];
 
+    // Jika data kosong, sesuaikan jumlah kolom (3 kolom untuk TPK, 4 kolom untuk Jenis Kayu)
     if (masterData.length === 0) {
-        listEl.innerHTML = '<tr><td colspan="4" class="text-center" style="padding:10px; color:#888;">Tidak ada data</td></tr>';
+        listEl.innerHTML = `<tr><td colspan="${isTPK ? 3 : 4}" class="text-center" style="padding:10px; color:#888;">Tidak ada data</td></tr>`;
         return;
     }
 
+    // Render baris tabel (Kolom Faktor hanya tampil jika BUKAN TPK)
     listEl.innerHTML = masterData.map((item, index) => `
         <tr>
             <td style="padding:8px; text-align:center;">${index + 1}</td>
             <td style="padding:8px;">${item.name}</td>
-            <td style="padding:8px; text-align:center;">${item.konversi || 1}</td>
+            ${!isTPK ? `<td style="padding:8px; text-align:center;">${item.konversi || 1}</td>` : ''}
             <td style="padding:8px; text-align:center;">
-                <button type="button" onclick="deleteMasterItem('${item.id}')" style="background:none; border:none; cursor:pointer;">🗑️</button>
+                <button type="button" onclick="deleteMasterItem('${item.id}')" style="background:none; border:none; cursor:pointer;" title="Hapus">🗑️</button>
             </td>
         </tr>
     `).join('');
 };
 
-// ==========================================
-// 3. LOGIKA INPUT MUTASI (SM KHUSUS DIKONVERSI KE M³)
-// ==========================================
-// ==========================================
-// HANDLER SUBMIT (INSERT & UPDATE)
-// ==========================================
 window.handleStockSubmit = async function (event) {
     event.preventDefault();
 
