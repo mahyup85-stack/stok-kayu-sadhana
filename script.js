@@ -1727,8 +1727,7 @@ window.renderRekapSaldo = function () {
         gTotalKirim += r.kirim;
         gTotalSaldoBap += sBap;
         gTotalSaldoLhp += sLhp;
-        gTotalKonversi += hasilKonversi;
-
+        
         return `
             <tr>
                 <td>${r.jenis}</td>
@@ -1740,8 +1739,6 @@ window.renderRekapSaldo = function () {
                 <td class="text-right">${formatSaldo(r.kirim)}</td>
                 <td class="text-right" style="font-weight:bold">${formatSaldo(sBap)}</td>
                 <td class="text-right" style="font-weight:bold">${formatSaldo(sLhp)}</td>
-                <!-- 💡 Kolom Baru: Hasil Konversi -->
-                <td class="text-right" style="font-weight:bold; color: #059669;">${formatSaldo(hasilKonversi)}</td>
             </tr>`;
     }).join('');
 
@@ -1755,8 +1752,6 @@ window.renderRekapSaldo = function () {
             <td class="text-right">${formatSaldo(gTotalKirim)}</td>
             <td class="text-right">${formatSaldo(gTotalSaldoBap)}</td>
             <td class="text-right">${formatSaldo(gTotalSaldoLhp)}</td>
-            <!-- 💡 Total Hasil Konversi -->
-            <td class="text-right" style="color: #059669;">${formatSaldo(gTotalKonversi)}</td>
         </tr>
     `;
 
