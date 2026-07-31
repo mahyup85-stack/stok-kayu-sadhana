@@ -989,7 +989,7 @@
             <div style="display: flex; flex-direction: column; gap: 10px;">
                 <input type="text" id="master-input-nama" placeholder="Nama Jenis Kayu / TPK..." required style="width: 100%;" />
                 
-                <!-- Input Faktor Konversi (Otomatis tersembunyi jika pilih TPK) -->
+                <!-- Input Faktor Konversi (ID: master-input-konversi) -->
                 <input type="number" id="master-input-konversi" step="0.0001" value="1" placeholder="Faktor Konversi (misal: 0.59)" style="width: 100%;" />
                 
                 <button type="submit" class="btn-primary" style="width: 100%;">Tambah / Update</button>
@@ -1002,7 +1002,8 @@
                     <tr>
                         <th style="padding: 8px; text-align: center;">No</th>
                         <th style="padding: 8px; text-align: left;">Nama</th>
-                        <th style="padding: 8px; text-align: center;">Faktor</th>
+                        <!-- Ditambahkan ID th-faktor agar header kolom bisa disembunyikan -->
+                        <th id="th-faktor" style="padding: 8px; text-align: center;">Faktor</th>
                         <th style="padding: 8px; text-align: center;">Aksi</th>
                     </tr>
                 </thead>
