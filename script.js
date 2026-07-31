@@ -2480,6 +2480,7 @@ function paksaAktifkanFilter() {
         }
     });
 }
+
 function populateAllDropdowns(sumberData = [], masterData = {}) {
     console.log("🔄 Sinkronisasi Dropdown...");
 
@@ -2499,8 +2500,8 @@ function populateAllDropdowns(sumberData = [], masterData = {}) {
             listTPK.map(item => `<option value="${item.name}">${item.name}</option>`).join('');
     }
 
-    // B. Dropdown Filter di Ringkasan Saldo (Penting!)
-    const elFilterJenis = document.getElementById('filter-jenis'); // Pastikan ID ini sesuai di HTML
+    // B. Dropdown Filter di Rekap Saldo
+    const elFilterJenis = document.getElementById('filter-jenis');
     const elFilterTPK = document.getElementById('filter-tpk');
 
     if (elFilterJenis) {
@@ -2514,23 +2515,49 @@ function populateAllDropdowns(sumberData = [], masterData = {}) {
         elFilterTPK.innerHTML = '<option value="">-- Semua TPK --</option>' +
             listTPK.map(item => `<option value="${item.name}">${item.name}</option>`).join('');
     }
+
+    // C. Dropdown Filter di Rincian Mutasi/Saldo
     const elRincianJenis = document.getElementById('filter-rincian-jenis');
     if (elRincianJenis) {
-        const listJenis = state.master["jenis_kayu"] || [];
+        const listJenis = (state.master && state.master["jenis_kayu"]) || masterData["jenis_kayu"] || [];
         elRincianJenis.innerHTML = '<option value="">-- Semua Jenis --</option>' +
             listJenis.map(j => `<option value="${j.name}">${j.name}</option>`).join('');
     }
 
     const elRincianTPK = document.getElementById('filter-rincian-tpk');
     if (elRincianTPK) {
-        const listTPK = state.master["tpk"] || [];
+        const listTPK = (state.master && state.master["tpk"]) || masterData["tpk"] || [];
         elRincianTPK.innerHTML = '<option value="">-- Semua TPK --</option>' +
             listTPK.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
     }
 
-    // Panggil fungsi tahun di akhir agar tahun 2026/2027 muncul
-    updateYearDropdowns();
+    // 🟢 D. TAMBAHAN BARU: ISI DROPDOWN PETAK (REKAP & RINCIAN)
+    // Ambil data sumber (bisa dari parameter sumberData atau state.data)
+    const dataSource = (sumberData && sumberData.length > 0) ? sumberData : (state.data || []);
 
+    // Filter daftar petak unik & bersihkan nilai kosong/null
+    const listPetakUnik = [...new Set(dataSource.map(item => item.petak).filter(Boolean))].sort();
+
+    // 1. Dropdown Petak di Rekap Saldo
+    const elFilterPetak = document.getElementById('filter-petak'); // ID filter petak Rekap
+    if (elFilterPetak) {
+        elFilterPetak.innerHTML = '<option value="">-- Semua Petak --</option>' +
+            listPetakUnik.map(p => `<option value="${p}">${p}</option>`).join('');
+        elFilterPetak.disabled = false; // Buka proteksi klik
+    }
+
+    // 2. Dropdown Petak di Rincian Saldo / Mutasi
+    const elRincianPetak = document.getElementById('filter-rincian-petak'); // ID filter petak Rincian
+    if (elRincianPetak) {
+        elRincianPetak.innerHTML = '<option value="">-- Semua Petak --</option>' +
+            listPetakUnik.map(p => `<option value="${p}">${p}</option>`).join('');
+        elRincianPetak.disabled = false; // Buka proteksi klik
+    }
+
+    // Panggil fungsi tahun di akhir agar tahun muncul
+    if (typeof updateYearDropdowns === 'function') {
+        updateYearDropdowns();
+    }
 }
 
 function hitungKonversiForm() {
