@@ -109,36 +109,38 @@ window.closeMasterModal = function () {
 };
 
 // 3. Render List Master
-window.renderMasterList = function () {
-    const listEl = document.getElementById('master-list-body') || document.getElementById('master-list');
+function renderMasterList() {
     const type = state.currentMasterType;
+    const listEl = document.getElementById('master-list-body') || document.getElementById('master-list');
+    const thFaktor = document.getElementById('th-faktor'); // ID elemen <th>Faktor</th> pada tabel
+    const isTPK = (type === 'tpk');
 
     if (!listEl) return;
 
-    const searchInput = document.getElementById('master-search');
-    const searchTerm = searchInput ? searchInput.value.toLowerCase() : "";
+    // Sembunyikan/tampilkan header tabel kolom "Faktor" jika ada elemen <th> nya
+    if (thFaktor) {
+        thFaktor.style.display = isTPK ? 'none' : 'table-cell';
+    }
 
-    const masterData = (state.master && state.master[type]) ? state.master[type] : [];
+    const items = (state.master && state.master[type]) ? state.master[type] : [];
 
-    const filteredData = masterData.filter(item =>
-        item.name && item.name.toLowerCase().includes(searchTerm)
-    );
-
-    if (filteredData.length === 0) {
-        listEl.innerHTML = '<tr><td colspan="3" class="text-center" style="padding:10px; color:#888;">Tidak ada data</td></tr>';
+    if (items.length === 0) {
+        listEl.innerHTML = '<tr><td colspan="4" class="text-center">Belum ada data</td></tr>';
         return;
     }
 
-    listEl.innerHTML = filteredData.map((item, index) => `
+    listEl.innerHTML = items.map((item, idx) => `
         <tr>
-            <td style="padding:8px; border-bottom:1px solid #eee; text-align:center;">${index + 1}</td>
-            <td style="padding:8px; border-bottom:1px solid #eee;">${item.name}</td>
-            <td style="padding:8px; border-bottom:1px solid #eee;" class="text-center">
-                <button type="button" onclick="deleteMasterItem('${item.id}')" style="background:none; border:none; cursor:pointer; font-size:16px;">🗑️</button>
+            <td class="text-center">${idx + 1}</td>
+            <td>${item.name}</td>
+            <!-- Tampilkan kolom konversi HANYA jika bukan TPK -->
+            ${!isTPK ? `<td class="text-center">${item.konversi || 1}</td>` : ''}
+            <td class="text-center">
+                <button type="button" onclick="deleteMaster('${item.id}')" class="btn-action btn-danger" title="Hapus">🗑️</button>
             </td>
         </tr>
     `).join('');
-};
+}
 
 // 4. Handle Submit Tambah Data
 // ==========================================
