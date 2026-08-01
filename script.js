@@ -526,35 +526,37 @@ window.initSemuaFilter = function () {
     }
 
     // 1. Ambil TPK Unik
-    const daftarTPK = [...new Set(state.data.map(d => d.tpk).filter(t => t))].sort();
+    const daftarTPK = [...new Set(state.data.map(d => d.tpk ? String(d.tpk).trim() : null).filter(Boolean))].sort();
 
     // 2. Isi Dropdown TPK Ringkasan & Rincian
-    const idsTPK = ['filter-tpk', 'filter-rincian-tpk'];
-    idsTPK.forEach(id => {
-        const el = document.getElementById(id);
+    const idsTPK = [
+        { tpkId: 'filter-tpk', petakId: 'filter-petak' },
+        { tpkId: 'filter-rincian-tpk', petakId: 'filter-rincian-petak' }
+    ];
+
+    idsTPK.forEach(item => {
+        const el = document.getElementById(item.tpkId);
         if (el) {
             el.innerHTML = '<option value="">-- Pilih TPK --</option>' +
                 daftarTPK.map(t => `<option value="${t}">${t}</option>`).join('');
 
-            // Pasang paksa event listener-nya di sini agar tidak lewat HTML saja
-            el.onchange = (id === 'filter-tpk') ? updatePetakByTPK : updateRincianPetakByTPK;
+            // PERBAIKAN PENTING: Panggil fungsi dengan meneruskan ID TPK & Petak yang sesuai
+            el.onchange = function () {
+                window.updatePetakByTPK(item.tpkId, item.petakId);
+            };
         }
     });
 
-    // 3. Ambil Tahun Unik (Solusi Tahun 2026)
-    // Ambil tahun unik dari kolom 'tanggal' (format: YYYY-MM-DD)
+    // 3. Ambil Tahun Unik
     const daftarTahun = [...new Set(state.data.map(d => {
-        return d.tanggal ? d.tanggal.split('-')[0] : null;
-    }).filter(t => t))].sort((a, b) => b - a); // Urutkan dari tahun terbaru
+        return d.tanggal ? String(d.tanggal).split('-')[0].trim() : null;
+    }).filter(Boolean))].sort((a, b) => b - a);
 
     const idsTahun = ['filter-dari-tahun', 'filter-sampai-tahun', 'filter-rincian-tahun-dari', 'filter-rincian-tahun-sampai'];
     idsTahun.forEach(id => {
         const el = document.getElementById(id);
         if (el) {
-            // Aktifkan kembali (jika sebelumnya terkunci)
             el.disabled = false;
-
-            // Isi datanya
             el.innerHTML = '<option value="">-- Tahun --</option>' +
                 daftarTahun.map(th => `<option value="${th}">${th}</option>`).join('');
         }
@@ -562,6 +564,7 @@ window.initSemuaFilter = function () {
 
     console.log("✅ Filter Sinkron. TPK:", daftarTPK.length, "Tahun:", daftarTahun);
 };
+
 window.updatePetakByTPK = function (tpkSelectId = 'filter-tpk', petakSelectId = 'filter-petak') {
     const tpkEl = document.getElementById(tpkSelectId);
     const petakEl = document.getElementById(petakSelectId);
