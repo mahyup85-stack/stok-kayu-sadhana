@@ -573,18 +573,18 @@ window.updatePetakByTPK = function (tpkSelectId = 'filter-tpk', petakSelectId = 
 
     const tpkVal = tpkEl ? tpkEl.value : '';
 
-    if (!tpkVal || !state.data) {
+    if (!tpkVal || !state.data || state.data.length === 0) {
         petakEl.disabled = true;
         return;
     }
 
-    // Filter data tanpa peduli spasi & huruf besar/kecil (Paling Aman)
+    // Cari data yang TPK-nya cocok
     const matchingData = state.data.filter(d =>
         String(d.tpk || "").trim().toLowerCase() === String(tpkVal || "").trim().toLowerCase()
     );
 
-    // Ambil daftar petak unik & urutkan
-    const uniquePetaks = [...new Set(matchingData.map(d => d.petak).filter(Boolean))].sort();
+    // Ambil daftar petak unik & hapus nilai kosong/strip
+    const uniquePetaks = [...new Set(matchingData.map(d => d.petak).filter(p => p && p !== '-'))].sort();
 
     if (uniquePetaks.length > 0) {
         uniquePetaks.forEach(p => {
@@ -1383,28 +1383,32 @@ function renderUI() {
 
 
 // Fungsi yang sama untuk bagian Rincian (Sesuaikan ID-nya)
-window.updateRincianPetakByTPK = function (isActive) {
-    const tpkVal = document.getElementById('filter-rincian-tpk').value;
+window.updateRincianPetakByTPK = function () {
+    const tpkVal = document.getElementById('filter-rincian-tpk')?.value;
     const petakEl = document.getElementById('filter-rincian-petak');
 
     if (!petakEl) return;
+
     petakEl.innerHTML = '<option value="">-- Semua Petak --</option>';
 
-    if (!tpkVal) {
+    if (!tpkVal || !state.data) {
         petakEl.disabled = true;
         return;
     }
 
-    // Ambil daftar petak unik dari transaksi yang sudah ada di database
+    // Ambil petak unik berdasarkan TPK yang dipilih
     const daftarPetak = [...new Set(state.data
-        .filter(d => d.tpk === tpkVal)
+        .filter(d => String(d.tpk || "").trim().toLowerCase() === String(tpkVal || "").trim().toLowerCase())
         .map(d => d.petak))]
-        .filter(Boolean)
+        .filter(p => p && p !== '-')
         .sort();
 
     if (daftarPetak.length > 0) {
         daftarPetak.forEach(p => {
-            petakEl.innerHTML += `<option value="${p}">${p}</option>`;
+            const opt = document.createElement('option');
+            opt.value = p;
+            opt.textContent = p;
+            petakEl.appendChild(opt);
         });
         petakEl.disabled = false;
     } else {
