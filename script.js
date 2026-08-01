@@ -920,49 +920,62 @@ function toggleMenu(id) {
     if (menu) menu.classList.toggle("open");
 }
 
-function switchView(v) {
+window.switchView = function (v) {
     state.view = v;
-    
-    // 1. Sembunyikan Modal Master jika user pindah menu lewat sidebar
-    const modal = document.getElementById('master-modal');
-    if (modal) modal.classList.add('hidden');
 
-    // 2. Update Judul di Header (Main Header)
-    const titleHeader = document.querySelector('.main-header h2');
+    // 1. Ambil elemen Modal Master
+    const modal = document.getElementById('master-modal');
+
+    // 2. Cek apakah menu yang dipilih adalah bagian dari Master Data
+    const isMasterData = (v === 'jenis-kayu' || v === 'tpk');
+
+    if (isMasterData) {
+        // Tampilkan Modal Master jika menu jenis-kayu / tpk dipilih
+        if (modal) modal.classList.remove('hidden');
+    } else {
+        // Sembunyikan Modal Master jika pindah ke menu lain
+        if (modal) modal.classList.add('hidden');
+    }
+
+    // 3. Update Judul di Header
+    const titleHeader = document.querySelector('.main-header h2, .main-header h1, #page-title');
     if (titleHeader) {
         const names = {
             'dashboard': 'KARTU STOK',
             'rekap-saldo': 'REKAPITULASI SALDO',
-            'rekap-rincian': 'RINCIAN MUTASI KAYU', 
+            'rekap-rincian': 'RINCIAN MUTASI KAYU',
             'kelola-sandi': 'PENGATURAN',
             'backup-setting': 'PENGATURAN',
             'jenis-kayu': 'MASTER DATA',
-            'tpk': 'MASTER DATA' 
+            'tpk': 'MASTER DATA'
         };
         titleHeader.innerText = names[v] || v.toUpperCase();
     }
 
-    // 3. Sembunyikan semua section konten agar tidak tumpang tindih
+    // 4. Sembunyikan semua section konten agar tidak tumpang tindih
     document.querySelectorAll('.view-section, [id^="view-"]').forEach(el => el.classList.add('hidden'));
 
-    // 4. Tampilkan section yang dipilih
+    // 5. Tampilkan section utama yang dipilih
     const target = document.getElementById('view-' + v);
     if (target) {
         target.classList.remove('hidden');
     }
 
-    // 5. Reset pagination ke halaman 1
+    // 6. Reset pagination
     state.currentPage = 1;
 
-    // 6. Jalankan fungsi render sesuai menu yang dipilih
+    // 7. Jalankan render data sesuai menu yang aktif
     if (v === 'dashboard' || v === 'kelola-sandi' || v === 'backup-setting') {
-        renderDashboardTable();
+        if (typeof renderDashboardTable === 'function') renderDashboardTable();
+    } else if (v === 'rekap-saldo' || v === 'ringkasan') {
+        if (typeof renderRekapSaldo === 'function') renderRekapSaldo();
+    } else if (v === 'jenis-kayu') {
+        if (typeof renderMasterJenisKayu === 'function') renderMasterJenisKayu();
+    } else if (v === 'tpk') {
+        if (typeof renderMasterTPK === 'function') renderMasterTPK();
     }
+};
 
-    if (v === 'rekap-saldo' || v === 'ringkasan') {
-        renderRekapSaldo();
-    }
-}
 let isSubmitting=false;
 
 // 1. FUNGSI HANDLER SUBMIT
