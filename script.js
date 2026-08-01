@@ -947,6 +947,7 @@ window.switchView = function (v) {
     if (titleHeader) {
         const names = {
             'dashboard': 'KARTU STOK',
+            'rekap': 'REKAPITULASI SALDO',       // Disesuaikan dengan parameter 'rekap' dari HTML
             'rekap-saldo': 'REKAPITULASI SALDO',
             'rekap-rincian': 'RINCIAN MUTASI KAYU',
             'kelola-sandi': 'PENGATURAN',
@@ -957,13 +958,16 @@ window.switchView = function (v) {
         titleHeader.innerText = names[v] || v.toUpperCase();
     }
 
-    // 4. Sembunyikan semua section konten agar tidak tumpang tindih
-    document.querySelectorAll('.view-section, [id^="view-"]').forEach(el => el.classList.add('hidden'));
+    // 4 & 5. Tampilkan section utama (Jika bukan Master Data Modal)
+    if (!isMasterData) {
+        // Sembunyikan semua section konten
+        document.querySelectorAll('.view-section, [id^="view-"]').forEach(el => el.classList.add('hidden'));
 
-    // 5. Tampilkan section utama yang dipilih
-    const target = document.getElementById('view-' + v);
-    if (target) {
-        target.classList.remove('hidden');
+        // Tampilkan section utama yang dipilih
+        const target = document.getElementById('view-' + v);
+        if (target) {
+            target.classList.remove('hidden');
+        }
     }
 
     // 6. Reset pagination
@@ -972,12 +976,16 @@ window.switchView = function (v) {
     // 7. Jalankan render data sesuai menu yang aktif
     if (v === 'dashboard' || v === 'kelola-sandi' || v === 'backup-setting') {
         if (typeof renderDashboardTable === 'function') renderDashboardTable();
-    } else if (v === 'rekap-saldo' || v === 'ringkasan') {
+    } else if (v === 'rekap' || v === 'rekap-saldo' || v === 'ringkasan') {
         if (typeof renderRekapSaldo === 'function') renderRekapSaldo();
+    } else if (v === 'rekap-rincian') {
+        if (typeof renderRekapRincian === 'function') renderRekapRincian();
     } else if (v === 'jenis-kayu') {
-        if (typeof renderMasterJenisKayu === 'function') renderMasterJenisKayu();
+        if (typeof showMasterModal === 'function') showMasterModal('jenis_kayu');
+        else if (typeof renderMasterJenisKayu === 'function') renderMasterJenisKayu();
     } else if (v === 'tpk') {
-        if (typeof renderMasterTPK === 'function') renderMasterTPK();
+        if (typeof showMasterModal === 'function') showMasterModal('tpk');
+        else if (typeof renderMasterTPK === 'function') renderMasterTPK();
     }
 };
 
