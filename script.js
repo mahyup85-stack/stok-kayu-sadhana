@@ -568,31 +568,36 @@ window.updatePetakByTPK = function (tpkSelectId = 'filter-tpk', petakSelectId = 
 
     if (!petakEl) return;
 
-    // Ambil value DAN teks label yang sedang dipilih di dropdown TPK
-    const selectedVal = tpkEl ? String(tpkEl.value).trim().toLowerCase() : '';
-    const selectedText = (tpkEl && tpkEl.selectedIndex >= 0) 
-        ? String(tpkEl.options[tpkEl.selectedIndex].text).trim().toLowerCase() 
-        : '';
+    // Helper untuk membersihkan & merapikan teks
+    const cleanString = (str) => String(str || '').replace(/\s+/g, ' ').trim().toLowerCase();
 
-    // Reset dropdown petak
+    // Ambil value DAN text dari TPK yang dipilih (bersihkan spasinya)
+    const rawVal = tpkEl ? tpkEl.value : '';
+    const rawText = (tpkEl && tpkEl.selectedIndex >= 0) ? tpkEl.options[tpkEl.selectedIndex].text : '';
+
+    const selectedVal = cleanString(rawVal);
+    const selectedText = cleanString(rawText);
+
+    // Reset isi dropdown petak
     petakEl.innerHTML = '<option value="">-- Semua Petak --</option>';
 
-    if (!selectedVal || !state.data || state.data.length === 0) {
+    // Gunakan state.data atau tentukan fallback ke array data utama kamu
+    const dataSource = state.data || state.rekapData || state.mutasiData || [];
+
+    // Jika TPK belum dipilih atau data kosong
+    if (!selectedVal || dataSource.length === 0) {
         petakEl.disabled = true;
         return;
     }
 
-    // Filter data: Cek apakah d.tpk cocok dengan value ATAU teks pilihan
-    const matchingData = state.data.filter(d => {
+    // Filter data dengan penanganan spasi yang identik
+    const matchingData = dataSource.filter(d => {
         if (!d.tpk) return false;
-        
-        // Bersihkan spasi ganda dan ubah ke huruf kecil
-        const dbTPK = String(d.tpk).replace(/\s+/g, ' ').trim().toLowerCase();
-        
-        return dbTPK === selectedVal || dbTPK === selectedText;
+        const dbTPK = cleanString(d.tpk);
+        return dbTPK === selectedVal || (selectedText !== '' && dbTPK === selectedText);
     });
 
-    console.log("Match TPK Ditemukan:", matchingData.length);
+    console.log(`[${tpkSelectId}] Match TPK Ditemukan:`, matchingData.length);
 
     // Ambil daftar petak unik dari hasil match
     const uniquePetaks = [...new Set(
@@ -601,9 +606,9 @@ window.updatePetakByTPK = function (tpkSelectId = 'filter-tpk', petakSelectId = 
             .filter(p => p !== '' && p !== '-' && p !== 'undefined' && p !== 'null')
     )].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-    console.log("Daftar Petak Unik:", uniquePetaks);
+    console.log(`[${petakSelectId}] Daftar Petak Unik:`, uniquePetaks);
 
-    // Render ke dropdown petak
+    // Render & Buka kuncian Petak
     if (uniquePetaks.length > 0) {
         uniquePetaks.forEach(p => {
             const opt = document.createElement('option');
@@ -611,13 +616,15 @@ window.updatePetakByTPK = function (tpkSelectId = 'filter-tpk', petakSelectId = 
             opt.textContent = p;
             petakEl.appendChild(opt);
         });
+        
         petakEl.disabled = false;
+        petakEl.removeAttribute('disabled'); // Memastikan kuncian HTML benar-benar dilepas
     } else {
         petakEl.disabled = true;
     }
 };
 
-// --- FUNGSI SPESIFIK UNTUK TABEL RINCIAN (JIKA DIBUTUHKAN DI HTML) ---
+// --- FUNGSI SPESIFIK UNTUK TABEL RINCIAN ---
 window.updatePetakRincianByTPK = function () {
     window.updatePetakByTPK('filter-rincian-tpk', 'filter-rincian-petak');
 };
