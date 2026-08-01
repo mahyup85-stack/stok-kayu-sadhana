@@ -30,40 +30,7 @@ let state = {
 };
 // --- FUNGSI MASTER DATA (SINKRON DENGAN SUPABASE) ---
 // Membuka Modal Master
-window.showMasterModal = function(type) {
-    state.currentMasterType = type;
-    
-    const modal = document.getElementById('master-modal');
-    const titleHeader = document.querySelector('.main-header h2'); // Target judul di header atas
-
-    // 1. Ubah Judul Header secara dinamis
-    if (titleHeader) {
-        titleHeader.innerText = (type === 'tpk' ? 'MASTER DATA' : 'MASTER DATA');
-    }
-
-    // 2. Munculkan area putih (Modal)
-    if (modal) {
-        modal.classList.remove('hidden');
-    }
-
-    // 3. Render list datanya
-    renderMasterList();
-};
-
-function showMasterModal() {
-    // Ubah header ke MASTER DATA secara manual
-    const titleHeader = document.querySelector('.main-header h2');
-    if (titleHeader) titleHeader.innerText = 'MASTER DATA';
-
-    // Tampilkan modal
-    document.getElementById('master-modal')?.classList.remove('hidden');
-}
-
-// 1. Alias agar dipanggil 'showMasterModal' atau 'openMasterModal' tetap jalan
-window.showMasterModal = function (type) {
-    window.openMasterModal(type);
-};
-
+// 1. Fungsi Buka Modal Master Data & Update Header
 window.openMasterModal = async function (type) {
     state.currentMasterType = type;
     
@@ -72,15 +39,22 @@ window.openMasterModal = async function (type) {
     const listEl = document.getElementById('master-list-body');
     const konversiInput = document.getElementById('master-input-konversi');
 
+    // 🔴 Ubah Judul Header Utama di Atas (KARTU STOK -> MASTER DATA)
+    const titleHeader = document.querySelector('.main-header h2, #current-view-title');
+    if (titleHeader) {
+        titleHeader.innerText = (type === 'tpk') ? 'MASTER TPK' : 'MASTER JENIS KAYU';
+    }
+
     if (!modal || !listEl) return;
 
     const isTPK = (type === 'tpk');
 
+    // Ubah Judul di dalam Modal Popup
     if (title) {
         title.innerText = isTPK ? 'Kelola Master TPK' : 'Kelola Master Jenis Kayu';
     }
 
-    // 🔴 Sembunyikan Input Konversi jika TPK
+    // Sembunyikan Input Konversi jika TPK
     if (konversiInput) {
         konversiInput.style.display = isTPK ? 'none' : 'block';
     }
@@ -107,11 +81,30 @@ window.openMasterModal = async function (type) {
     }
 };
 
-// 2. Fungsi Tutup Modal (Mencegah error 'closeMasterModal is not defined')
+// 2. Alias agar dipanggil 'showMasterModal' tetap jalan
+window.showMasterModal = function (type) {
+    window.openMasterModal(type);
+};
+
+// 3. Fungsi Tutup Modal & Kembalikan Judul Header ke Halaman Sebelumnya
 window.closeMasterModal = function () {
     const modal = document.getElementById('master-modal');
     if (modal) {
         modal.classList.add('hidden');
+    }
+
+    // 🔴 Kembalikan Judul Header Utama saat modal ditutup
+    const titleHeader = document.querySelector('.main-header h2, #current-view-title');
+    if (titleHeader && state.view) {
+        const names = {
+            'dashboard': 'KARTU STOK',
+            'rekap': 'REKAPITULASI SALDO',
+            'rekap-saldo': 'REKAPITULASI SALDO',
+            'rekap-rincian': 'RINCIAN MUTASI KAYU',
+            'kelola-sandi': 'PENGATURAN',
+            'backup-setting': 'PENGATURAN'
+        };
+        titleHeader.innerText = names[state.view] || 'KARTU STOK';
     }
 };
 
@@ -947,7 +940,7 @@ window.switchView = function (v) {
     if (titleHeader) {
         const names = {
             'dashboard': 'KARTU STOK',
-            'rekap': 'REKAPITULASI SALDO',       // Disesuaikan dengan parameter 'rekap' dari HTML
+            'rekap': 'REKAPITULASI',       // Disesuaikan dengan parameter 'rekap' dari HTML
             'rekap-saldo': 'REKAPITULASI SALDO',
             'rekap-rincian': 'RINCIAN MUTASI KAYU',
             'kelola-sandi': 'PENGATURAN',
