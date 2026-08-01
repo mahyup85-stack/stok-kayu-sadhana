@@ -566,25 +566,40 @@ window.updatePetakByTPK = function (tpkSelectId = 'filter-tpk', petakSelectId = 
     const tpkEl = document.getElementById(tpkSelectId);
     const petakEl = document.getElementById(petakSelectId);
 
-    if (!petakEl) return;
-
-    // Reset dropdown petak
-    petakEl.innerHTML = '<option value="">-- Semua Petak --</option>';
-
-    const tpkVal = tpkEl ? tpkEl.value : '';
-
-    if (!tpkVal || !state.data || state.data.length === 0) {
-        petakEl.disabled = true;
+    if (!petakEl) {
+        console.error("Elemen dropdown petak tidak ditemukan! Cek ID:", petakSelectId);
         return;
     }
 
-    // Cari data yang TPK-nya cocok
-    const matchingData = state.data.filter(d =>
-        String(d.tpk || "").trim().toLowerCase() === String(tpkVal || "").trim().toLowerCase()
+    const tpkVal = tpkEl ? tpkEl.value : '';
+
+    // Filter data berdasarkan TPK
+    const matchingData = state.data.filter(d => {
+        const valTPK = String(d.tpk || d.TPK || d.Tpk || "").trim().toLowerCase();
+        return valTPK === String(tpkVal).trim().toLowerCase();
+    });
+
+    console.log("Ditemukan:", matchingData.length);
+    
+    // CEK NAMA KOLOM PETAK DI CONSOLE:
+    if (matchingData.length > 0) {
+        console.log("Contoh 1 data hasil filter:", matchingData[0]); 
+    }
+
+    // Mengambil nilai petak dengan mengecek beberapa variasi penulisan nama kolom
+    const listPetak = matchingData.map(d => 
+        d.petak || d.PETAK || d.Petak || d.no_petak || d.NO_PETAK || d.noPetak || ""
     );
 
-    // Ambil daftar petak unik & hapus nilai kosong/strip
-    const uniquePetaks = [...new Set(matchingData.map(d => d.petak).filter(p => p && p !== '-'))].sort();
+    // Ambil nilai unik dan bersihkan spasi
+    const uniquePetaks = [...new Set(listPetak.map(p => String(p).trim()))]
+        .filter(p => p !== "" && p !== "-" && p !== "undefined" && p !== "null")
+        .sort();
+
+    console.log("Daftar Petak Unik Hasil Extract:", uniquePetaks);
+
+    // Reset isi dropdown petak
+    petakEl.innerHTML = '<option value="">-- Semua Petak --</option>';
 
     if (uniquePetaks.length > 0) {
         uniquePetaks.forEach(p => {
@@ -593,7 +608,7 @@ window.updatePetakByTPK = function (tpkSelectId = 'filter-tpk', petakSelectId = 
             opt.textContent = p;
             petakEl.appendChild(opt);
         });
-        petakEl.disabled = false;
+        petakEl.disabled = false; // Aktifkan dropdown
     } else {
         petakEl.disabled = true;
     }
