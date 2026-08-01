@@ -656,71 +656,33 @@
                 </div>
             </aside>
             <nav>
-
-                <aside>
-    <nav class="sidebar-nav">
-        <!-- Dashboard / Kartu Stok -->
-        <button onclick="switchView('dashboard')" class="nav-btn">📊 Kartu Stok</button>
-
-        <!-- Submenu Rekapitulasi -->
-        <div class="nav-item">
-            <button onclick="toggleMenu('rekap')" class="nav-btn">📈 Rekapitulasi</button>
-            <div id="rekap-submenu" class="submenu">
-                <ul class="sidebar-menu">
-                    <li onclick="switchView('rekap')">
-                        <a href="#">Rekap Saldo</a>
-                    </li>
-                    <li onclick="switchView('rekap-rincian')">
-                        <a href="#">Rincian Mutasi</a>
-                    </li>
-                </ul>
+                <button onclick="switchView('dashboard')" class="nav-btn">📊 Kartu Stok</button>
+                <button onclick="toggleMenu('rekap')" class="nav-btn">📈 Rekapitulasi</button>
+                <div id="rekap-submenu" class="submenu">
+                    <button onclick="switchView('rekap')" class="sub-link">• Rekap Saldo</button>
+                    <button onclick="switchView('rekap-rincian')" class="sub-link">• Rincian Mutasi</button>
+                </div>
+                <button onclick="toggleMenu('master')" class="nav-btn">📁 Master Data</button>
+                <div id="master-submenu" class="submenu">
+                    <button onclick="showMasterModal('jenis_kayu')" class="sub-link">• Jenis Kayu</button>
+                    <button onclick="showMasterModal('tpk')" class="sub-link">• TPK</button>
+                </div>
+                <button onclick="toggleMenu('pengaturan')" class="nav-btn">⚙️ Pengaturan</button>
+                <div id="pengaturan-submenu" class="submenu">
+                    <button onclick="switchView('kelola-sandi')" class="sub-link">• Kelola Akun</button>
+                    <button onclick="switchView('backup-setting')" class="sub-link">• Backup & Restore</button>
+                </div>
+            </nav>
+            <div style="padding: 20px;">
+                <button onclick="logout()"
+                    style="width:100%; background:#ef4444; color:white; border:none; padding:10px; border-radius:8px; cursor:pointer; font-weight: bold;">Keluar</button>
             </div>
-        </div>
-
-        <!-- Submenu Master Data -->
-        <div class="nav-item">
-            <button onclick="toggleMenu('master')" class="nav-btn">📁 Master Data</button>
-            <div id="master-submenu" class="submenu">
-                <ul class="sidebar-menu">
-                    <li onclick="switchView('jenis-kayu')">
-                        <a href="#">Jenis Kayu</a>
-                    </li>
-                    <li onclick="switchView('tpk')">
-                        <a href="#">TPK</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-
-        <!-- Submenu Pengaturan -->
-        <div class="nav-item">
-            <button onclick="toggleMenu('pengaturan')" class="nav-btn">⚙️ Pengaturan</button>
-            <div id="pengaturan-submenu" class="submenu">
-                <ul class="sidebar-menu">
-                    <li onclick="switchView('kelola-sandi')">
-                        <a href="#">Kelola Akun</a>
-                    </li>
-                    <li onclick="switchView('backup-setting')">
-                        <a href="#">Backup & Restore</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-
-    <!-- Tombol Keluar -->
-    <div style="padding: 20px;">
-        <button onclick="logout()" 
-            style="width: 100%; background: #ef4444; color: white; border: none; padding: 10px; border-radius: 8px; cursor: pointer; font-weight: bold;">
-            Keluar
-        </button>
-    </div>
-</aside>
+        </aside>
         <main>
             <header
                 style="display: flex; justify-content: space-between; align-items: center; padding: 8px 8px; background: #fff; border-bottom: 1px solid #ddd;">
                 <div class="main-header">
-                    <h2 id="current-view-title">Kartu Stok</h2>
+                    <h1>KARTU STOK</h1>
                 </div>
 
             </header>

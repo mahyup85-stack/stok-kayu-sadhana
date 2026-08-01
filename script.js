@@ -50,9 +50,14 @@ window.showMasterModal = function(type) {
     renderMasterList();
 };
 
-// ==========================================
-// FUNGSI MASTER DATA (LENGKAP & SINKRON)
-// ==========================================
+function showMasterModal() {
+    // Ubah header ke MASTER DATA secara manual
+    const titleHeader = document.querySelector('.main-header h2');
+    if (titleHeader) titleHeader.innerText = 'MASTER DATA';
+
+    // Tampilkan modal
+    document.getElementById('master-modal')?.classList.remove('hidden');
+}
 
 // 1. Alias agar dipanggil 'showMasterModal' atau 'openMasterModal' tetap jalan
 window.showMasterModal = function (type) {
@@ -938,7 +943,7 @@ window.switchView = function (v) {
     }
 
     // 3. Update Judul di Header
-    const titleHeader = document.querySelector('.main-header h2, .main-header h1, #page-title');
+    const titleHeader = document.querySelector('.main-header h2, .main-header h1, .main-header h3, #page-title');
     if (titleHeader) {
         const names = {
             'dashboard': 'KARTU STOK',
