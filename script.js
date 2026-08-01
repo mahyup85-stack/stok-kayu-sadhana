@@ -566,39 +566,50 @@ window.updatePetakByTPK = function (tpkSelectId = 'filter-tpk', petakSelectId = 
     const tpkEl = document.getElementById(tpkSelectId);
     const petakEl = document.getElementById(petakSelectId);
 
-    if (!petakEl) {
-        console.error("Elemen dropdown petak tidak ditemukan! Cek ID:", petakSelectId);
+    if (!petakEl) return;
+
+    // Ambil nilai yang sedang dipilih dari dropdown TPK
+    const tpkVal = tpkEl ? tpkEl.value : '';
+    const selectedText = tpkEl && tpkEl.selectedIndex >= 0 ? tpkEl.options[tpkEl.selectedIndex].text : '';
+
+    console.log("=== DEBUG TPK ===");
+    console.log("Value TPK yang dipilih (tpkEl.value):", `"${tpkVal}"`);
+    console.log("Teks TPK yang terlihat (option.text):", `"${selectedText}"`);
+
+    if (!state.data || state.data.length === 0) {
+        console.warn("state.data masih kosong/belum dimuat!");
+        petakEl.disabled = true;
         return;
     }
 
-    const tpkVal = tpkEl ? tpkEl.value : '';
+    // Tampilkan contoh 1 sampel data dari state.data
+    console.log("Contoh 1 Sampel Data di state.data:", state.data[0]);
 
-    // Filter data berdasarkan TPK
+    // Cari matching data dengan mencoba mencocokkan VALUE atau TEKS PILIHAN TPK
     const matchingData = state.data.filter(d => {
-        const valTPK = String(d.tpk || d.TPK || d.Tpk || "").trim().toLowerCase();
-        return valTPK === String(tpkVal).trim().toLowerCase();
+        // Ambil nilai TPK dari objek data (toleran nama kolom tpk / TPK)
+        const rawDataTPK = String(d.tpk || d.TPK || d.Tpk || "").trim().toLowerCase();
+        const searchVal = String(tpkVal).trim().toLowerCase();
+        const searchText = String(selectedText).trim().toLowerCase();
+
+        // Cocokkan ke value ATAU ke teks label option-nya
+        return rawDataTPK === searchVal || (searchText !== "" && rawDataTPK === searchText);
     });
 
-    console.log("Ditemukan:", matchingData.length);
-    
-    // CEK NAMA KOLOM PETAK DI CONSOLE:
-    if (matchingData.length > 0) {
-        console.log("Contoh 1 data hasil filter:", matchingData[0]); 
-    }
+    console.log("Hasil Match Data setelah perbaikan:", matchingData.length);
 
-    // Mengambil nilai petak dengan mengecek beberapa variasi penulisan nama kolom
+    // Ambil petak unik
     const listPetak = matchingData.map(d => 
         d.petak || d.PETAK || d.Petak || d.no_petak || d.NO_PETAK || d.noPetak || ""
     );
 
-    // Ambil nilai unik dan bersihkan spasi
     const uniquePetaks = [...new Set(listPetak.map(p => String(p).trim()))]
         .filter(p => p !== "" && p !== "-" && p !== "undefined" && p !== "null")
         .sort();
 
     console.log("Daftar Petak Unik Hasil Extract:", uniquePetaks);
 
-    // Reset isi dropdown petak
+    // Isi ke elemen HTML
     petakEl.innerHTML = '<option value="">-- Semua Petak --</option>';
 
     if (uniquePetaks.length > 0) {
@@ -608,7 +619,7 @@ window.updatePetakByTPK = function (tpkSelectId = 'filter-tpk', petakSelectId = 
             opt.textContent = p;
             petakEl.appendChild(opt);
         });
-        petakEl.disabled = false; // Aktifkan dropdown
+        petakEl.disabled = false;
     } else {
         petakEl.disabled = true;
     }
