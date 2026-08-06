@@ -1276,24 +1276,13 @@ window.editData = function(id) {
 };
 
 window.deleteData = async function(id) {
-    if (!id) {
-        alert("ID data tidak ditemukan!");
-        return;
-    }
-
-    // Pengecekan Ketersediaan Client Supabase (api)
-    const supabaseClient = window.api || (typeof api !== 'undefined' ? api : null);
-    if (!supabaseClient) {
-        alert("Koneksi ke database belum siap. Silakan refresh halaman.");
-        return;
-    }
-
-    if (!confirm("Apakah Anda yakin ingin menghapus data ini?")) return;
+    if (!id) return alert("ID tidak ditemukan!");
+    if (!confirm("Yakin ingin menghapus data ini?")) return;
 
     try {
         if (typeof showLoading === 'function') showLoading(true);
 
-        const { error } = await supabaseClient
+        const { error } = await api
             .from('stok_kayu')
             .delete()
             .eq('id', id);
@@ -1301,14 +1290,11 @@ window.deleteData = async function(id) {
         if (error) throw error;
 
         alert("Data berhasil dihapus!");
-
-        // Refresh data
-        if (typeof loadMutasiData === 'function') await loadMutasiData();
         if (typeof fetchData === 'function') await fetchData();
 
     } catch (err) {
-        console.error("Gagal menghapus data:", err);
-        alert("Gagal menghapus data: " + (err.message || err));
+        console.error("Error Delete:", err);
+        alert("Gagal menghapus: " + (err.message || err));
     } finally {
         if (typeof showLoading === 'function') showLoading(false);
     }
