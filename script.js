@@ -1582,45 +1582,51 @@ function renderFilteredTable(filteredData) {
 }
 
 function renderMutasiTable(data) {
-    const tbody = document.getElementById('main-table-body'); // SESUAI DENGAN ID HTML KAMU
+    const tbody = document.getElementById('main-table-body');
     if (!tbody) return;
 
     if (!data || data.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 15px;">Tidak ada data mutasi</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align: center; padding: 15px; color: #888;">Tidak ada data mutasi</td></tr>`;
         return;
     }
 
-    tbody.innerHTML = data.map(item => `
-        <tr>
-            <td style="text-align: center;">
-                <input type="checkbox" class="row-checkbox" value="${item.id}">
-            </td>
-            <td>${item.tanggal || '-'}</td>
-            <td>${item.keterangan || '-'}</td>
-            <td>${item.jenis_kayu || '-'}</td>
-            <td>${item.tpk || '-'}</td>
-            <td>${item.petak || '-'}</td>
-            <td style="text-align: right;">${parseFloat(item.masuk_m3 || 0).toFixed(2)}</td>
-            <td style="text-align: right;">${parseFloat(item.keluar_m3 || 0).toFixed(2)}</td>
-            <td style="text-align: center; white-space: nowrap;">
-                <!-- ✏️ TOMBOL EDIT -->
-                <button type="button" 
-                        onclick="editData('${item.id}')" 
-                        style="background: #f59e0b; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin-right: 4px;" 
-                        title="Edit Data">
-                    ✏️
-                </button>
-                
-                <!-- 🗑️ TOMBOL HAPUS -->
-                <button type="button" 
-                        onclick="deleteData('${item.id}')" 
-                        style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;" 
-                        title="Hapus Data">
-                    🗑️
-                </button>
-            </td>
-        </tr>
-    `).join('');
+    tbody.innerHTML = data.map(item => {
+        // Konversi angka masuk & keluar M3
+        const masuk = parseFloat(item.masuk_m3 || 0);
+        const keluar = parseFloat(item.keluar_m3 || 0);
+
+        return `
+            <tr>
+                <td style="text-align: center;">
+                    <input type="checkbox" class="row-checkbox" value="${item.id}">
+                </td>
+                <td>${item.tanggal || '-'}</td>
+                <td>${item.keterangan || '-'}</td>
+                <td>${item.jenis_kayu || '-'}</td>
+                <td>${item.tpk || '-'}</td>
+                <td>${item.petak || '-'}</td>
+                <td style="text-align: right;">${masuk > 0 ? masuk.toFixed(2) : '-'}</td>
+                <td style="text-align: right;">${keluar > 0 ? keluar.toFixed(2) : '-'}</td>
+                <td style="text-align: center; white-space: nowrap;">
+                    <!-- ✏️ TOMBOL EDIT (Dipanggil lewat window.editData) -->
+                    <button type="button" 
+                            onclick="window.editData ? window.editData('${item.id}') : editData('${item.id}')" 
+                            style="background: #f59e0b; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin-right: 4px;" 
+                            title="Edit Data">
+                        ✏️
+                    </button>
+                    
+                    <!-- 🗑️ TOMBOL HAPUS (Dipanggil lewat window.deleteData) -->
+                    <button type="button" 
+                            onclick="window.deleteData ? window.deleteData('${item.id}') : deleteData('${item.id}')" 
+                            style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;" 
+                            title="Hapus Data">
+                        🗑️
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
 }
 
 // 💡 Helper fungsi untuk menghitung hasil konversi (Bisa ditaruh di atas fungsi ini)
