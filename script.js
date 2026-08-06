@@ -1228,49 +1228,64 @@ window.editData = function(id) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-window.deleteData = async function(rawId) {
+window.deleteData = function(rawId) {
     const cleanId = parseInt(rawId, 10);
     if (isNaN(cleanId)) return alert("ID data tidak valid!");
 
-    // LANGSUNG JALANKAN PROSES HAPUS (Tanpa confirm() native yang diblokir)
-    try {
-        console.log("Mengirim perintah hapus ke Supabase untuk ID:", cleanId);
+    // Konfirmasi menggunakan SweetAlert2 (Tidak bisa diblokir browser)
+    Swal.fire({
+        title: 'Konfirmasi Hapus',
+        text: `Apakah Anda yakin ingin menghapus data dengan ID ${cleanId}?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Ya, Hapus!',
+        cancelButtonText: 'Batal'
+    }).then(async (result) => {
+        // Eksekusi hanya jika tombol "Ya, Hapus!" diklik
+        if (result.isConfirmed) {
+            try {
+                if (typeof showLoading === 'function') showLoading(true);
 
-        // 1. Eksekusi Hapus ke Supabase
-        const response = await api
-            .from('stok_kayu')
-            .delete()
-            .eq('id', cleanId);
+                // 1. Eksekusi Hapus ke Supabase
+                const response = await api
+                    .from('stok_kayu')
+                    .delete()
+                    .eq('id', cleanId);
 
-        if (response && response.error) {
-            throw response.error;
-        }
+                if (response && response.error) throw response.error;
 
-        // 2. Hapus Data dari State Lokal (UI Langsung Berubah)
-        if (typeof state !== 'undefined') {
-            if (Array.isArray(state.data)) {
-                state.data = state.data.filter(item => Number(item.id) !== cleanId);
+                // 2. Update State Lokal (UI Instan)
+                if (typeof state !== 'undefined') {
+                    if (Array.isArray(state.data)) {
+                        state.data = state.data.filter(item => Number(item.id) !== cleanId);
+                    }
+                    if (Array.isArray(state.filteredData)) {
+                        state.filteredData = state.filteredData.filter(item => Number(item.id) !== cleanId);
+                    }
+                }
+
+                // 3. Fetch Ulang & Re-render
+                if (typeof fetchData === 'function') await fetchData();
+                if (typeof applyFilter === 'function') applyFilter();
+                if (typeof filterData === 'function') filterData();
+                
+                if (typeof renderDashboardTable === 'function') renderDashboardTable();
+                if (typeof renderRekapRincian === 'function') renderRekapRincian();
+                if (typeof renderRincian === 'function') renderRincian();
+
+                // Notifikasi Sukses
+                Swal.fire('Terhapus!', 'Data berhasil dihapus dari database.', 'success');
+
+            } catch (err) {
+                console.error("Error saat menghapus:", err);
+                Swal.fire('Gagal!', 'Gagal menghapus data: ' + (err.message || err), 'error');
+            } finally {
+                if (typeof showLoading === 'function') showLoading(false);
             }
-            if (Array.isArray(state.filteredData)) {
-                state.filteredData = state.filteredData.filter(item => Number(item.id) !== cleanId);
-            }
         }
-
-        // 3. Tarik data ulang / Re-render
-        if (typeof fetchData === 'function') await fetchData();
-        if (typeof applyFilter === 'function') applyFilter();
-        if (typeof filterData === 'function') filterData();
-        
-        if (typeof renderDashboardTable === 'function') renderDashboardTable();
-        if (typeof renderRekapRincian === 'function') renderRekapRincian();
-        if (typeof renderRincian === 'function') renderRincian();
-
-        console.log("Data ID " + cleanId + " berhasil dihapus!");
-
-    } catch (err) {
-        console.error("Error saat menghapus:", err);
-        alert("Gagal menghapus data: " + (err.message || err));
-    }
+    });
 };
 
 // ==========================================
