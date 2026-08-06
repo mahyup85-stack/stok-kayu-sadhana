@@ -992,93 +992,7 @@ window.switchView = function (v) {
     }
 };
 
-let isSubmittingStock = false;
 
-window.handleStockSubmit = async function (event) {
-    if (event) event.preventDefault();
-
-    // 1. Kunci agar tidak bisa diklik ganda
-    if (isSubmittingStock) return false;
-
-    const form = event ? (event.currentTarget || event.target) : document.getElementById('stock-form');
-    const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
-
-    const editId = document.getElementById('edit-id')?.value;
-    const date = document.getElementById('input-date')?.value;
-    const ket = document.getElementById('input-ket')?.value;
-    const jenis = document.getElementById('input-jenis')?.value;
-    const tpk = document.getElementById('input-tpk')?.value;
-    const petak = document.getElementById('input-petak')?.value || '-';
-    
-    // Ambil input SM
-    const inSM = parseFloat(document.getElementById('input-in-sm')?.value) || 0;
-    const outSM = parseFloat(document.getElementById('input-out-sm')?.value) || 0;
-
-    // Hitung konversi ke M3
-    let faktorKonversi = 1;
-    if (state.master && state.master['jenis_kayu']) {
-        const itemKayu = state.master['jenis_kayu'].find(k => k.name === jenis);
-        if (itemKayu && itemKayu.konversi) {
-            faktorKonversi = parseFloat(itemKayu.konversi);
-        }
-    }
-
-    const inM3 = inSM * faktorKonversi;
-    const outM3 = outSM * faktorKonversi;
-
-    const payload = {
-        tanggal: date,
-        keterangan: ket,
-        jenis_kayu: jenis,
-        tpk: tpk,
-        petak: petak,
-        masuk_m3: inM3,
-        keluar_m3: outM3
-    };
-
-    try {
-        isSubmittingStock = true;
-        if (submitBtn) submitBtn.disabled = true;
-        if (typeof showLoading === 'function') showLoading(true);
-
-        if (editId) {
-            // MODE UPDATE DATA
-            const { error } = await api.from('stok_kayu').update(payload).eq('id', editId);
-            if (error) throw error;
-            alert("Data Berhasil Diperbarui!");
-        } else {
-            // MODE INSERT DATA BARU
-            const { error } = await api.from('stok_kayu').insert([payload]);
-            if (error) throw error;
-            alert(`Data Berhasil Disimpan!\nMasuk: ${inSM} SM = ${inM3.toFixed(2)} M³ (Faktor: ${faktorKonversi})`);
-        }
-
-        if (typeof cancelEdit === 'function') cancelEdit();
-        if (typeof fetchData === 'function') await fetchData();
-
-    } catch (err) {
-        console.error("Gagal memproses data:", err.message);
-        alert("Gagal menyimpan/mengubah mutasi: " + err.message);
-    } finally {
-        if (typeof showLoading === 'function') showLoading(false);
-        isSubmittingStock = false;
-        if (submitBtn) submitBtn.disabled = false;
-    }
-};
-
-// Pasang Event Listener secara tunggal
-function setupStockForm() {
-    const stockForm = document.getElementById('stock-form'); // Pastikan ID form di HTML adalah 'stock-form'
-    if (stockForm) {
-        stockForm.onsubmit = window.handleStockSubmit;
-    }
-}
-
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", setupStockForm);
-} else {
-    setupStockForm();
-}
 
 function showView(viewId) {
     // ... kode sembunyi/tampil Anda ...
@@ -2408,103 +2322,7 @@ function exportRincianExcel() {
     link.click();
 }
 
-// Pindahkan pendaftaran window ke paling atas
-window.updatePetakByTPK = updatePetakByTPK;
-window.applyRekapFilter = applyRekapFilter;
-window.switchView = switchView;
 
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", setupStockForm);
-} else {
-    setupStockForm();
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    const stockForm = document.getElementById('stock-form');
-    if (stockForm) {
-        stockForm.onsubmit = null; // Mencegah pemicuan ganda
-
-        stockForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            // Helper aman untuk ambil value dari HTML
-            const getVal = (id) => {
-                const el = document.getElementById(id);
-                return el ? el.value : '';
-            };
-
-            const editId = getVal('edit-id');
-            const date = getVal('input-date');
-            const ket = getVal('input-ket');
-            const jenis = getVal('input-jenis');
-            const tpk = getVal('input-tpk');
-            const petak = getVal('input-petak');
-            
-            // Ambil input SM dari Form HTML
-            const inSM = parseFloat(getVal('input-in-sm')) || 0;
-            const outSM = parseFloat(getVal('input-out-sm')) || 0;
-
-            // Cari faktor konversi dari master jenis kayu (Aman Case-Insensitive)
-            let faktorKonversi = 1;
-            if (state.master && state.master['jenis_kayu']) {
-                const itemKayu = state.master['jenis_kayu'].find(
-                    k => k.name && k.name.trim().toLowerCase() === jenis.trim().toLowerCase()
-                );
-                if (itemKayu && itemKayu.konversi) {
-                    faktorKonversi = parseFloat(itemKayu.konversi);
-                }
-            }
-
-            // Hitung hasil konversi ke M³
-            const inM3 = inSM * faktorKonversi;
-            const outM3 = outSM * faktorKonversi;
-
-            // Payload HANYA mengirim kolom yang ada di database Supabase (masuk_m3 & keluar_m3)
-            const payload = {
-                tanggal: date,
-                keterangan: ket,
-                jenis_kayu: jenis,
-                tpk: tpk,
-                petak: petak,
-                masuk_m3: inM3,
-                keluar_m3: outM3
-            };
-
-            try {
-                if (typeof showLoading === 'function') showLoading(true);
-
-                if (editId) {
-                    // UPDATE ke tabel 'stok_kayu'
-                    const { error } = await api.from('stok_kayu').update(payload).eq('id', editId);
-                    if (error) throw error;
-                    alert("Data berhasil diperbarui!");
-                } else {
-                    // INSERT ke tabel 'stok_kayu'
-                    const { error } = await api.from('stok_kayu').insert([payload]);
-                    if (error) throw error;
-                    alert(`Data berhasil disimpan!\n${inSM} SM x ${faktorKonversi} = ${inM3.toFixed(2)} M³`);
-                }
-
-                if (e.target && typeof e.target.reset === 'function') e.target.reset();
-                if (typeof cancelEdit === 'function') cancelEdit();                         
-                if (typeof loadMutasiData === 'function') loadMutasiData();
-                if (typeof fetchData === 'function') fetchData();
-
-            } catch (err) {
-                console.error("Database Error:", err);
-                alert("Gagal menyimpan data: " + err.message);
-            } finally {
-                if (typeof showLoading === 'function') showLoading(false);
-            }
-        });
-    }
-
-    if (state.isLoggedIn) {
-        if (typeof startApp === 'function') startApp();
-    } else {
-        if (typeof initLoginHandler === 'function') initLoginHandler();
-    }
-});
 
 window.sinkronisasiFilterRincian = function () {
     console.log("🔄 Sinkronisasi Filter Rincian dimulai...");
@@ -2676,91 +2494,32 @@ function hitungKonversiForm() {
     }
 }
 
-// Jalankan aplikasi otomatis saat halaman dibuka
-// --- HANLDER UTAMA SUBMIT FORM (PREVENT DOUBLE SUBMIT) ---
-let isSubmitting = false;
+// Expose fungsi ke window jika dipanggil dari HTML
+window.updatePetakByTPK = updatePetakByTPK;
+window.applyRekapFilter = applyRekapFilter;
+window.switchView = switchView;
 
+// Flag pengunci agar tombol simpan tidak bisa diklik ganda
+let isSubmittingStock = false;
+
+// SINGLE EVENT LISTENER UNTUK INITIALISASI DAN FORM SUBMIT
 document.addEventListener('DOMContentLoaded', () => {
     const stockForm = document.getElementById('stock-form');
+
     if (stockForm) {
-        stockForm.onsubmit = null; // Mencegah pemicuan bawaan HTML
+        // Reset atribut onsubmit agar tidak ada pemicu ganda
+        stockForm.onsubmit = null;
 
-        stockForm.addEventListener('submit', async function(e) {
+        stockForm.addEventListener('submit', async function (e) {
             e.preventDefault();
+            e.stopImmediatePropagation(); // Mencegah listener ganda lain jika terlanjur terpasang
 
-            if (isSubmitting) return;
-            isSubmitting = true;
+            // Jika sedang proses submit, batalkan eksekusi berikutnya
+            if (isSubmittingStock) return;
 
-            const submitBtn = e.target.querySelector('button[type="submit"]');
-            const getVal = (id) => document.getElementById(id)?.value || '';
+            const submitBtn = stockForm.querySelector('button[type="submit"]');
 
-            const editId = getVal('edit-id');
-            const jenis = getVal('input-jenis');
-            const smMasuk = parseFloat(getVal('input-in-sm')) || 0;
-            const smKeluar = parseFloat(getVal('input-out-sm')) || 0;
-
-            // Hitung Faktor Konversi
-            const faktor = (window.state && window.state.konversiKayu) ? (window.state.konversiKayu[jenis] || 1) : 1;
-            const m3Masuk = smMasuk * faktor;
-            const m3Keluar = smKeluar * faktor;
-
-            const payload = {
-                tanggal: getVal('input-date'),
-                keterangan: getVal('input-ket'),
-                jenis_kayu: jenis,
-                tpk: getVal('input-tpk'),
-                petak: getVal('input-petak') || "-",
-                masuk_m3: m3Masuk,
-                keluar_m3: m3Keluar
-            };
-
-            try {
-                if (typeof showLoading === 'function') showLoading(true);
-                if (submitBtn) submitBtn.disabled = true;
-
-                if (editId) {
-                    const { error } = await api.from('stok_kayu').update(payload).eq('id', editId);
-                    if (error) throw error;
-                    alert("Data berhasil diperbarui!");
-                    if (typeof window.cancelEdit === 'function') window.cancelEdit();
-                } else {
-                    const { error } = await api.from('stok_kayu').insert([payload]);
-                    if (error) throw error;
-                    alert("Data berhasil disimpan!");
-                }
-
-                if (e.target && typeof e.target.reset === 'function') e.target.reset();
-                if (typeof fetchData === 'function') await fetchData();
-
-            } catch (err) {
-                console.error("Database Error:", err);
-                if (err.code === "23505") {
-                    alert("⚠️ Gagal: Data transaksi dengan rincian ini sudah ada di database (Duplikat).");
-                } else {
-                    alert("Gagal menyimpan data: " + (err.message || err));
-                }
-            } finally {
-                isSubmitting = false;
-                if (submitBtn) submitBtn.disabled = false;
-                if (typeof showLoading === 'function') showLoading(false);
-            }
-        });
-    }
-});
-
-
-// Eksport fungsi ke global jika dipanggil via onclick
-window.renderRekapRincian = renderRekapRincian;
-
-document.addEventListener('DOMContentLoaded', () => {
-    const stockForm = document.getElementById('stock-form');
-    if (stockForm) {
-        stockForm.onsubmit = null; // Mencegah pemicuan ganda
-
-        stockForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            // Helper aman untuk ambil value dari HTML
+            // Helper aman untuk mengambil input dari HTML
             const getVal = (id) => {
                 const el = document.getElementById(id);
                 return el ? el.value : '';
@@ -2768,16 +2527,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const editId = getVal('edit-id');
             const date = getVal('input-date');
-            const ket = getVal('input-ket');
+            const ket = getVal('input-ket')?.trim();
             const jenis = getVal('input-jenis');
             const tpk = getVal('input-tpk');
-            const petak = getVal('input-petak');
-            
-            // Ambil input SM dari Form HTML
+            const petak = getVal('input-petak')?.trim() || '-';
+
+            // Ambil input SM dari Form
             const inSM = parseFloat(getVal('input-in-sm')) || 0;
             const outSM = parseFloat(getVal('input-out-sm')) || 0;
 
-            // Cari faktor konversi dari master jenis kayu (Aman Case-Insensitive)
+            if (!ket || !jenis || !tpk) {
+                alert("Harap lengkapi Keterangan, Jenis Kayu, dan TPK!");
+                return;
+            }
+
+            // Cari faktor konversi dari master jenis kayu (Case-Insensitive)
             let faktorKonversi = 1;
             if (state.master && state.master['jenis_kayu']) {
                 const itemKayu = state.master['jenis_kayu'].find(
@@ -2792,7 +2556,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const inM3 = inSM * faktorKonversi;
             const outM3 = outSM * faktorKonversi;
 
-            // Payload HANYA mengirim kolom yang ada di database Supabase (masuk_m3 & keluar_m3)
             const payload = {
                 tanggal: date,
                 keterangan: ket,
@@ -2804,34 +2567,42 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             try {
+                // Aktifkan pengunci & matikan tombol simpan
+                isSubmittingStock = true;
+                if (submitBtn) submitBtn.disabled = true;
                 if (typeof showLoading === 'function') showLoading(true);
 
                 if (editId) {
-                    // UPDATE ke tabel 'stok_kayu'
+                    // MODE UPDATE DATA
                     const { error } = await api.from('stok_kayu').update(payload).eq('id', editId);
                     if (error) throw error;
                     alert("Data berhasil diperbarui!");
                 } else {
-                    // INSERT ke tabel 'stok_kayu'
+                    // MODE INSERT DATA BARU
                     const { error } = await api.from('stok_kayu').insert([payload]);
                     if (error) throw error;
                     alert(`Data berhasil disimpan!\n${inSM} SM x ${faktorKonversi} = ${inM3.toFixed(2)} M³`);
                 }
 
-                if (e.target && typeof e.target.reset === 'function') e.target.reset();
-                if (typeof cancelEdit === 'function') cancelEdit();                           
+                // Reset Form & Refresh Data
+                stockForm.reset();
+                if (typeof cancelEdit === 'function') cancelEdit();
                 if (typeof loadMutasiData === 'function') loadMutasiData();
-                if (typeof fetchData === 'function') fetchData();
+                if (typeof fetchData === 'function') await fetchData();
 
             } catch (err) {
                 console.error("Database Error:", err);
-                alert("Gagal menyimpan data: " + err.message);
+                alert("Gagal menyimpan data: " + (err.message || err));
             } finally {
+                // Buka pengunci kembali
+                isSubmittingStock = false;
+                if (submitBtn) submitBtn.disabled = false;
                 if (typeof showLoading === 'function') showLoading(false);
             }
         });
     }
 
+    // Inisialisasi status Login
     if (state.isLoggedIn) {
         if (typeof startApp === 'function') startApp();
     } else {
