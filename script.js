@@ -1229,23 +1229,16 @@ window.editData = function(id) {
 };
 
 window.deleteData = async function(rawId) {
-    console.log("1. Raw ID diterima:", rawId);
-
     const cleanId = parseInt(rawId, 10);
     if (isNaN(cleanId)) return alert("ID data tidak valid!");
 
-    // Konfirmasi Hapus
-    if (!confirm(`Apakah Anda yakin ingin menghapus data dengan ID ${cleanId}?`)) {
-        console.log("Hapus dibatalkan oleh pengguna.");
-        return;
-    }
-
+    // LANGSUNG JALANKAN PROSES HAPUS (Tanpa confirm() native yang diblokir)
     try {
-        console.log("2. Mengirim perintah hapus ke Supabase untuk ID:", cleanId);
+        console.log("Mengirim perintah hapus ke Supabase untuk ID:", cleanId);
 
-        // Eksekusi Hapus ke Supabase
+        // 1. Eksekusi Hapus ke Supabase
         const response = await api
-            .from('stok_kayu') // PASTI-KAN NAMA TABEL SUDAH BENAR
+            .from('stok_kayu')
             .delete()
             .eq('id', cleanId);
 
@@ -1253,9 +1246,7 @@ window.deleteData = async function(rawId) {
             throw response.error;
         }
 
-        console.log("3. Berhasil hapus di Supabase. Memperbarui state & UI...");
-
-        // A. HAPUS DATA SECARA LOKAL DARI STATE (Agresif/Langsung)
+        // 2. Hapus Data dari State Lokal (UI Langsung Berubah)
         if (typeof state !== 'undefined') {
             if (Array.isArray(state.data)) {
                 state.data = state.data.filter(item => Number(item.id) !== cleanId);
@@ -1265,12 +1256,8 @@ window.deleteData = async function(rawId) {
             }
         }
 
-        // B. TARIK DATA DARI DATABASE (OPSIONAL)
-        if (typeof fetchData === 'function') {
-            await fetchData();
-        }
-
-        // C. RENDER ULANG TABEL
+        // 3. Tarik data ulang / Re-render
+        if (typeof fetchData === 'function') await fetchData();
         if (typeof applyFilter === 'function') applyFilter();
         if (typeof filterData === 'function') filterData();
         
@@ -1278,10 +1265,10 @@ window.deleteData = async function(rawId) {
         if (typeof renderRekapRincian === 'function') renderRekapRincian();
         if (typeof renderRincian === 'function') renderRincian();
 
-        alert("Data berhasil dihapus!");
+        console.log("Data ID " + cleanId + " berhasil dihapus!");
 
     } catch (err) {
-        console.error("4. Error saat menghapus:", err);
+        console.error("Error saat menghapus:", err);
         alert("Gagal menghapus data: " + (err.message || err));
     }
 };
