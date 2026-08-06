@@ -1229,17 +1229,22 @@ window.editData = function(id) {
 };
 
 window.deleteData = async function(rawId) {
-    const cleanId = parseInt(rawId, 10);
-    if (isNaN(cleanId)) return alert("ID data tidak valid!");
+    console.log("Tombol hapus diklik. Raw ID:", rawId);
 
-    // 1. DIALOG KONFIRMASI HAPUS
-    const yakin = confirm(`Apakah Anda yakin ingin menghapus data ini? (ID: ${cleanId})`);
-    if (!yakin) {
-        return; // Batal menghapus jika user menekan tombol "Cancel"
+    const cleanId = parseInt(rawId, 10);
+    if (isNaN(cleanId)) {
+        alert("ID data tidak valid!");
+        return;
     }
 
+    // 1. DIALOG KONFIRMASI HAPUS
+    const yakin = confirm("Apakah Anda yakin ingin menghapus data ini?");
+    if (!yakin) return;
+
     try {
-        if (typeof showLoading === 'function') showLoading(true);
+        if (typeof showLoading === 'function') {
+            showLoading(true);
+        }
 
         // 2. Eksekusi Hapus ke Supabase
         const response = await api
@@ -1247,14 +1252,16 @@ window.deleteData = async function(rawId) {
             .delete()
             .eq('id', cleanId);
 
-        if (response.error) throw response.error;
+        if (response && response.error) {
+            throw response.error;
+        }
 
         // 3. Ambil data terbaru dari database
         if (typeof fetchData === 'function') {
             await fetchData();
         }
 
-        // 4. Jalankan ulang filter & render tampilan
+        // 4. Jalankan ulang filter & render tampilan (Aman dari error jika fungsi tidak ada)
         if (typeof applyFilters === 'function') applyFilters();
         if (typeof filterData === 'function') filterData();
 
@@ -1269,7 +1276,9 @@ window.deleteData = async function(rawId) {
         console.error("Gagal menghapus:", err);
         alert("Gagal menghapus data: " + (err.message || err));
     } finally {
-        if (typeof showLoading === 'function') showLoading(false);
+        if (typeof showLoading === 'function') {
+            showLoading(false);
+        }
     }
 };
 
