@@ -193,84 +193,6 @@ window.renderMasterList = function () {
     `).join('');
 };
 
-window.handleStockSubmit = async function (event) {
-    event.preventDefault();
-
-    const editId = document.getElementById('edit-id').value; // Cek ID untuk mode Edit
-    const date = document.getElementById('input-date').value;
-    const ket = document.getElementById('input-ket').value;
-    const jenis = document.getElementById('input-jenis').value;
-    const tpk = document.getElementById('input-tpk').value;
-    const petak = document.getElementById('input-petak').value || '-';
-    
-    // Ambil Input Satuan SM
-    const inSM = parseFloat(document.getElementById('input-in-sm').value) || 0;
-    const outSM = parseFloat(document.getElementById('input-out-sm').value) || 0;
-
-    // CARI FAKTOR KONVERSI DARI MASTER JENIS KAYU
-    let faktorKonversi = 1;
-    if (state.master && state.master['jenis_kayu']) {
-        const itemKayu = state.master['jenis_kayu'].find(k => k.name === jenis);
-        if (itemKayu && itemKayu.konversi) {
-            faktorKonversi = parseFloat(itemKayu.konversi);
-        }
-    }
-
-    // HITUNG NILAI M3
-    const inM3 = inSM * faktorKonversi;
-    const outM3 = outSM * faktorKonversi;
-
-    const payload = {
-        tanggal: date,
-        keterangan: ket,
-        jenis_kayu: jenis,
-        tpk: tpk,
-        petak: petak,
-        masuk_m3: inM3,
-        keluar_m3: outM3
-    };
-
-    try {
-        if (typeof showLoading === 'function') showLoading(true);
-
-        if (editId) {
-            // MODE UPDATE DATA
-            const { error } = await api
-                .from('stok_kayu')
-                .update(payload)
-                .eq('id', editId);
-
-            if (error) throw error;
-            alert("Data Berhasil Diperbarui!");
-        } else {
-            // MODE INSERT DATA BARU
-            const { error } = await api
-                .from('stok_kayu')
-                .insert([payload]);
-
-            if (error) throw error;
-            alert(`Data Berhasil Disimpan!\nMasuk: ${inSM} SM = ${inM3.toFixed(2)} M³ (Faktor: ${faktorKonversi})`);
-        }
-
-        // Reset Form, Kembali ke mode normal & Refresh Tabel
-        cancelEdit();
-        if (typeof fetchData === 'function') await fetchData();
-
-    } catch (err) {
-        alert("Gagal menyimpan/mengubah mutasi: " + err.message);
-    } finally {
-        if (typeof showLoading === 'function') showLoading(false);
-    }
-};
-
-// Hubungkan Event Listener Form ke handleStockSubmit saat DOM Siap
-document.addEventListener('DOMContentLoaded', () => {
-    const stockForm = document.getElementById('stock-form');
-    if (stockForm) {
-        stockForm.onsubmit = window.handleStockSubmit;
-    }
-});
-
 // 5. Delete Item
 window.deleteMasterItem = async function (id) {
     const type = state.currentMasterType;
@@ -982,70 +904,94 @@ window.switchView = function (v) {
     }
 };
 
-let isSubmitting=false;
+let isSubmittingStock = false;
 
-// 1. FUNGSI HANDLER SUBMIT
-async function handleMutasiSubmit(e) {
-    if (e) e.preventDefault();
+window.handleStockSubmit = async function (event) {
+    if (event) event.preventDefault();
 
-    if (isSubmitting) return false;
+    // 1. Kunci agar tidak bisa diklik ganda
+    if (isSubmittingStock) return false;
 
-    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const form = event ? (event.currentTarget || event.target) : document.getElementById('stock-form');
+    const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
+
+    const editId = document.getElementById('edit-id')?.value;
+    const date = document.getElementById('input-date')?.value;
+    const ket = document.getElementById('input-ket')?.value;
+    const jenis = document.getElementById('input-jenis')?.value;
+    const tpk = document.getElementById('input-tpk')?.value;
+    const petak = document.getElementById('input-petak')?.value || '-';
+    
+    // Ambil input SM
+    const inSM = parseFloat(document.getElementById('input-in-sm')?.value) || 0;
+    const outSM = parseFloat(document.getElementById('input-out-sm')?.value) || 0;
+
+    // Hitung konversi ke M3
+    let faktorKonversi = 1;
+    if (state.master && state.master['jenis_kayu']) {
+        const itemKayu = state.master['jenis_kayu'].find(k => k.name === jenis);
+        if (itemKayu && itemKayu.konversi) {
+            faktorKonversi = parseFloat(itemKayu.konversi);
+        }
+    }
+
+    const inM3 = inSM * faktorKonversi;
+    const outM3 = outSM * faktorKonversi;
+
+    const payload = {
+        tanggal: date,
+        keterangan: ket,
+        jenis_kayu: jenis,
+        tpk: tpk,
+        petak: petak,
+        masuk_m3: inM3,
+        keluar_m3: outM3
+    };
 
     try {
-        isSubmitting = true;
+        isSubmittingStock = true;
         if (submitBtn) submitBtn.disabled = true;
-        if (typeof showLoading === "function") showLoading(true);
+        if (typeof showLoading === 'function') showLoading(true);
 
-        const payload = {
-            tanggal: document.getElementById("input-date").value,
-            keterangan: document.getElementById("input-ket").value,
-            jenis_kayu: document.getElementById("input-jenis").value,
-            tpk: document.getElementById("input-tpk").value,
-            petak: document.getElementById("input-petak").value || "-",
-            masuk_m3: parseFloat(document.getElementById("input-in").value) || 0,
-            keluar_m3: parseFloat(document.getElementById("input-out").value) || 0
-        };
-
-        const { error } = await api.from('stok_kayu').insert([payload]);
-        if (error) throw error;
-
-        alert("Data Berhasil Disimpan!");
-        e.target.reset();
-
-        if (typeof fetchData === "function") {
-            await fetchData();
+        if (editId) {
+            // MODE UPDATE DATA
+            const { error } = await api.from('stok_kayu').update(payload).eq('id', editId);
+            if (error) throw error;
+            alert("Data Berhasil Diperbarui!");
+        } else {
+            // MODE INSERT DATA BARU
+            const { error } = await api.from('stok_kayu').insert([payload]);
+            if (error) throw error;
+            alert(`Data Berhasil Disimpan!\nMasuk: ${inSM} SM = ${inM3.toFixed(2)} M³ (Faktor: ${faktorKonversi})`);
         }
+
+        if (typeof cancelEdit === 'function') cancelEdit();
+        if (typeof fetchData === 'function') await fetchData();
 
     } catch (err) {
         console.error("Gagal memproses data:", err.message);
-        alert("Gagal memproses data: " + err.message);
+        alert("Gagal menyimpan/mengubah mutasi: " + err.message);
     } finally {
-        if (typeof showLoading === "function") showLoading(false);
-        isSubmitting = false;
+        if (typeof showLoading === 'function') showLoading(false);
+        isSubmittingStock = false;
         if (submitBtn) submitBtn.disabled = false;
+    }
+};
+
+// Pasang Event Listener secara tunggal
+function setupStockForm() {
+    const stockForm = document.getElementById('stock-form'); // Pastikan ID form di HTML adalah 'stock-form'
+    if (stockForm) {
+        stockForm.onsubmit = window.handleStockSubmit;
     }
 }
 
-// 2. FUNGSI INISIALISASI FORM (PEMBERSIH EVENT GANDA)
-function setupFormMutasi() {
-    const formElement = document.getElementById("form-stok"); // Sesuaikan ID form Anda
-    if (!formElement) return;
-
-    // TRIK PAMUNGKAS: Clone elemen form untuk MEMBUANG SEMUA event listener ganda yang menempel sebelumnya
-    const newForm = formElement.cloneNode(true);
-    formElement.parentNode.replaceChild(newForm, formElement);
-
-    // Pasang HANYA 1 event listener bersih ke form baru
-    newForm.onsubmit = handleMutasiSubmit;
-}
-
-// Jalankan pembersihan & pemasangan event saat halaman siap
 if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", setupFormMutasi);
+    document.addEventListener("DOMContentLoaded", setupStockForm);
 } else {
-    setupFormMutasi();
+    setupStockForm();
 }
+
 function showView(viewId) {
     // ... kode sembunyi/tampil Anda ...
     document.querySelectorAll('.view-section, [id^="view-"]').forEach(s => s.classList.add('hidden'));
