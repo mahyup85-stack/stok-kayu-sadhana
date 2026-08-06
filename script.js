@@ -1229,26 +1229,23 @@ window.editData = function(id) {
 };
 
 window.deleteData = async function(rawId) {
-    console.log("Tombol hapus diklik. Raw ID:", rawId);
+    console.log("1. Raw ID diterima:", rawId);
 
     const cleanId = parseInt(rawId, 10);
-    if (isNaN(cleanId)) {
-        alert("ID data tidak valid!");
+    if (isNaN(cleanId)) return alert("ID data tidak valid!");
+
+    // Konfirmasi Hapus
+    if (!confirm(`Apakah Anda yakin ingin menghapus data dengan ID ${cleanId}?`)) {
+        console.log("Hapus dibatalkan oleh pengguna.");
         return;
     }
 
-    // 1. DIALOG KONFIRMASI HAPUS
-    const yakin = confirm("Apakah Anda yakin ingin menghapus data ini?");
-    if (!yakin) return;
-
     try {
-        if (typeof showLoading === 'function') {
-            showLoading(true);
-        }
+        console.log("2. Mengirim perintah hapus ke Supabase untuk ID:", cleanId);
 
-        // 2. Eksekusi Hapus ke Supabase
+        // Eksekusi Hapus ke Supabase
         const response = await api
-            .from('stok_kayu')
+            .from('stok_kayu') // PASTI-KAN NAMA TABEL SUDAH BENAR
             .delete()
             .eq('id', cleanId);
 
@@ -1256,29 +1253,36 @@ window.deleteData = async function(rawId) {
             throw response.error;
         }
 
-        // 3. Ambil data terbaru dari database
+        console.log("3. Berhasil hapus di Supabase. Memperbarui state & UI...");
+
+        // A. HAPUS DATA SECARA LOKAL DARI STATE (Agresif/Langsung)
+        if (typeof state !== 'undefined') {
+            if (Array.isArray(state.data)) {
+                state.data = state.data.filter(item => Number(item.id) !== cleanId);
+            }
+            if (Array.isArray(state.filteredData)) {
+                state.filteredData = state.filteredData.filter(item => Number(item.id) !== cleanId);
+            }
+        }
+
+        // B. TARIK DATA DARI DATABASE (OPSIONAL)
         if (typeof fetchData === 'function') {
             await fetchData();
         }
 
-        // 4. Jalankan ulang filter & render tampilan (Aman dari error jika fungsi tidak ada)
-        if (typeof applyFilters === 'function') applyFilters();
+        // C. RENDER ULANG TABEL
+        if (typeof applyFilter === 'function') applyFilter();
         if (typeof filterData === 'function') filterData();
-
+        
         if (typeof renderDashboardTable === 'function') renderDashboardTable();
         if (typeof renderRekapRincian === 'function') renderRekapRincian();
         if (typeof renderRincian === 'function') renderRincian();
 
-        // 5. Notifikasi Berhasil
         alert("Data berhasil dihapus!");
 
     } catch (err) {
-        console.error("Gagal menghapus:", err);
+        console.error("4. Error saat menghapus:", err);
         alert("Gagal menghapus data: " + (err.message || err));
-    } finally {
-        if (typeof showLoading === 'function') {
-            showLoading(false);
-        }
     }
 };
 
