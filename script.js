@@ -1229,53 +1229,47 @@ window.editData = function(id) {
 };
 
 window.deleteData = async function(rawId) {
-    console.log("--> 1. Masuk ke window.deleteData");
-    
     const cleanId = parseInt(rawId, 10);
-    console.log("--> 2. ID Bersih:", cleanId);
+    if (isNaN(cleanId)) return alert("ID data tidak valid!");
 
-    // Skip confirm sementara untuk pengujian
-    // if (!confirm("Yakin hapus?")) return;
+    // 1. DIALOG KONFIRMASI HAPUS
+    const yakin = confirm(`Apakah Anda yakin ingin menghapus data ini? (ID: ${cleanId})`);
+    if (!yakin) {
+        return; // Batal menghapus jika user menekan tombol "Cancel"
+    }
 
     try {
-        console.log("--> 3. Memulai proses hapus...");
+        if (typeof showLoading === 'function') showLoading(true);
 
-        // Cek apakah variabel API / Supabase tersedia
-        if (typeof api === 'undefined') {
-            console.error("CRITICAL: Variabel 'api' tidak ditemukan/undefined!");
-            alert("Error: Koneksi API tidak ditemukan!");
-            return;
-        }
-
-        console.log("--> 4. Mengirim request delete ke Supabase...");
-        
-        // Jalankan query dengan timeout sederhana
+        // 2. Eksekusi Hapus ke Supabase
         const response = await api
-            .from('stok_kayu') // PASTI-KAN NAMA TABEL BENAR
+            .from('stok_kayu')
             .delete()
             .eq('id', cleanId);
 
-        console.log("--> 5. Respons diterima dari Supabase:", response);
+        if (response.error) throw response.error;
 
-        if (response.error) {
-            console.error("--> ERROR SUPABASE:", response.error);
-            alert("Gagal Hapus: " + response.error.message);
-            return;
-        }
-
-        console.log("--> 6. Hapus sukses di database! Memperbarui UI...");
-        alert("BERHASIL: Data dengan ID " + cleanId + " terhapus!");
-
-        // Refresh data/tabel
+        // 3. Ambil data terbaru dari database
         if (typeof fetchData === 'function') {
             await fetchData();
-        } else if (typeof renderDashboardTable === 'function') {
-            renderDashboardTable();
         }
 
+        // 4. Jalankan ulang filter & render tampilan
+        if (typeof applyFilters === 'function') applyFilters();
+        if (typeof filterData === 'function') filterData();
+
+        if (typeof renderDashboardTable === 'function') renderDashboardTable();
+        if (typeof renderRekapRincian === 'function') renderRekapRincian();
+        if (typeof renderRincian === 'function') renderRincian();
+
+        // 5. Notifikasi Berhasil
+        alert("Data berhasil dihapus!");
+
     } catch (err) {
-        console.error("--> CATCH ERROR:", err);
-        alert("Terjadi kesalahan: " + err.message);
+        console.error("Gagal menghapus:", err);
+        alert("Gagal menghapus data: " + (err.message || err));
+    } finally {
+        if (typeof showLoading === 'function') showLoading(false);
     }
 };
 
