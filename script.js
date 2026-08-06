@@ -702,14 +702,25 @@ function save() {
     localStorage.setItem("sadhana_data_lokal", JSON.stringify(state.data));
     localStorage.setItem("sadhana_master", JSON.stringify(state.master)); // Samakan dengan key load
 }
+
 async function saveData() {
-    const tanggalInput = document.getElementById('input-date')?.value || new Date().toISOString().split('T')[0];
-    const ket = document.getElementById('input-ket')?.value || "";
+    // 1. Ambil nilai input dari HTML (Gunakan ID yang sesuai dengan HTML)
+    const rawDate = document.getElementById('input-date')?.value;
+    const tanggalInput = rawDate ? formatTanggalDB(rawDate) : new Date().toISOString().split('T')[0];
+    const ket = document.getElementById('input-ket')?.value?.trim() || "";
     const jenis = document.getElementById('input-jenis')?.value || "";
     const tpk = document.getElementById("input-tpk")?.value || "";
-    const petak = document.getElementById('input-petak')?.value || "-";
-    const masuk = parseFloat(document.getElementById('input-in')?.value) || 0;
-    const keluar = parseFloat(document.getElementById('input-out')?.value) || 0;
+    const petak = document.getElementById('input-petak')?.value?.trim() || "-";
+    
+    // Sesuaikan ID dengan HTML: 'input-in-sm' & 'input-out-sm'
+    const masuk = parseFloat(document.getElementById('input-in-sm')?.value || document.getElementById('input-in')?.value) || 0;
+    const keluar = parseFloat(document.getElementById('input-out-sm')?.value || document.getElementById('input-out')?.value) || 0;
+
+    // Validasi sederhana
+    if (!ket || !jenis || !tpk) {
+        alert("Harap lengkapi Keterangan, Jenis Kayu, dan TPK!");
+        return;
+    }
 
     const payload = {
         tanggal: tanggalInput,
@@ -722,21 +733,54 @@ async function saveData() {
     };
 
     try {
-        const { error } = await api.from('stok_kayu').insert([payload]);
-        if (error) throw error;
+        if (typeof showLoading === 'function') showLoading(true);
+
+        const { data, error } = await api.from('stok_kayu').insert([payload]);
+
+        if (error) {
+            // Tangkap khusus Error 23505 (Data Duplikat Persis)
+            if (error.code === '23505') {
+                alert("⚠️ GAGAL SIMPAN: Data transaksi dengan Rincian, Tanggal, Jenis, TPK, dan Volume yang sama persis sudah ada di database!");
+                return;
+            }
+            throw error;
+        }
+
+        alert("Data berhasil disimpan!");
+
+        // Reset Form setelah simpan
+        const form = document.getElementById('stock-form');
+        if (form) form.reset();
+
+        // Refresh Data Tabel
+        if (typeof fetchData === 'function') await fetchData();
+        if (typeof loadMutasiData === 'function') await loadMutasiData();
+
     } catch (err) {
-        console.error("Gagal simpan via saveData:", err.message);
+        console.error("Gagal simpan via saveData:", err);
+        alert("Gagal menyimpan data: " + (err.message || err));
+    } finally {
+        if (typeof showLoading === 'function') showLoading(false);
     }
 }
-// Fungsi untuk memastikan tanggal selalu YYYY-MM-DD
+
+// Fungsi untuk memastikan tanggal selalu YYYY-MM-DD (Aman dari Bug Timezone)
 function formatTanggalDB(dateString) {
     if (!dateString) return null;
+    
+    // Jika format input sudah YYYY-MM-DD dari <input type="date">, langsung kembalikan
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        return dateString;
+    }
+
     const d = new Date(dateString);
-    const month = '' + (d.getMonth() + 1);
-    const day = '' + d.getDate();
+    if (isNaN(d.getTime())) return null;
+
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
     const year = d.getFullYear();
 
-    return [year, month.padStart(2, '0'), day.padStart(2, '0')].join('-');
+    return `${year}-${month}-${day}`;
 }
 
 async function fetchData() {
