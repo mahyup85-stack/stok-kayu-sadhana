@@ -1235,11 +1235,12 @@ window.editData = function(id) {
 
 window.deleteData = async function(id) {
     if (!id) return alert("ID tidak ditemukan!");
-    if (!confirm("Yakin ingin menghapus data ini?")) return;
+    if (!confirm("Apakah Anda yakin ingin menghapus data ini?")) return;
 
     try {
         if (typeof showLoading === 'function') showLoading(true);
 
+        // Hapus dari Supabase
         const { error } = await api
             .from('stok_kayu')
             .delete()
@@ -1247,7 +1248,14 @@ window.deleteData = async function(id) {
 
         if (error) throw error;
 
+        // Update state lokal
+        state.data = state.data.filter(item => String(item.id) !== String(id));
+        state.filteredData = state.filteredData.filter(item => String(item.id) !== String(id));
+
         alert("Data berhasil dihapus!");
+
+        // Refresh tabel
+        if (typeof renderDashboardTable === 'function') renderDashboardTable();
         if (typeof fetchData === 'function') await fetchData();
 
     } catch (err) {
