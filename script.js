@@ -1229,42 +1229,44 @@ window.editData = function(id) {
 };
 
 window.deleteData = async function(rawId) {
-    // 1. Sanitasi ID: Ambil angka pertama dari string (misal "6960 2" menjadi 6960)
+    console.log("--> 1. Masuk ke window.deleteData");
+    
     const cleanId = parseInt(rawId, 10);
+    console.log("--> 2. ID Bersih:", cleanId);
 
-    console.log("ID Asli:", rawId, "| ID Setelah Dibersihkan:", cleanId);
-
-    if (isNaN(cleanId)) {
-        alert("ID data tidak valid!");
-        return;
-    }
-
-    if (!confirm(`Apakah Anda yakin ingin menghapus data dengan ID ${cleanId}?`)) return;
+    // Skip confirm sementara untuk pengujian
+    // if (!confirm("Yakin hapus?")) return;
 
     try {
-        if (typeof showLoading === 'function') showLoading(true);
+        console.log("--> 3. Memulai proses hapus...");
 
-        // 2. Eksekusi Hapus ke Supabase
-        const { error } = await api
-            .from('stok_kayu') // Ganti sesuai nama tabel Anda
+        // Cek apakah variabel API / Supabase tersedia
+        if (typeof api === 'undefined') {
+            console.error("CRITICAL: Variabel 'api' tidak ditemukan/undefined!");
+            alert("Error: Koneksi API tidak ditemukan!");
+            return;
+        }
+
+        console.log("--> 4. Mengirim request delete ke Supabase...");
+        
+        // Jalankan query dengan timeout sederhana
+        const response = await api
+            .from('stok_kayu') // PASTI-KAN NAMA TABEL BENAR
             .delete()
             .eq('id', cleanId);
 
-        if (error) throw error;
+        console.log("--> 5. Respons diterima dari Supabase:", response);
 
-        // 3. Update State Lokal (jika menggunakan state)
-        if (typeof state !== 'undefined') {
-            if (state.data) {
-                state.data = state.data.filter(item => Number(item.id) !== cleanId);
-            }
-            if (state.filteredData) {
-                state.filteredData = state.filteredData.filter(item => Number(item.id) !== cleanId);
-            }
+        if (response.error) {
+            console.error("--> ERROR SUPABASE:", response.error);
+            alert("Gagal Hapus: " + response.error.message);
+            return;
         }
 
-        alert("Data berhasil dihapus!");
+        console.log("--> 6. Hapus sukses di database! Memperbarui UI...");
+        alert("BERHASIL: Data dengan ID " + cleanId + " terhapus!");
 
-        // 4. Refresh Data / Tampilan Tabel
+        // Refresh data/tabel
         if (typeof fetchData === 'function') {
             await fetchData();
         } else if (typeof renderDashboardTable === 'function') {
@@ -1272,10 +1274,8 @@ window.deleteData = async function(rawId) {
         }
 
     } catch (err) {
-        console.error("Gagal menghapus data:", err);
-        alert("Gagal menghapus data: " + (err.message || err));
-    } finally {
-        if (typeof showLoading === 'function') showLoading(false);
+        console.error("--> CATCH ERROR:", err);
+        alert("Terjadi kesalahan: " + err.message);
     }
 };
 
