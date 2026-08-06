@@ -1170,12 +1170,7 @@ function logout() {
     location.reload();
 }
 
-// ==========================================
-// 1. FUNGSI EDIT DATA (Mengubah Form ke Mode Update)
-// ==========================================
-// ==========================================
-// FUNGSI EDIT DATA
-// ==========================================
+
 window.editData = function(id) {
     const cleanId = String(id).trim();
     // PERBAIKAN: Gunakan state.data, bukan state.mutasiData
@@ -1233,37 +1228,9 @@ window.editData = function(id) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-window.deleteData = async function(id) {
-    if (!id) return alert("ID tidak ditemukan!");
-    if (!confirm("Apakah Anda yakin ingin menghapus data ini?")) return;
-
-    try {
-        if (typeof showLoading === 'function') showLoading(true);
-
-        // Hapus dari Supabase
-        const { error } = await api
-            .from('stok_kayu')
-            .delete()
-            .eq('id', id);
-
-        if (error) throw error;
-
-        // Update state lokal
-        state.data = state.data.filter(item => String(item.id) !== String(id));
-        state.filteredData = state.filteredData.filter(item => String(item.id) !== String(id));
-
-        alert("Data berhasil dihapus!");
-
-        // Refresh tabel
-        if (typeof renderDashboardTable === 'function') renderDashboardTable();
-        if (typeof fetchData === 'function') await fetchData();
-
-    } catch (err) {
-        console.error("Error Delete:", err);
-        alert("Gagal menghapus: " + (err.message || err));
-    } finally {
-        if (typeof showLoading === 'function') showLoading(false);
-    }
+window.deleteData = function(id) {
+    console.log("Fungsi deleteData berhasil dipanggil! ID:", id);
+    alert("Tombol berfungsi! ID: " + id);
 };
 
 // ==========================================
