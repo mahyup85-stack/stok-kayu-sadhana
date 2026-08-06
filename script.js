@@ -2637,67 +2637,75 @@ function hitungKonversiForm() {
 
 // Jalankan aplikasi otomatis saat halaman dibuka
 // --- HANLDER UTAMA SUBMIT FORM (PREVENT DOUBLE SUBMIT) ---
-isSubmitting = false;
+let isSubmitting = false;
 
-async function handleStockSubmit(e) {
-    e.preventDefault();
+document.addEventListener('DOMContentLoaded', () => {
+    const stockForm = document.getElementById('stock-form');
+    if (stockForm) {
+        stockForm.onsubmit = null; // Mencegah pemicuan bawaan HTML
 
-    if (isSubmitting) return;
-    isSubmitting = true;
+        stockForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
 
-    const editId = document.getElementById('edit-id')?.value;
-    const submitBtn = e.target.querySelector('button[type="submit"]');
+            if (isSubmitting) return;
+            isSubmitting = true;
 
-    // 1. Ambil nilai jenis kayu & angka SM yang diinput user
-    const jenis = document.getElementById('input-jenis')?.value;
-    const smMasuk = parseFloat(document.getElementById('input-in-sm')?.value) || 0;
-    const smKeluar = parseFloat(document.getElementById('input-out-sm')?.value) || 0;
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const getVal = (id) => document.getElementById(id)?.value || '';
 
-    // 2. Cari faktor konversi jenis kayu dari state (default 1 jika tidak ada)
-    const faktor = (window.state && window.state.konversiKayu) ? (window.state.konversiKayu[jenis] || 1) : 1;
+            const editId = getVal('edit-id');
+            const jenis = getVal('input-jenis');
+            const smMasuk = parseFloat(getVal('input-in-sm')) || 0;
+            const smKeluar = parseFloat(getVal('input-out-sm')) || 0;
 
-    // 3. Hitung hasil M3 secara otomatis di belakang layar
-    const m3Masuk = smMasuk * faktor;
-    const m3Keluar = smKeluar * faktor;
+            // Hitung Faktor Konversi
+            const faktor = (window.state && window.state.konversiKayu) ? (window.state.konversiKayu[jenis] || 1) : 1;
+            const m3Masuk = smMasuk * faktor;
+            const m3Keluar = smKeluar * faktor;
 
-    // 4. Masukkan hasil konversi M3 ke data yang akan dikirim ke Supabase
-    const formData = {
-        tanggal: document.getElementById('input-date').value,
-        keterangan: document.getElementById('input-ket').value,
-        jenis_kayu: jenis,
-        tpk: document.getElementById('input-tpk').value,
-        petak: document.getElementById('input-petak').value || "-",
-        masuk_m3: m3Masuk,   // 👈 Hasil konversi SM -> M3
-        keluar_m3: m3Keluar  // 👈 Hasil konversi SM -> M3
-    };
+            const payload = {
+                tanggal: getVal('input-date'),
+                keterangan: getVal('input-ket'),
+                jenis_kayu: jenis,
+                tpk: getVal('input-tpk'),
+                petak: getVal('input-petak') || "-",
+                masuk_m3: m3Masuk,
+                keluar_m3: m3Keluar
+            };
 
-    try {
-        if (typeof showLoading === 'function') showLoading(true);
-        if (submitBtn) submitBtn.disabled = true;
+            try {
+                if (typeof showLoading === 'function') showLoading(true);
+                if (submitBtn) submitBtn.disabled = true;
 
-        if (editId) {
-            const { error } = await api.from('stok_kayu').update(formData).eq('id', editId);
-            if (error) throw error;
-            alert("Data berhasil diperbarui!");
-            if (typeof window.cancelEdit === 'function') window.cancelEdit();
-        } else {
-            const { error } = await api.from('stok_kayu').insert([formData]);
-            if (error) throw error;
-            alert("Data berhasil disimpan!");
-            e.target.reset(); // Kosongkan form setelah simpan
-        }
+                if (editId) {
+                    const { error } = await api.from('stok_kayu').update(payload).eq('id', editId);
+                    if (error) throw error;
+                    alert("Data berhasil diperbarui!");
+                    if (typeof window.cancelEdit === 'function') window.cancelEdit();
+                } else {
+                    const { error } = await api.from('stok_kayu').insert([payload]);
+                    if (error) throw error;
+                    alert("Data berhasil disimpan!");
+                }
 
-        if (typeof fetchData === 'function') await fetchData();
+                if (e.target && typeof e.target.reset === 'function') e.target.reset();
+                if (typeof fetchData === 'function') await fetchData();
 
-    } catch (err) {
-        console.error("Gagal memproses data:", err.message);
-        alert("Gagal memproses data: " + err.message);
-    } finally {
-        if (typeof showLoading === 'function') showLoading(false);
-        if (submitBtn) submitBtn.disabled = false;
-        isSubmitting = false;
+            } catch (err) {
+                console.error("Database Error:", err);
+                if (err.code === "23505") {
+                    alert("⚠️ Gagal: Data transaksi dengan rincian ini sudah ada di database (Duplikat).");
+                } else {
+                    alert("Gagal menyimpan data: " + (err.message || err));
+                }
+            } finally {
+                isSubmitting = false;
+                if (submitBtn) submitBtn.disabled = false;
+                if (typeof showLoading === 'function') showLoading(false);
+            }
+        });
     }
-}
+});
 
 
 // Eksport fungsi ke global jika dipanggil via onclick
