@@ -1228,9 +1228,55 @@ window.editData = function(id) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-window.deleteData = function(id) {
-    console.log("Fungsi deleteData berhasil dipanggil! ID:", id);
-    alert("Tombol berfungsi! ID: " + id);
+window.deleteData = async function(rawId) {
+    // 1. Sanitasi ID: Ambil angka pertama dari string (misal "6960 2" menjadi 6960)
+    const cleanId = parseInt(rawId, 10);
+
+    console.log("ID Asli:", rawId, "| ID Setelah Dibersihkan:", cleanId);
+
+    if (isNaN(cleanId)) {
+        alert("ID data tidak valid!");
+        return;
+    }
+
+    if (!confirm(`Apakah Anda yakin ingin menghapus data dengan ID ${cleanId}?`)) return;
+
+    try {
+        if (typeof showLoading === 'function') showLoading(true);
+
+        // 2. Eksekusi Hapus ke Supabase
+        const { error } = await api
+            .from('stok_kayu') // Ganti sesuai nama tabel Anda
+            .delete()
+            .eq('id', cleanId);
+
+        if (error) throw error;
+
+        // 3. Update State Lokal (jika menggunakan state)
+        if (typeof state !== 'undefined') {
+            if (state.data) {
+                state.data = state.data.filter(item => Number(item.id) !== cleanId);
+            }
+            if (state.filteredData) {
+                state.filteredData = state.filteredData.filter(item => Number(item.id) !== cleanId);
+            }
+        }
+
+        alert("Data berhasil dihapus!");
+
+        // 4. Refresh Data / Tampilan Tabel
+        if (typeof fetchData === 'function') {
+            await fetchData();
+        } else if (typeof renderDashboardTable === 'function') {
+            renderDashboardTable();
+        }
+
+    } catch (err) {
+        console.error("Gagal menghapus data:", err);
+        alert("Gagal menghapus data: " + (err.message || err));
+    } finally {
+        if (typeof showLoading === 'function') showLoading(false);
+    }
 };
 
 // ==========================================
