@@ -785,32 +785,76 @@ async function fetchData() {
     }
 }
 
-
 async function restoreData() {
+    const fileInput = document.getElementById("restore-file");
+    const file = fileInput ? fileInput.files[0] : null;
 
-    if (!confirm("Hapus data lama dan ganti dengan data dari file backup ini?")) return;
-
-    try {
-        // 1. Kosongkan Tabel di Supabase dahulu (Mencegah Duplikat)
-        const { error: delError } = await api
-            .from('stok_kayu')
-            .delete()
-            .neq('id', 0); // Hapus semua baris
-
-        if (delError) throw delError;
-
-        // 2. Masukkan Data Baru dari JSON
-        const { error: insError } = await api
-            .from('stok_kayu')
-            .insert(importedData.data);
-
-        if (insError) throw insError;
-
-        alert("✅ Database berhasil diperbarui total!");
-        location.reload(); // Segarkan halaman untuk melihat hasilnya
-    } catch (err) {
-        alert("❌ Gagal sinkronisasi ke cloud: " + err.message);
+    if (!file) {
+        alert("Pilih file backup (JSON) terlebih dahulu!");
+        return;
     }
+
+    if (!confirm("Hapus data lama dan ganti dengan data dari file backup ini?")) {
+        return;
+    }
+
+    const reader = new FileReader();
+
+    reader.onload = async (e) => {
+        try {
+            if (typeof showLoading === 'function') showLoading(true);
+
+            // 1. Baca isi file JSON
+            const importedData = JSON.parse(e.target.result);
+
+            // Tentukan letak array data (bisa langsung berupa array atau di dalam properti .data)
+            const rowsToInsert = Array.isArray(importedData) 
+                ? importedData 
+                : (importedData.data || importedData.stok_kayu || []);
+
+            if (!rowsToInsert || rowsToInsert.length === 0) {
+                throw new Error("File backup kosong atau format data tidak sesuai.");
+            }
+
+            // Bersihkan properti ID jika ada agar tidak bentrok dengan auto-increment Supabase
+            const cleanPayload = rowsToInsert.map(item => {
+                const { id, created_at, ...rest } = item;
+                return rest;
+            });
+
+            // 2. Kosongkan Tabel di Supabase (Mencegah Duplikat)
+            const { error: delError } = await api
+                .from('stok_kayu')
+                .delete()
+                .neq('id', 0); // Hapus semua baris
+
+            if (delError) throw delError;
+
+            // 3. Masukkan Data Baru ke Supabase
+            const { error: insError } = await api
+                .from('stok_kayu')
+                .insert(cleanPayload);
+
+            if (insError) throw insError;
+
+            // 4. Perbarui State Lokal jika fungsi save tersedia
+            if (typeof state !== 'undefined') {
+                if (importedData.master) state.master = importedData.master;
+                if (typeof save === 'function') save();
+            }
+
+            alert("✅ Database berhasil dipulihkan total!");
+            location.reload(); // Segarkan halaman untuk menampilkan data baru
+
+        } catch (err) {
+            console.error("Restore Error:", err);
+            alert("❌ Gagal memulihkan data: " + err.message);
+        } finally {
+            if (typeof showLoading === 'function') showLoading(false);
+        }
+    };
+
+    reader.readAsText(file);
 }
 
 function togglePassword(inputId, iconElement) {
@@ -1338,10 +1382,7 @@ window.deleteSelected = async function () {
     }
 };
 
-// ==========================================
-// 2. FUNGSI TOGGLE SELECT ALL (toggleSelectAll)
-// ==========================================
-// Pasang fungsi ini di script.js (bisa di luar DOMContentLoaded)
+
 window.toggleSelectAll = function(source) {
     // Ambil semua checkbox baris yang punya class 'row-checkbox'
     const checkboxes = document.querySelectorAll('.row-checkbox');
@@ -1604,7 +1645,7 @@ window.renderRekapSaldo = function () {
 
     // 1. Ambil Nilai Filter Periode (DARI & SAMPAI)
     const fBulanDari = document.getElementById("filter-dari-bulan")?.value || 1;
-    const fTahunDari = document.getElementById("filter-dari-tahun")?.value || 2026;
+    const fTahunDari = parseInt(document.getElementById("filter-dari-tahun")?.value, 10) || new Date().getFullYear();
     const fBulanSampai = document.getElementById("filter-sampai-bulan")?.value || 12;
     const fTahunSampai = document.getElementById("filter-sampai-tahun")?.value || 2026;
 
@@ -1763,21 +1804,25 @@ window.renderRekapTable = function () {
 
 // Helper untuk memproses data rekap (filter + grouping)
 function getProcessedRekapData() {
-    const fDariB = document.getElementById("filter-dari-bulan").value;
-    const fDariT = document.getElementById("filter-dari-tahun").value;
-    const fSampaiB = document.getElementById("filter-sampai-bulan").value;
-    const fSampaiT = document.getElementById("filter-sampai-tahun").value;
-    const fH = document.getElementById("filter-tpk").value;
-    const fJ = document.getElementById("filter-jenis").value;
-    const fP = document.getElementById("filter-petak").value;
-    const fK = document.getElementById("filter-ket").value.toLowerCase();
+    // Helper untuk mengambil value elemen HTML dengan aman tanpa crash
+    const getVal = (id) => document.getElementById(id)?.value || '';
 
-    if (!state.hasAppliedFilter) return null;
+    const fDariB = parseInt(getVal("filter-dari-bulan"), 10) || 1;
+    const fDariT = parseInt(getVal("filter-dari-tahun"), 10) || new Date().getFullYear();
+    const fSampaiB = parseInt(getVal("filter-sampai-bulan"), 10) || 12;
+    const fSampaiT = parseInt(getVal("filter-sampai-tahun"), 10) || new Date().getFullYear();
+    
+    const fH = getVal("filter-tpk");
+    const fJ = getVal("filter-jenis");
+    const fP = getVal("filter-petak");
+    const fK = getVal("filter-ket").toLowerCase();
+
+    // Pastikan state.data tersedia sebelum diolah
+    if (!state.hasAppliedFilter || !Array.isArray(state.data)) return null;
 
     const grouped = {};
     const sorted = [...state.data].sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
 
-    // Inisialisasi variabel Grand Total
     let totalSAwalLHP = 0;
     let totalBapBerjalan = 0;
     let totalLhpBerjalan = 0;
@@ -1786,36 +1831,44 @@ function getProcessedRekapData() {
     let totalGrandLHP = 0;
 
     const startDate = new Date(fDariT, fDariB - 1, 1);
-    const endDate = new Date(fSampaiT, fSampaiB, 0);
+    const endDate = new Date(fSampaiT, fSampaiB, 0, 23, 59, 59); // Set sampai akhir hari pada bulan tersebut
 
     sorted.forEach(d => {
         const dataDate = new Date(d.tanggal);
-        if (dataDate > endDate) return; // skip data after end
+        if (isNaN(dataDate.getTime()) || dataDate > endDate) return;
 
-        if (fH && d.he_lotim !== fH) return;
-        if (fJ && d.jenis !== fJ) return;
-        if (fP && d.petak !== fP) return;
+        // Pemetaan properti database Supabase
+        const tpk = d.tpk || '';
+        const jenis = d.jenis_kayu || '';
+        const petak = d.petak || '';
+        const ketStr = (d.keterangan || '').toLowerCase();
+
+        // Pengecekan Filter
+        if (fH && tpk !== fH) return;
+        if (fJ && jenis !== fJ) return;
+        if (fP && petak !== fP) return;
         if (fK) {
-            const searchTerms = fK.split(',').map(t => t.trim()).filter(t => t);
-            const match = searchTerms.some(term => d.ket.toLowerCase().includes(term));
+            const searchTerms = fK.split(',').map(t => t.trim()).filter(Boolean);
+            const match = searchTerms.some(term => ketStr.includes(term));
             if (!match) return;
         }
 
-        const masuk = parseFloat(d.p || 0);
-        const keluar = parseFloat(d.m || 0);
-        const ket = d.ket.toUpperCase();
+        const masuk = parseFloat(d.masuk_m3) || 0;
+        const keluar = parseFloat(d.keluar_m3) || 0;
+        const ket = ketStr.toUpperCase();
 
-        let isBefore = false;
-        let isCurrent = false;
-        if (dataDate < startDate) {
-            isBefore = true;
-        } else if (dataDate <= endDate) {
-            isCurrent = true;
-        }
+        const isBefore = dataDate < startDate;
+        const isCurrent = dataDate >= startDate && dataDate <= endDate;
 
-        const key = `${d.jenis}|${d.he_lotim}|${d.petak}`;
+        const key = `${jenis}|${tpk}|${petak}`;
         if (!grouped[key]) {
-            grouped[key] = { sAwalLHP: 0, sAwalBAP: 0, bapBerjalan: 0, lhpBerjalan: 0, kirimBerjalan: 0 };
+            grouped[key] = { 
+                sAwalLHP: 0, 
+                sAwalBAP: 0, 
+                bapBerjalan: 0, 
+                lhpBerjalan: 0, 
+                kirimBerjalan: 0 
+            };
         }
 
         if (isBefore) {
@@ -1829,8 +1882,7 @@ function getProcessedRekapData() {
             } else if (ket.includes("KIRIM")) {
                 grouped[key].sAwalLHP -= keluar;
             }
-        }
-        else if (isCurrent) {
+        } else if (isCurrent) {
             if (ket.includes("SALDO AWAL")) {
                 grouped[key].sAwalLHP += masuk;
             } else if (ket.includes("LHP")) {
@@ -1846,10 +1898,11 @@ function getProcessedRekapData() {
     const rows = [];
     Object.entries(grouped).forEach(([key, v]) => {
         const [jen, tpk, pet] = key.split("|");
+
+        // Perhitungan Saldo Akhir termasuk membawa sAwalBAP dari masa lalu
         const sBAP = (v.sAwalBAP + v.bapBerjalan) - v.lhpBerjalan;
         const sLHP = (v.sAwalLHP + v.lhpBerjalan) - v.kirimBerjalan;
 
-        // Akumulasi ke Grand Total
         totalSAwalLHP += v.sAwalLHP;
         totalBapBerjalan += v.bapBerjalan;
         totalLhpBerjalan += v.lhpBerjalan;
@@ -1857,14 +1910,17 @@ function getProcessedRekapData() {
         totalGrandBAP += sBAP;
         totalGrandLHP += sLHP;
 
-        if (v.sAwalLHP !== 0 || v.bapBerjalan !== 0 || v.lhpBerjalan !== 0 || v.kirimBerjalan !== 0 || sBAP !== 0 || sLHP !== 0) {
+        if (v.sAwalLHP !== 0 || v.sAwalBAP !== 0 || v.bapBerjalan !== 0 || v.lhpBerjalan !== 0 || v.kirimBerjalan !== 0 || sBAP !== 0 || sLHP !== 0) {
             rows.push({
-                jenis: jen, tpk, petak: pet,
+                jenis: jen, 
+                tpk: tpk, 
+                petak: pet,
                 sAwalLHP: v.sAwalLHP,
                 bapBerjalan: v.bapBerjalan,
                 lhpBerjalan: v.lhpBerjalan,
                 kirimBerjalan: v.kirimBerjalan,
-                sBAP, sLHP
+                sBAP, 
+                sLHP
             });
         }
     });
@@ -1872,7 +1928,12 @@ function getProcessedRekapData() {
     return {
         rows,
         totals: {
-            totalSAwalLHP, totalBapBerjalan, totalLhpBerjalan, totalKirimBerjalan, totalGrandBAP, totalGrandLHP
+            totalSAwalLHP, 
+            totalBapBerjalan, 
+            totalLhpBerjalan, 
+            totalKirimBerjalan, 
+            totalGrandBAP, 
+            totalGrandLHP
         },
         fDariB, fDariT, fSampaiB, fSampaiT
     };
@@ -2243,25 +2304,7 @@ function backupData() {
     a.click();
 }
 
-function restoreData() {
-    const fileInput = document.getElementById("restore-file");
-    const file = fileInput.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        try {
-            const imported = JSON.parse(e.target.result);
-            state = imported;
-            state.isLoggedIn = false;
-            save();
-            alert("Restore berhasil! Silakan login kembali.");
-            location.reload();
-        } catch (err) {
-            alert("File tidak valid.");
-        }
-    };
-    reader.readAsText(file);
-}
+
 
 function exportToCSV() {
     let csv = ["Tanggal,Keterangan,Jenis Kayu,TPK,Petak,Masuk,Keluar"];
@@ -2323,99 +2366,102 @@ function exportRincianExcel() {
     link.download = fileName;
     link.click();
 }
-// Daftarkan fungsi ke global window agar onclick di HTML bisa jalan
+
+// Pindahkan pendaftaran window ke paling atas
 window.updatePetakByTPK = updatePetakByTPK;
 window.applyRekapFilter = applyRekapFilter;
 window.switchView = switchView;
 
-document.addEventListener("DOMContentLoaded", () => {
-    if (state.isLoggedIn) {
-        if (typeof startApp === 'function') startApp();
-    } else {
-        if (typeof initLoginHandler === 'function') initLoginHandler();
-    }
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setupStockForm);
+} else {
+    setupStockForm();
+}
 
-    // Helper aman untuk mengambil value elemen HTML tanpa crash saat elemen null
-    const getVal = (id) => {
-        const el = document.getElementById(id);
-        return el ? el.value : '';
-    };
-
-    // Event Listener untuk Stock Form (Dipasang dengan Pengecekan)
+document.addEventListener('DOMContentLoaded', () => {
     const stockForm = document.getElementById('stock-form');
     if (stockForm) {
-        stockForm.addEventListener('submit', async (e) => {
+        stockForm.onsubmit = null; // Mencegah pemicuan ganda
+
+        stockForm.addEventListener('submit', async function(e) {
             e.preventDefault();
+            
+            // Helper aman untuk ambil value dari HTML
+            const getVal = (id) => {
+                const el = document.getElementById(id);
+                return el ? el.value : '';
+            };
 
             const editId = getVal('edit-id');
-            const jenisKayu = getVal('input-jenis');
-
-            // 1. Ambil nilai SM dari input HTML baru (input-in-sm & input-out-sm)
+            const date = getVal('input-date');
+            const ket = getVal('input-ket');
+            const jenis = getVal('input-jenis');
+            const tpk = getVal('input-tpk');
+            const petak = getVal('input-petak');
+            
+            // Ambil input SM dari Form HTML
             const inSM = parseFloat(getVal('input-in-sm')) || 0;
             const outSM = parseFloat(getVal('input-out-sm')) || 0;
 
-            // 2. Cari Faktor Konversi dari Master Data Jenis Kayu
+            // Cari faktor konversi dari master jenis kayu (Aman Case-Insensitive)
             let faktorKonversi = 1;
             if (state.master && state.master['jenis_kayu']) {
-                const itemKayu = state.master['jenis_kayu'].find(k => k.name === jenisKayu);
+                const itemKayu = state.master['jenis_kayu'].find(
+                    k => k.name && k.name.trim().toLowerCase() === jenis.trim().toLowerCase()
+                );
                 if (itemKayu && itemKayu.konversi) {
                     faktorKonversi = parseFloat(itemKayu.konversi);
                 }
             }
 
-            // 3. Hitung Otomatis Nilai M³ (SM * Faktor Konversi)
+            // Hitung hasil konversi ke M³
             const inM3 = inSM * faktorKonversi;
             const outM3 = outSM * faktorKonversi;
 
-            // 4. Siapkan Data Payload ke Supabase
-            const formData = {
-                tanggal: getVal('input-date'),
-                keterangan: getVal('input-ket'),
-                jenis_kayu: jenisKayu,
-                tpk: getVal('input-tpk'),
-                petak: getVal('input-petak'),
-                masuk_m3: inM3,   // Hasil konversi M³
-                keluar_m3: outM3   // Hasil konversi M³
+            // Payload HANYA mengirim kolom yang ada di database Supabase (masuk_m3 & keluar_m3)
+            const payload = {
+                tanggal: date,
+                keterangan: ket,
+                jenis_kayu: jenis,
+                tpk: tpk,
+                petak: petak,
+                masuk_m3: inM3,
+                keluar_m3: outM3
             };
 
             try {
                 if (typeof showLoading === 'function') showLoading(true);
 
                 if (editId) {
-                    // --- PROSES UPDATE ---
-                    const { error } = await api
-                        .from('stok_kayu') // atau 'mutasi_stok' sesuaikan nama tabelmu
-                        .update(formData)
-                        .eq('id', editId);
-
+                    // UPDATE ke tabel 'stok_kayu'
+                    const { error } = await api.from('stok_kayu').update(payload).eq('id', editId);
                     if (error) throw error;
                     alert("Data berhasil diperbarui!");
-                    if (typeof cancelEdit === 'function') cancelEdit();
                 } else {
-                    // --- PROSES SIMPAN BARU ---
-                    const { error } = await api
-                        .from('stok_kayu')
-                        .insert([formData]);
-
+                    // INSERT ke tabel 'stok_kayu'
+                    const { error } = await api.from('stok_kayu').insert([payload]);
                     if (error) throw error;
-                    alert(`Data berhasil disimpan!\nIn: ${inSM} SM (${inM3.toFixed(2)} M³) | Faktor: ${faktorKonversi}`);
-                    
-                    if (e.target && typeof e.target.reset === 'function') {
-                        e.target.reset();
-                    }
+                    alert(`Data berhasil disimpan!\n${inSM} SM x ${faktorKonversi} = ${inM3.toFixed(2)} M³`);
                 }
 
-                // Refresh data di tabel
-                if (typeof fetchData === 'function') fetchData();
+                if (e.target && typeof e.target.reset === 'function') e.target.reset();
+                if (typeof cancelEdit === 'function') cancelEdit();                         
                 if (typeof loadMutasiData === 'function') loadMutasiData();
+                if (typeof fetchData === 'function') fetchData();
 
             } catch (err) {
-                console.error("Kesalahan database:", err.message);
-                alert("Gagal memproses data: " + err.message);
+                console.error("Database Error:", err);
+                alert("Gagal menyimpan data: " + err.message);
             } finally {
                 if (typeof showLoading === 'function') showLoading(false);
             }
         });
+    }
+
+    if (state.isLoggedIn) {
+        if (typeof startApp === 'function') startApp();
+    } else {
+        if (typeof initLoginHandler === 'function') initLoginHandler();
     }
 });
 
