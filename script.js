@@ -1275,21 +1275,25 @@ window.editData = function(id) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
-
 window.deleteData = async function(id) {
     if (!id) {
         alert("ID data tidak ditemukan!");
         return;
     }
 
-    // Tampilkan konfirmasi ke pengguna
+    // Pengecekan Ketersediaan Client Supabase (api)
+    const supabaseClient = window.api || (typeof api !== 'undefined' ? api : null);
+    if (!supabaseClient) {
+        alert("Koneksi ke database belum siap. Silakan refresh halaman.");
+        return;
+    }
+
     if (!confirm("Apakah Anda yakin ingin menghapus data ini?")) return;
 
     try {
         if (typeof showLoading === 'function') showLoading(true);
 
-        // Hapus baris data berdasarkan ID dari tabel 'stok_kayu'
-        const { error } = await api
+        const { error } = await supabaseClient
             .from('stok_kayu')
             .delete()
             .eq('id', id);
@@ -1298,17 +1302,18 @@ window.deleteData = async function(id) {
 
         alert("Data berhasil dihapus!");
 
-        // Refresh/muat ulang tabel setelah berhasil menghapus
+        // Refresh data
         if (typeof loadMutasiData === 'function') await loadMutasiData();
         if (typeof fetchData === 'function') await fetchData();
 
     } catch (err) {
         console.error("Gagal menghapus data:", err);
-        alert("Gagal menghapus data: " + err.message);
+        alert("Gagal menghapus data: " + (err.message || err));
     } finally {
         if (typeof showLoading === 'function') showLoading(false);
     }
 };
+
 // ==========================================
 // 2. FUNGSI BATAL EDIT (Kembali ke Mode Simpan)
 // ==========================================
