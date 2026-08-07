@@ -1670,8 +1670,14 @@ window.renderRekapSaldo = function () {
     if (!tableBody) return;
 
     // Helper untuk format angka aman
-    const formatSaldo = (val) => (val || 0).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
+    // Helper untuk format angka aman (BARU - Bebas dari -0.00)
+const formatSaldo = (val) => {
+    let num = parseFloat(val) || 0;
+    // Jika angka sangat mendekati 0 (antara -0.001 sampai 0.001), paksa jadi 0 murni
+    if (Math.abs(num) < 0.0001) num = 0;
+    
+    return num.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
     // 1. Ambil Nilai Filter Periode (DARI & SAMPAI)
     const fBulanDari = document.getElementById("filter-dari-bulan")?.value || 1;
     const fTahunDari = parseInt(document.getElementById("filter-dari-tahun")?.value, 10) || new Date().getFullYear();
