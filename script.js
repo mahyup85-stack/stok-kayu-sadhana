@@ -2204,6 +2204,7 @@ function getProcessedRincianData() {
 
 function renderRincian() {
     const body = document.getElementById("rincian-table-body");
+    const pageInfo = document.getElementById("page-info"); // Elemen teks info halaman (misal: "Halaman 1 dari 10")
     if (!body) return;
 
     if (!state.hasAppliedFilter) {
@@ -2215,24 +2216,28 @@ function renderRincian() {
     if (!processed) return;
 
     const { filtered, saldoAwal } = processed;
+
+    // --- 1. SETUP PAGINATION ---
+    const totalRows = filtered.length;
+    const rowsPerPage = state.rowsPerPage || 10; // Jumlah baris per halaman
+    const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+
+    // Proteksi halaman aktif
+    if (!state.currentPage || state.currentPage < 1) state.currentPage = 1;
+    if (state.currentPage > totalPages) state.currentPage = totalPages;
+
+    const startIndex = (state.currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+
+    // --- 2. HITUNG SALDO BERJALAN SAMPAI HALAMAN SAAT INI ---
     let runningSaldo = saldoAwal;
     let totalMasukFisik = 0;
     let totalKeluarFisik = 0;
     let totalDokumenLHP = 0;
     let totalKirim = 0;
-    let htmlContent = "";
 
-    // 1. Baris Saldo Awal (Total 8 Kolom: 7 gabung + 1 saldo)
-    htmlContent += `
-        <tr style="background-color: #f3f4f6; font-style: italic;">
-            <td colspan="5" class="text-center">SALDO AWAL (Sampai Periode Sebelumnya)</td>
-            <td class="text-right">-</td>
-            <td class="text-right">-</td>
-            <td class="text-right font-bold">${saldoAwal.toFixed(2)}</td>
-        </tr>
-    `;
-
-    filtered.forEach(d => {
+    // Hitung akumulasi untuk SEMUA data (guna menghitung Running Saldo awal halaman & Grand Total)
+    const processedDataWithSaldo = filtered.map(d => {
         const valP = parseFloat(d.p || 0); // Masuk
         const valM = parseFloat(d.m || 0); // Keluar
         const ket = (d.ket || "").toUpperCase();
@@ -2249,7 +2254,6 @@ function renderRincian() {
             mskHitung = valP; klrHitung = 0;
             totalDokumenLHP += valP;
         } else {
-            // Mutasi umum (Fisik)
             mskTampil = valP; klrTampil = valM;
             mskHitung = valP; klrHitung = valM;
         }
@@ -2258,24 +2262,51 @@ function renderRincian() {
         totalMasukFisik += mskHitung;
         totalKeluarFisik += klrHitung;
 
+        return {
+            ...d,
+            mskTampil,
+            klrTampil,
+            currentRunningSaldo: runningSaldo
+        };
+    });
+
+    // POTONG DATA HANYA UNTUK HALAMAN SEKARANG
+    const paginatedData = processedDataWithSaldo.slice(startIndex, endIndex);
+
+    let htmlContent = "";
+
+    // --- 3. BARIS SALDO AWAL (Tampilkan di halaman 1) ---
+    if (state.currentPage === 1) {
+        htmlContent += `
+            <tr style="background-color: #f3f4f6; font-style: italic;">
+                <td colspan="5" class="text-center">SALDO AWAL (Sampai Periode Sebelumnya)</td>
+                <td class="text-right">-</td>
+                <td class="text-right">-</td>
+                <td class="text-right font-bold">${saldoAwal.toFixed(2)}</td>
+            </tr>
+        `;
+    }
+
+    // --- 4. RENDER BARIS TERCETAK (PAGINATED) ---
+    paginatedData.forEach(d => {
+        const ket = (d.ket || "").toUpperCase();
         const rowStyle = ket.includes('LHP') ? 'background-color: #f9fafb; color: #6b7280;' : '';
 
         htmlContent += `
             <tr style="${rowStyle}">
-                <td>${d.tanggal}</td>
-                <td>${d.ket}</td>
-                <td>${d.jenis}</td>
-                <td>${d.tpk}</td>
-                <td>${d.petak}</td>
-                <td class="text-right">${mskTampil.toFixed(2)}</td>
-                <td class="text-right">${klrTampil.toFixed(2)}</td>
-                <td class="text-right font-bold">${runningSaldo.toFixed(2)}</td>
+                <td>${d.tanggal || '-'}</td>
+                <td>${d.ket || '-'}</td>
+                <td>${d.jenis || '-'}</td>
+                <td>${d.tpk || '-'}</td>
+                <td>${d.petak || '-'}</td>
+                <td class="text-right">${d.mskTampil ? d.mskTampil.toFixed(2) : '-'}</td>
+                <td class="text-right">${d.klrTampil ? d.klrTampil.toFixed(2) : '-'}</td>
+                <td class="text-right font-bold">${d.currentRunningSaldo.toFixed(2)}</td>
             </tr>`;
     });
 
-    // 2. Baris Grand Total (Total 8 Kolom: 5 gabung + 3 angka)
-    if (filtered.length > 0 || saldoAwal !== 0) {
-        // Total Kirim (Opsional)
+    // --- 5. BARIS GRAND TOTAL (Tampilkan di halaman terakhir) ---
+    if (state.currentPage === totalPages && (filtered.length > 0 || saldoAwal !== 0)) {
         if (totalKirim > 0) {
             htmlContent += `
                 <tr style="background-color: #fef2f2; color: #dc2626; font-size: 0.85rem;">
@@ -2285,7 +2316,6 @@ function renderRincian() {
                 </tr>`;
         }
 
-        // Grand Total Utama
         htmlContent += `
             <tr style="background-color: #f3f4f6; font-weight: bold; border-top: 2px solid #374151;">
                 <td colspan="5" class="text-center">GRAND TOTAL MUTASI FISIK</td>
@@ -2296,6 +2326,11 @@ function renderRincian() {
     }
 
     body.innerHTML = htmlContent;
+
+    // Update Teks Pagination jika ada elemennya
+    if (pageInfo) {
+        pageInfo.innerText = `Halaman ${state.currentPage} dari ${totalPages}`;
+    }
 }
 
 // BACKUP & EXPORT
@@ -2563,7 +2598,7 @@ document.addEventListener('DOMContentLoaded', () => {
             e.stopImmediatePropagation(); // Mencegah listener ganda lain jika terlanjur terpasang
 
             // Jika sedang proses submit, batalkan eksekusi berikutnya
-            if (isSubmittingStock) return;
+            if (typeof isSubmittingStock !== 'undefined' && isSubmittingStock) return;
 
             const submitBtn = stockForm.querySelector('button[type="submit"]');
 
@@ -2616,7 +2651,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 // Aktifkan pengunci & matikan tombol simpan
-                isSubmittingStock = true;
+                if (typeof isSubmittingStock !== 'undefined') isSubmittingStock = true;
                 if (submitBtn) submitBtn.disabled = true;
                 if (typeof showLoading === 'function') showLoading(true);
 
@@ -2643,7 +2678,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert("Gagal menyimpan data: " + (err.message || err));
             } finally {
                 // Buka pengunci kembali
-                isSubmittingStock = false;
+                if (typeof isSubmittingStock !== 'undefined') isSubmittingStock = false;
                 if (submitBtn) submitBtn.disabled = false;
                 if (typeof showLoading === 'function') showLoading(false);
             }
@@ -2656,4 +2691,39 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         if (typeof initLoginHandler === 'function') initLoginHandler();
     }
-});
+
+    // ==========================================
+    // EVENT LISTENER PAGINATION RINCIAN MUTASI
+    // ==========================================
+    document.getElementById("btn-next")?.addEventListener("click", () => {
+        state.currentPage = (state.currentPage || 1) + 1;
+        if (typeof renderRincian === 'function') renderRincian();
+    });
+
+    document.getElementById("btn-prev")?.addEventListener("click", () => {
+        if ((state.currentPage || 1) > 1) {
+            state.currentPage--;
+            if (typeof renderRincian === 'function') renderRincian();
+        }
+    });
+
+    // Navigasi ke Halaman Pertama (<<)
+    document.getElementById("btn-first")?.addEventListener("click", () => {
+        state.currentPage = 1;
+        if (typeof renderRincian === 'function') renderRincian();
+    });
+
+    // Navigasi ke Halaman Terakhir (>>)
+    document.getElementById("btn-last")?.addEventListener("click", () => {
+        if (typeof getProcessedRincianData === 'function') {
+            const processed = getProcessedRincianData();
+            if (processed && processed.filtered) {
+                const rowsPerPage = state.rowsPerPage || 10;
+                state.currentPage = Math.ceil(processed.filtered.length / rowsPerPage) || 1;
+                if (typeof renderRincian === 'function') renderRincian();
+            }
+        }
+    });
+
+}); // Akhir dari DOMContentLoaded
+
