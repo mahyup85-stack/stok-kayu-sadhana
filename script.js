@@ -283,33 +283,74 @@ function renderDashboardTable(dataToRender = null) {
 }
 
 // Fungsi untuk membuat tombol navigasi halaman
-function renderPaginationControls() {
+window.renderPaginationControls = function () {
     const container = document.getElementById("pagination-container");
     if (!container) return;
 
-    const totalPages = Math.ceil(state.filteredData.length / state.rowsPerPage);
+    // 1. Tentukan sumber data secara dinamis (Rincian Mutasi vs Dashboard Utama)
+    let totalRows = 0;
+    if (typeof getProcessedRincianData === 'function' && state.hasAppliedFilter) {
+        const processed = getProcessedRincianData();
+        totalRows = processed?.filtered?.length || 0;
+    } else {
+        totalRows = state.filteredData?.length || state.data?.length || 0;
+    }
 
+    const rowsPerPage = state.rowsPerPage || 10;
+    const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+    const currentPage = state.currentPage || 1;
+
+    // 2. Render tombol HTML dengan status disabled yang presisi
     let html = `
-        <div style="display:flex; justify-content:center; align-items:center; gap:10px; padding:10px;">
-            <button onclick="changePage(1)" ${state.currentPage === 1 ? 'disabled' : ''}>&laquo;</button>
-            <button onclick="changePage(${state.currentPage - 1})" ${state.currentPage === 1 ? 'disabled' : ''}>Prev</button>
-            <span>Halaman ${state.currentPage} dari ${totalPages}</span>
-            <button onclick="changePage(${state.currentPage + 1})" ${state.currentPage === totalPages ? 'disabled' : ''}>Next</button>
-            <button onclick="changePage(${totalPages})" ${state.currentPage === totalPages ? 'disabled' : ''}>&raquo;</button>
+        <div style="display:flex; justify-content:center; align-items:center; gap:8px; padding:12px 0;">
+            <button class="btn-page" onclick="changePage(1)" ${currentPage === 1 ? 'disabled' : ''}>&laquo;</button>
+            <button class="btn-page" onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Prev</button>
+            
+            <span style="font-size: 0.9rem; font-weight: 500; margin: 0 8px;">
+                Halaman <strong>${currentPage}</strong> dari <strong>${totalPages}</strong>
+            </span>
+            
+            <button class="btn-page" onclick="changePage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
+            <button class="btn-page" onclick="changePage(${totalPages})" ${currentPage >= totalPages ? 'disabled' : ''}>&raquo;</button>
         </div>
     `;
+    
     container.innerHTML = html;
 };
 
-// Fungsi pindah halaman
+// Fungsi pindah halaman (Aman untuk semua modul)
 window.changePage = function (page) {
-    const totalPages = Math.ceil(state.filteredData.length / state.rowsPerPage);
+    // Hitung total halaman sesuai modul aktif
+    let totalRows = 0;
+    if (typeof getProcessedRincianData === 'function' && state.hasAppliedFilter) {
+        const processed = getProcessedRincianData();
+        totalRows = processed?.filtered?.length || 0;
+    } else {
+        totalRows = state.filteredData?.length || state.data?.length || 0;
+    }
+
+    const rowsPerPage = state.rowsPerPage || 10;
+    const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+
+    // Validasi batas halaman
     if (page < 1 || page > totalPages) return;
 
+    // Set halaman baru
     state.currentPage = page;
-    renderDashboardTable(state.filteredData);
-    // Scroll ke atas tabel saat pindah halaman
-    document.querySelector('.tabel-wrapper').scrollTop = 0;
+
+    // Render ulang tampilan yang sesuai
+    if (typeof renderRincian === 'function') {
+        renderRincian();
+    }
+    if (typeof renderDashboardTable === 'function') {
+        renderDashboardTable();
+    }
+
+    // Scroll halus ke atas tabel
+    const wrapper = document.querySelector('.tabel-wrapper') || document.querySelector('.table-responsive');
+    if (wrapper) {
+        wrapper.scrollTop = 0;
+    }
 };
 
 // Pasang ke window agar aman jika dipanggil dengan window.state
