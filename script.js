@@ -2475,7 +2475,203 @@ function exportRincianExcel() {
     link.click();
 }
 
+// Helper untuk membuat QR Code dalam format Base64 Image
+function generateQRCodeBase64(text) {
+    return new Promise((resolve) => {
+        // Buat elemen div sementara di memori
+        const tempDiv = document.createElement("div");
+        tempDiv.style.display = "none";
+        document.body.appendChild(tempDiv);
 
+        const qrcode = new QRCode(tempDiv, {
+            text: text,
+            width: 100,
+            height: 100,
+            correctLevel: QRCode.CorrectLevel.H
+        });
+
+        // Berikan delay singkat agar QR Code selesai dirender
+        setTimeout(() => {
+            const img = tempDiv.querySelector("img") || tempDiv.querySelector("canvas");
+            let dataUrl = "";
+            if (img) {
+                dataUrl = img.src || img.toDataURL("image/png");
+            }
+            document.body.removeChild(tempDiv);
+            resolve(dataUrl);
+        }, 100);
+    });
+}
+
+async function exportLaporanPDF() {
+    try {
+        if (typeof showLoading === 'function') showLoading(true);
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const marginX = 14;
+
+        // =========================================================
+        // 1. KOP SURAT PERUSAHAAN (HEADER)
+        // =========================================================
+        // Nama Perusahaan
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.setTextColor(30, 41, 59); // Dark Gray
+        doc.text("PT. SADHANA ARIFNUSA", marginX, 18);
+
+        // Sub-title / Alamat / Kontak
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text("Kawasan Pengelolaan Kayu & TPK Terpadu", marginX, 23);
+        doc.text("Jl. Raya Labuhan Lombok Sambelia | Telp: -", marginX, 27);
+
+        // Garis Pembatas Kop Surat (Double Line)
+        doc.setLineWidth(0.8);
+        doc.setDrawColor(30, 41, 59);
+        doc.line(marginX, 31, pageWidth - marginX, 31);
+        doc.setLineWidth(0.2);
+        doc.line(marginX, 32, pageWidth - marginX, 32);
+
+        // =========================================================
+        // 2. JUDUL LAPORAN & PERIODE
+        // =========================================================
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        doc.setTextColor(15, 23, 42);
+        doc.text("LAPORAN REKAPITULASI STOK & MUTASI KAYU", pageWidth / 2, 42, { align: "center" });
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(71, 85, 105);
+        
+        const filterBulan = state.filter?.dariBulan || "Semua";
+        const filterTahun = state.filter?.dariTahun || new Date().getFullYear();
+        doc.text(`Periode: ${filterBulan} ${filterTahun} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 47, { align: "center" });
+
+        // =========================================================
+        // 3. TARIK DATA & PENYUSUNAN TABEL (AUTO-TABLE)
+        // =========================================================
+        // Mengambil data dari processed state / Supabase
+        const processed = typeof getProcessedRincianData === 'function' ? getProcessedRincianData() : null;
+        const listData = processed?.filtered || state.data || [];
+
+        const tableBody = [];
+        let totalMasuk = 0;
+        let totalKeluar = 0;
+
+        listData.forEach((item, index) => {
+            const msk = parseFloat(item.masuk_m3 || item.p || 0);
+            const klr = parseFloat(item.keluar_m3 || item.m || 0);
+            totalMasuk += msk;
+            totalKeluar += klr;
+
+            tableBody.push([
+                index + 1,
+                item.tanggal || '-',
+                item.keterangan || item.ket || '-',
+                item.jenis_kayu || item.jenis || '-',
+                item.tpk || '-',
+                item.petak || '-',
+                msk > 0 ? msk.toFixed(2) : '-',
+                klr > 0 ? klr.toFixed(2) : '-'
+            ]);
+        });
+
+        // Baris Total Keseluruhan
+        tableBody.push([
+            { content: 'TOTAL MUTASI', colSpan: 6, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: totalMasuk.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: totalKeluar.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
+        ]);
+
+        // Generate Tabel PDF
+        doc.autoTable({
+            startY: 52,
+            head: [['No', 'Tanggal', 'Keterangan', 'Jenis Kayu', 'TPK', 'Petak', 'Masuk (M³)', 'Keluar (M³)']],
+            body: tableBody,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [30, 41, 59],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                halign: 'center',
+                fontSize: 8
+            },
+            bodyStyles: {
+                fontSize: 8,
+                textColor: [51, 65, 85]
+            },
+            columnStyles: {
+                0: { halign: 'center', cellWidth: 10 },
+                1: { halign: 'center', cellWidth: 22 },
+                2: { halign: 'left' },
+                3: { halign: 'left', cellWidth: 25 },
+                4: { halign: 'center', cellWidth: 20 },
+                5: { halign: 'center', cellWidth: 18 },
+                6: { halign: 'right', cellWidth: 22 },
+                7: { halign: 'right', cellWidth: 22 }
+            },
+            margin: { left: marginX, right: marginX }
+        });
+
+        // =========================================================
+        // 4. DIGITAL STAMP & QR CODE VERIFIKASI (FOOTER)
+        // =========================================================
+        let finalY = doc.lastAutoTable.finalY + 10;
+
+        // Proteksi jika posisi tanda tangan terlalu melebihi batas bawah halaman
+        if (finalY > 230) {
+            doc.addPage();
+            finalY = 20;
+        }
+
+        // Teks Verifikasi Dokumen Digital
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(100, 116, 139);
+        
+        const docID = `DOC-SADHANA-${Date.now().toString(36).toUpperCase()}`;
+        const verifyUrl = `https://sadhana-app.vercel.app/verify?id=${docID}`;
+
+        // Generate QR Code Base64 Image
+        const qrBase64 = await generateQRCodeBase64(verifyUrl);
+
+        // Tempelkan QR Code ke PDF (Lebar 22mm x Tinggi 22mm)
+        if (qrBase64) {
+            doc.addImage(qrBase64, 'PNG', marginX, finalY, 22, 22);
+        }
+
+        doc.setFont("helvetica", "bold");
+        doc.text("DOKUMEN INI DITERBITKAN SECARA DIGITAL", marginX + 25, finalY + 5);
+        doc.setFont("helvetica", "normal");
+        doc.text(`ID Dokumen: ${docID}`, marginX + 25, finalY + 9);
+        doc.text("Pindai QR Code di samping untuk memverifikasi keaslian", marginX + 25, finalY + 13);
+        doc.text("laporan mutasi stok kayu ini.", marginX + 25, finalY + 17);
+
+        // Blok Tanda Tangan Pengesahan (Sebelah Kanan)
+        const rightAlignX = pageWidth - marginX - 45;
+        doc.setTextColor(15, 23, 42);
+        doc.text("Disetujui Oleh,", rightAlignX, finalY + 5);
+        doc.text("Kepala Operasional TPK", rightAlignX, finalY + 9);
+        
+        doc.setFont("helvetica", "bold");
+        doc.text("( .................................... )", rightAlignX, finalY + 28);
+
+        // Save / Download PDF
+        const fileName = `Laporan_Resmi_Stok_Kayu_${new Date().toISOString().slice(0, 10)}.pdf`;
+        doc.save(fileName);
+
+    } catch (err) {
+        console.error("Gagal membuat laporan PDF:", err);
+        alert("Gagal membuat PDF: " + err.message);
+    } finally {
+        if (typeof showLoading === 'function') showLoading(false);
+    }
+}
 
 window.sinkronisasiFilterRincian = function () {
     console.log("🔄 Sinkronisasi Filter Rincian dimulai...");
