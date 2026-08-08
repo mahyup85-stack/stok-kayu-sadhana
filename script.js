@@ -2665,14 +2665,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         stockForm.addEventListener('submit', async function (e) {
             e.preventDefault();
-            e.stopImmediatePropagation(); // Mencegah listener ganda lain jika terlanjur terpasang
+            e.stopImmediatePropagation();
 
-            // Jika sedang proses submit, batalkan eksekusi berikutnya
             if (typeof isSubmittingStock !== 'undefined' && isSubmittingStock) return;
 
             const submitBtn = stockForm.querySelector('button[type="submit"]');
 
-            // Helper aman untuk mengambil input dari HTML
             const getVal = (id) => {
                 const el = document.getElementById(id);
                 return el ? el.value : '';
@@ -2685,7 +2683,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const tpk = getVal('input-tpk');
             const petak = getVal('input-petak')?.trim() || '-';
 
-            // Ambil input SM dari Form
+            // Ambil input SM dari Form (Masuk & Keluar)
             const inSM = parseFloat(getVal('input-in-sm')) || 0;
             const outSM = parseFloat(getVal('input-out-sm')) || 0;
 
@@ -2694,20 +2692,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // Cari faktor konversi dari master jenis kayu (Case-Insensitive)
-            let faktorKonversi = 1;
+            if (inSM === 0 && outSM === 0) {
+                alert("Harap isi jumlah Masuk (SM) atau Keluar (SM)!");
+                return;
+            }
+
+            // 1. Cari faktor konversi dari master jenis kayu (Mendukung properti 'konversi' maupun 'faktor_konversi')
+            let faktorKonversi = 0.67; // Default jika master data tidak ketemu
             if (state.master && state.master['jenis_kayu']) {
                 const itemKayu = state.master['jenis_kayu'].find(
-                    k => k.name && k.name.trim().toLowerCase() === jenis.trim().toLowerCase()
+                    k => (k.name && k.name.trim().toLowerCase() === jenis.trim().toLowerCase()) ||
+                         (k.jenis_kayu && k.jenis_kayu.trim().toLowerCase() === jenis.trim().toLowerCase())
                 );
-                if (itemKayu && itemKayu.konversi) {
-                    faktorKonversi = parseFloat(itemKayu.konversi);
+                if (itemKayu) {
+                    faktorKonversi = parseFloat(itemKayu.konversi || itemKayu.faktor_konversi || itemKayu.faktor || 0.67);
                 }
             }
 
-            // Hitung hasil konversi ke M³
+            // 2. Hitung hasil konversi ke M³
             const inM3 = inSM * faktorKonversi;
             const outM3 = outSM * faktorKonversi;
+
+            // 3. Tentukan mana SM & M3 yang aktif digunakan untuk Notifikasi Alert
+            const activeSM = inSM > 0 ? inSM : outSM;
+            const activeM3 = inM3 > 0 ? inM3 : outM3;
 
             const payload = {
                 tanggal: date,
@@ -2720,7 +2728,6 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             try {
-                // Aktifkan pengunci & matikan tombol simpan
                 if (typeof isSubmittingStock !== 'undefined') isSubmittingStock = true;
                 if (submitBtn) submitBtn.disabled = true;
                 if (typeof showLoading === 'function') showLoading(true);
@@ -2734,7 +2741,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     // MODE INSERT DATA BARU
                     const { error } = await api.from('stok_kayu').insert([payload]);
                     if (error) throw error;
-                    alert(`Data berhasil disimpan!\n${inSM} SM x ${faktorKonversi} = ${inM3.toFixed(2)} M³`);
+                    
+                    // ✅ Notifikasi Alert menggunakan SM & M3 yang aktif
+                    alert(`Data berhasil disimpan!\n${activeSM} SM x ${faktorKonversi} = ${activeM3.toFixed(2)} M³`);
                 }
 
                 // Reset Form & Refresh Data
@@ -2747,7 +2756,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error("Database Error:", err);
                 alert("Gagal menyimpan data: " + (err.message || err));
             } finally {
-                // Buka pengunci kembali
                 if (typeof isSubmittingStock !== 'undefined') isSubmittingStock = false;
                 if (submitBtn) submitBtn.disabled = false;
                 if (typeof showLoading === 'function') showLoading(false);
@@ -2761,6 +2769,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         if (typeof initLoginHandler === 'function') initLoginHandler();
     }
+});
 
     // ==========================================
     // EVENT LISTENER PAGINATION RINCIAN MUTASI
