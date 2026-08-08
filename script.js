@@ -2508,7 +2508,7 @@ async function exportRekapSaldoPDF() {
         if (typeof showLoading === 'function') showLoading(true);
 
         const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' }); // Gunakan Landscape agar muat banyak kolom
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
         const pageWidth = doc.internal.pageSize.getWidth();
         const marginX = 14;
@@ -2524,7 +2524,7 @@ async function exportRekapSaldoPDF() {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         doc.setTextColor(100, 116, 139);
-        doc.text("Kawasan Pengelolaan Kayu & TPK Terpadu ", marginX, 20);
+        doc.text("Kawasan Pengelolaan Kayu & TPK Terpadu", marginX, 20);
         doc.text("Jl. Raya Labuhan Lombok - Sambelia | Telp: -", marginX, 27);
 
         doc.setLineWidth(0.6);
@@ -2547,21 +2547,34 @@ async function exportRekapSaldoPDF() {
         doc.text(`Periode: ${filterBulan} ${filterTahun} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 36, { align: "center" });
 
         // =========================================================
-        // 3. AMBIL DATA REKAP SALDO (Bukan Data Rincian)
+        // 3. AMBIL DATA REKAP SALDO (Dengan Proteksi Aman)
         // =========================================================
-        // Mengambil data dari fungsi rekap Anda (misal getProcessedRekapData() atau state.rekapData)
-        const rekapList = typeof getProcessedRekapData === 'function' 
-            ? getProcessedRekapData() 
-            : (state.rekapData || []);
+        let rekapList = [];
+
+        if (typeof getProcessedRekapData === 'function') {
+            const processed = getProcessedRekapData();
+            rekapList = processed?.filtered || processed || [];
+        } else if (Array.isArray(state.rekapData)) {
+            rekapList = state.rekapData;
+        } else if (Array.isArray(state.filteredData)) {
+            rekapList = state.filteredData;
+        }
+
+        if (!Array.isArray(rekapList) || rekapList.length === 0) {
+            if (typeof showLoading === 'function') showLoading(false);
+            alert("Tidak ada data rekap saldo untuk diekspor. Silakan terapkan filter terlebih dahulu.");
+            return;
+        }
 
         const tableBody = [];
         let totalAwal = 0, totalMasuk = 0, totalKeluar = 0, totalAkhir = 0;
 
+        // Loop Data Rekap
         rekapList.forEach((item, index) => {
-            const awal = parseFloat(item.saldo_awal || 0);
-            const masuk = parseFloat(item.masuk || 0);
-            const keluar = parseFloat(item.keluar || 0);
-            const akhir = parseFloat(item.saldo_akhir || (awal + masuk - keluar));
+            const awal = parseFloat(item.saldo_awal || item.awal || 0);
+            const masuk = parseFloat(item.masuk || item.masuk_m3 || 0);
+            const keluar = parseFloat(item.keluar || item.keluar_m3 || 0);
+            const akhir = parseFloat(item.saldo_akhir || item.akhir || (awal + masuk - keluar));
 
             totalAwal += awal;
             totalMasuk += masuk;
@@ -2572,15 +2585,15 @@ async function exportRekapSaldoPDF() {
                 index + 1,
                 item.tpk || '-',
                 item.petak || '-',
-                item.jenis_kayu || '-',
+                item.jenis_kayu || item.jenis || '-',
                 awal > 0 ? awal.toFixed(2) : '0.00',
                 masuk > 0 ? masuk.toFixed(2) : '0.00',
                 keluar > 0 ? keluar.toFixed(2) : '0.00',
                 akhir > 0 ? akhir.toFixed(2) : '0.00'
             ]);
-        });
+        }); // <-- Kurung tutup loop yang benar di sini
 
-        // Baris Total Rekap
+        // Baris Total Keseluruhan (DI LUAR LOOP)
         tableBody.push([
             { content: 'TOTAL KESELURUHAN', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
             { content: totalAwal.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
@@ -2622,17 +2635,20 @@ async function exportRekapSaldoPDF() {
         // 5. DIGITAL STAMP & FOOTER
         // =========================================================
         let finalY = doc.lastAutoTable.finalY + 10;
-        if (finalY > 160) { // Menyesuaikan batas tinggi landscape A4
+        if (finalY > 160) {
             doc.addPage();
             finalY = 20;
         }
 
         const docID = `REKAP-SADHANA-${Date.now().toString(36).toUpperCase()}`;
-        const verifyUrl = `https://sadhana-app.vercel.app/verify?id=${docID}`;
-        const qrBase64 = await generateQRCodeBase64(verifyUrl);
-
-        if (qrBase64) {
-            doc.addImage(qrBase64, 'PNG', marginX, finalY, 20, 20);
+        const verifyUrl = `https://stok-kayu-sadhana.vercel.app/verify?id=${docID}`;
+        
+        // Pengecekan aman jika fungsi QR Code tersedia
+        if (typeof generateQRCodeBase64 === 'function') {
+            const qrBase64 = await generateQRCodeBase64(verifyUrl);
+            if (qrBase64) {
+                doc.addImage(qrBase64, 'PNG', marginX, finalY, 20, 20);
+            }
         }
 
         doc.setFontSize(8);
