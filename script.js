@@ -2507,14 +2507,42 @@ async function exportRekapSaldoPDF() {
     try {
         if (typeof showLoading === 'function') showLoading(true);
 
-        // 1. AMBIL DATA LANGSUNG DARI DOM TABEL HTML YANG TAMPIL DI LAYAR
-        const rows = document.querySelectorAll("#view-rekap table tbody tr");
+        // =========================================================
+        // 1. Dapatkan Informasi Filter yang Sedang Aktif di Aplikasi
+        // =========================================================
+        const getFilterText = (id) => {
+            const el = document.getElementById(id) || document.querySelector(`[name="${id}"]`);
+            if (!el) return null;
+            if (el.tagName === 'SELECT') {
+                return el.options[el.selectedIndex]?.text || el.value;
+            }
+            return el.value;
+        };
+
+        const dariBulan   = getFilterText('dariBulan') || getFilterText('dari_bulan') || 'Januari';
+        const dariTahun   = getFilterText('dariTahun') || getFilterText('dari_tahun') || new Date().getFullYear();
+        const sampaiBulan = getFilterText('sampaiBulan') || getFilterText('sampai_bulan') || 'Agustus';
+        const sampaiTahun = getFilterText('sampaiTahun') || getFilterText('sampai_tahun') || new Date().getFullYear();
+        
+        const filterTPK   = getFilterText('filterTPK') || getFilterText('tpk') || 'Semua TPK';
+        const filterJenis = getFilterText('filterJenis') || getFilterText('jenis') || 'Semua Jenis';
+        const filterPetak = getFilterText('filterPetak') || getFilterText('petak') || 'Semua Petak';
+
+        // Teks Periode dan Filter Gabungan
+        const periodeTeks = `${dariBulan} ${dariTahun} s/d ${sampaiBulan} ${sampaiTahun}`;
+        const detailFilterTeks = `TPK: ${filterTPK} | Jenis: ${filterJenis} | Petak: ${filterPetak}`;
+        const tanggalCetak = new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+        // =========================================================
+        // 2. Baca Seluruh 8 Kolom Tabel Rekap Langsung dari DOM
+        // =========================================================
+        const rows = document.querySelectorAll("#view-rekap table tbody tr, main table tbody tr");
         let rekapList = [];
 
         rows.forEach(row => {
             const cols = row.querySelectorAll("td");
-            // Mengabaikan baris Total Keseluruhan jika ada di tbody
-            if (cols.length >= 7 && !row.innerText.includes("TOTAL KESELURUHAN")) {
+            // Mengabaikan baris Total Keseluruhan atau baris kosong
+            if (cols.length >= 8 && !row.innerText.includes("TOTAL KESELURUHAN") && !row.innerText.includes("Tidak ada data")) {
                 rekapList.push({
                     jenis_kayu: cols[0]?.innerText.trim() || '-',
                     tpk: cols[1]?.innerText.trim() || '-',
@@ -2528,18 +2556,15 @@ async function exportRekapSaldoPDF() {
             }
         });
 
-        // 2. VALIDASI JIKA TABEL BENAR-BENAR KOSONG
         if (rekapList.length === 0) {
             if (typeof showLoading === 'function') showLoading(false);
-            if (typeof showToast === 'function') {
-                showToast("Tidak ada data rekap saldo untuk diekspor.", "error");
-            } else {
-                alert("Tidak ada data rekap saldo untuk diekspor.");
-            }
+            alert("Tidak ada data rekap saldo untuk diekspor. Silakan terapkan filter terlebih dahulu.");
             return;
         }
 
-        // 3. INISIALISASI PDF (LANDSCAPE A4)
+        // =========================================================
+        // 3. Inisialisasi PDF Landscape A4
+        // =========================================================
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
         const pageWidth = doc.internal.pageSize.getWidth();
@@ -2557,28 +2582,39 @@ async function exportRekapSaldoPDF() {
         doc.text("Kawasan Pengelolaan Kayu & TPK Terpadu", marginX, 20);
         doc.text("Jl. Raya Labuhan Lombok - Sambelia | Telp: -", marginX, 25);
 
+        // Garis Header Pembatas Kop
         doc.setLineWidth(0.6);
         doc.setDrawColor(30, 41, 59);
         doc.line(marginX, 28, pageWidth - marginX, 28);
 
-        // Judul Laporan & Periode
+        // Judul Laporan
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
+        doc.setFontSize(13);
         doc.setTextColor(15, 23, 42);
         doc.text("LAPORAN REKAPITULASI SALDO STOK KAYU", pageWidth / 2, 35, { align: "center" });
 
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8.5);
-        doc.setTextColor(71, 85, 105);
-        doc.text(`Dicetak Pada: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 40, { align: "center" });
+        // Baris Periode & Sub-Filter yang Jelas
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(30, 41, 59);
+        doc.text(`Periode: ${periodeTeks}`, pageWidth / 2, 41, { align: "center" });
 
-        // 4. SUSUN DATA TABEL PDF
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(71, 85, 105);
+        doc.text(`Filter: ${detailFilterTeks}  |  Dicetak: ${tanggalCetak}`, pageWidth / 2, 46, { align: "center" });
+
+        // =========================================================
+        // 4. Susun Data Tabel & Hitung Total Akurat (8 Kolom Sesuai Aplikasi)
+        // =========================================================
         const tableBody = [];
-        let totalLHP = 0, totalKirim = 0, totalSaldoLHP = 0;
+        let totalBAP = 0, totalLHP = 0, totalKirim = 0, totalSaldoBAP = 0, totalSaldoLHP = 0;
 
         rekapList.forEach((item, index) => {
+            totalBAP += item.bap;
             totalLHP += item.lhp;
             totalKirim += item.kirim;
+            totalSaldoBAP += item.saldo_bap;
             totalSaldoLHP += item.saldo_lhp;
 
             tableBody.push([
@@ -2586,24 +2622,28 @@ async function exportRekapSaldoPDF() {
                 item.jenis_kayu,
                 item.tpk,
                 item.petak,
+                item.bap > 0 ? item.bap.toFixed(2) : '0,00',
                 item.lhp > 0 ? item.lhp.toFixed(2) : '0,00',
                 item.kirim > 0 ? item.kirim.toFixed(2) : '0,00',
+                item.saldo_bap > 0 ? item.saldo_bap.toFixed(2) : '0,00',
                 item.saldo_lhp > 0 ? item.saldo_lhp.toFixed(2) : '0,00'
             ]);
         });
 
-        // Baris Total
+        // Baris Total Keseluruhan (Sama Persis dengan Aplikasi)
         tableBody.push([
-            { content: 'TOTAL STOK FISIK (LHP - KIRIM)', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: 'TOTAL KESELURUHAN', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: totalBAP.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
             { content: totalLHP.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
             { content: totalKirim.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: totalSaldoBAP.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
             { content: totalSaldoLHP.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
         ]);
 
-        // Generate AutoTable PDF
+        // Render Tabel AutoTable
         doc.autoTable({
-            startY: 45,
-            head: [['No', 'Jenis Kayu', 'TPK', 'Petak', 'LHP (M³)', 'Kirim (M³)', 'Saldo LHP (M³)']],
+            startY: 51,
+            head: [['No', 'Jenis Kayu', 'TPK', 'Petak', 'BAP (M³)', 'LHP (M³)', 'Kirim (M³)', 'Saldo BAP (M³)', 'Saldo LHP (M³)']],
             body: tableBody,
             theme: 'grid',
             headStyles: {
@@ -2621,12 +2661,16 @@ async function exportRekapSaldoPDF() {
                 3: { halign: 'center' },
                 4: { halign: 'right' },
                 5: { halign: 'right' },
-                6: { halign: 'right', fontStyle: 'bold' }
+                6: { halign: 'right' },
+                7: { halign: 'right' },
+                8: { halign: 'right', fontStyle: 'bold' }
             },
             margin: { left: marginX, right: marginX }
         });
 
-        // 5. STAMP DIGITAL & QR CODE
+        // =========================================================
+        // 5. Digital Stamp & Pengesahan
+        // =========================================================
         let finalY = doc.lastAutoTable.finalY + 8;
         if (finalY > 160) {
             doc.addPage();
@@ -2669,15 +2713,48 @@ async function exportLaporanPDF() {
     try {
         if (typeof showLoading === 'function') showLoading(true);
 
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' }); // Landscape agar kolom mutasi muat presisi
+        // 1. BACA LANGSUNG ELEMEN TABEL MUTASI YANG TAMPIL DI LAYAR
+        // Mencari tabel yang ada di dalam konteks Rincian Mutasi
+        const rows = document.querySelectorAll("#view-rincian-mutasi table tbody tr, #view-mutasi table tbody tr, main table tbody tr, .content table tbody tr");
+        let mutasiList = [];
 
+        rows.forEach(row => {
+            const cols = row.querySelectorAll("td");
+            // Memastikan baris berisi data (minimal 7 kolom)
+            if (cols.length >= 7 && !row.innerText.includes("Tidak ada data")) {
+                mutasiList.push({
+                    tanggal: cols[0]?.innerText.trim() || '-',
+                    keterangan: cols[1]?.innerText.trim() || '-',
+                    jenis: cols[2]?.innerText.trim() || '-',
+                    tpk: cols[3]?.innerText.trim() || '-',
+                    petak: cols[4]?.innerText.trim() || '-',
+                    masuk: parseFloat(cols[5]?.innerText.replace('-', '0').replace(/\./g, '').replace(',', '.') || 0),
+                    keluar: parseFloat(cols[6]?.innerText.replace('-', '0').replace(/\./g, '').replace(',', '.') || 0)
+                });
+            }
+        });
+
+        // Fallback jika membaca DOM gagal, ambil dari state.filteredMutasi / state.mutasiData
+        if (mutasiList.length === 0 && Array.isArray(state.filteredMutasi)) {
+            mutasiList = state.filteredMutasi;
+        } else if (mutasiList.length === 0 && Array.isArray(state.mutasiData)) {
+            mutasiList = state.mutasiData;
+        }
+
+        // 2. VALIDASI DATA
+        if (mutasiList.length === 0) {
+            if (typeof showLoading === 'function') showLoading(false);
+            alert("Tidak ada data rincian mutasi untuk diekspor. Silakan terapkan filter terlebih dahulu.");
+            return;
+        }
+
+        // 3. INISIALISASI PDF
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
         const pageWidth = doc.internal.pageSize.getWidth();
         const marginX = 14;
 
-        // =========================================================
-        // 1. KOP SURAT PERUSAHAAN (HEADER)
-        // =========================================================
+        // Header / Kop Surat
         doc.setFont("helvetica", "bold");
         doc.setFontSize(15);
         doc.setTextColor(30, 41, 59);
@@ -2693,9 +2770,7 @@ async function exportLaporanPDF() {
         doc.setDrawColor(30, 41, 59);
         doc.line(marginX, 28, pageWidth - marginX, 28);
 
-        // =========================================================
-        // 2. JUDUL LAPORAN & PERIODE
-        // =========================================================
+        // Judul Laporan
         doc.setFont("helvetica", "bold");
         doc.setFontSize(13);
         doc.setTextColor(15, 23, 42);
@@ -2709,40 +2784,7 @@ async function exportLaporanPDF() {
         const filterTahun = state.filter?.dariTahun || new Date().getFullYear();
         doc.text(`Periode: ${filterBulan} ${filterTahun} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 40, { align: "center" });
 
-        // =========================================================
-        // 3. AMBIL DATA RINCIAN MUTASI (LANGSUNG DARI TABEL DOM / STATE)
-        // =========================================================
-        const rows = document.querySelectorAll("#view-mutasi table tbody tr, #view-kartu-stok table tbody tr");
-        let mutasiList = [];
-
-        // Prioritas 1: Ambil dari baris tabel DOM yang tampil di layar
-        if (rows.length > 0) {
-            rows.forEach(row => {
-                const cols = row.querySelectorAll("td");
-                if (cols.length >= 6 && !row.innerText.includes("Tidak ada data")) {
-                    mutasiList.push({
-                        tanggal: cols[0]?.innerText.trim() || '-',
-                        keterangan: cols[1]?.innerText.trim() || '-',
-                        jenis: cols[2]?.innerText.trim() || '-',
-                        tpk: cols[3]?.innerText.trim() || '-',
-                        petak: cols[4]?.innerText.trim() || '-',
-                        masuk: parseFloat(cols[5]?.innerText.replace(/\./g, '').replace(',', '.') || 0),
-                        keluar: parseFloat(cols[6]?.innerText.replace(/\./g, '').replace(',', '.') || 0)
-                    });
-                }
-            });
-        } 
-        // Prioritas 2: Fallback ke variabel state mutasi jika DOM tidak terdeteksi
-        else if (Array.isArray(state.mutasiData)) {
-            mutasiList = state.mutasiData;
-        }
-
-        if (mutasiList.length === 0) {
-            if (typeof showLoading === 'function') showLoading(false);
-            alert("Tidak ada data rincian mutasi untuk diekspor. Silakan terapkan filter terlebih dahulu.");
-            return;
-        }
-
+        // 4. TABEL BODY & TOTAL
         const tableBody = [];
         let totalMasuk = 0, totalKeluar = 0;
 
@@ -2760,8 +2802,8 @@ async function exportLaporanPDF() {
                 item.jenis || item.jenis_kayu || '-',
                 item.tpk || '-',
                 item.petak || '-',
-                masuk > 0 ? masuk.toFixed(2) : '0,00',
-                keluar > 0 ? keluar.toFixed(2) : '0,00'
+                masuk > 0 ? masuk.toFixed(2) : '-',
+                keluar > 0 ? keluar.toFixed(2) : '-'
             ]);
         });
 
@@ -2772,12 +2814,10 @@ async function exportLaporanPDF() {
             { content: totalKeluar.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
         ]);
 
-        // =========================================================
-        // 4. GENERATE TABEL MUTASI KE PDF (WAJIB ADA)
-        // =========================================================
+        // RENDER AUTOTABLE
         doc.autoTable({
             startY: 45,
-            head: [['No', 'Tanggal', 'Keterangan / Dokumen', 'Jenis Kayu', 'TPK', 'Petak', 'Masuk (M³)', 'Keluar (M³)']],
+            head: [['No', 'Tanggal', 'Keterangan', 'Jenis Kayu', 'TPK', 'Petak', 'Masuk (M³)', 'Keluar (M³)']],
             body: tableBody,
             theme: 'grid',
             headStyles: {
@@ -2801,11 +2841,8 @@ async function exportLaporanPDF() {
             margin: { left: marginX, right: marginX }
         });
 
-        // =========================================================
-        // 5. DIGITAL STAMP & FOOTER
-        // =========================================================
+        // 5. STAMP DIGITAL & VERIFIKASI
         let finalY = doc.lastAutoTable.finalY + 10;
-
         if (finalY > 160) {
             doc.addPage();
             finalY = 20;
@@ -2817,28 +2854,28 @@ async function exportLaporanPDF() {
         if (typeof generateQRCodeBase64 === 'function') {
             const qrBase64 = await generateQRCodeBase64(verifyUrl);
             if (qrBase64) {
-                doc.addImage(qrBase64, 'PNG', marginX, finalY, 20, 20);
+                doc.addImage(qrBase64, 'PNG', marginX, finalY, 18, 18);
             }
         }
 
         doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(30, 41, 59);
-        doc.text("DOKUMEN MUTASI RESMI", marginX + 23, finalY + 5);
+        doc.text("DOKUMEN MUTASI RESMI", marginX + 22, finalY + 4);
         doc.setFont("helvetica", "normal");
-        doc.text(`ID Dokumen: ${docID}`, marginX + 23, finalY + 9);
-        doc.text("Pindai QR Code untuk memverifikasi keaslian transaksi.", marginX + 23, finalY + 13);
+        doc.text(`ID Dokumen: ${docID}`, marginX + 22, finalY + 8);
+        doc.text("Pindai QR Code untuk memverifikasi keaslian transaksi.", marginX + 22, finalY + 12);
 
         const rightAlignX = pageWidth - marginX - 50;
-        doc.text("Disetujui Oleh,", rightAlignX, finalY + 5);
+        doc.text("Disetujui Oleh,", rightAlignX, finalY + 4);
         doc.setFont("helvetica", "bold");
-        doc.text("( Kepala Operasional TPK )", rightAlignX, finalY + 22);
+        doc.text("( Kepala Operasional TPK )", rightAlignX, finalY + 20);
 
         doc.save(`Rincian_Mutasi_Stok_Kayu_${new Date().toISOString().slice(0, 10)}.pdf`);
 
     } catch (err) {
-        console.error("Gagal membuat laporan PDF mutasi:", err);
-        alert("Gagal membuat PDF: " + err.message);
+        console.error("Gagal export PDF mutasi:", err);
+        alert("Gagal membuat PDF Mutasi: " + err.message);
     } finally {
         if (typeof showLoading === 'function') showLoading(false);
     }
