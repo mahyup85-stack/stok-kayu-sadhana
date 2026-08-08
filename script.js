@@ -2642,7 +2642,7 @@ async function exportRekapSaldoPDF() {
     }
 }
 
-async function exportRincianMutasiPDF() {
+async function exportLaporanPDF() {
     try {
         if (typeof showLoading === 'function') showLoading(true);
 
