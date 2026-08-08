@@ -745,7 +745,7 @@ function save() {
 }
 
 async function saveData() {
-    // 1. Ambil nilai input dari HTML (Gunakan ID yang sesuai dengan HTML)
+    // 1. Ambil nilai input dari HTML
     const rawDate = document.getElementById('input-date')?.value;
     const tanggalInput = rawDate ? formatTanggalDB(rawDate) : new Date().toISOString().split('T')[0];
     const ket = document.getElementById('input-ket')?.value?.trim() || "";
@@ -753,9 +753,9 @@ async function saveData() {
     const tpk = document.getElementById("input-tpk")?.value || "";
     const petak = document.getElementById('input-petak')?.value?.trim() || "-";
     
-    // Sesuaikan ID dengan HTML: 'input-in-sm' & 'input-out-sm'
-    const masuk = parseFloat(document.getElementById('input-in-sm')?.value || document.getElementById('input-in')?.value) || 0;
-    const keluar = parseFloat(document.getElementById('input-out-sm')?.value || document.getElementById('input-out')?.value) || 0;
+    // 2. Ambil nilai SM (Stack Meter) dari input Masuk & Keluar
+    const masukSM = parseFloat(document.getElementById('input-in-sm')?.value || document.getElementById('input-in')?.value) || 0;
+    const keluarSM = parseFloat(document.getElementById('input-out-sm')?.value || document.getElementById('input-out')?.value) || 0;
 
     // Validasi sederhana
     if (!ket || !jenis || !tpk) {
@@ -763,14 +763,36 @@ async function saveData() {
         return;
     }
 
+    if (masukSM === 0 && keluarSM === 0) {
+        alert("Harap isi jumlah Masuk (SM) atau Keluar (SM)!");
+        return;
+    }
+
+    // 3. Cari Faktor Konversi berdasarkan Jenis Kayu dari state/master data
+    let faktorKonversi = 0.67; // Default faktor konversi
+    if (state.master && state.master.jenis_kayu) {
+        const itemKayu = state.master.jenis_kayu.find(k => k.name === jenis || k.jenis_kayu === jenis);
+        if (itemKayu && itemKayu.faktor_konversi) {
+            faktorKonversi = parseFloat(itemKayu.faktor_konversi);
+        }
+    }
+
+    // 4. Hitung konversi SM ke M3
+    const masukM3 = masukSM * faktorKonversi;
+    const keluarM3 = keluarSM * faktorKonversi;
+
+    // Tentukan SM aktif & M3 aktif untuk keperluan Notifikasi Alert
+    const smAktif = masukSM > 0 ? masukSM : keluarSM;
+    const m3Aktif = masukM3 > 0 ? masukM3 : keluarM3;
+
     const payload = {
         tanggal: tanggalInput,
         keterangan: ket,
         jenis_kayu: jenis, 
         tpk: tpk,      
         petak: petak,
-        masuk_m3: masuk,
-        keluar_m3: keluar
+        masuk_m3: masukM3,   // Nilai M3 yang sudah dikonversi
+        keluar_m3: keluarM3   // Nilai M3 yang sudah dikonversi
     };
 
     try {
@@ -787,7 +809,8 @@ async function saveData() {
             throw error;
         }
 
-        alert("Data berhasil disimpan!");
+        // 5. Notifikasi Alert dengan perhitungan yang benar
+        alert(`Data berhasil disimpan!\n${smAktif} SM x ${faktorKonversi} = ${m3Aktif.toFixed(2)} M³`);
 
         // Reset Form setelah simpan
         const form = document.getElementById('stock-form');
