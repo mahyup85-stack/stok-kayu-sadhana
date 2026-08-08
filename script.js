@@ -2697,7 +2697,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // 1. Cari faktor konversi dari master jenis kayu (Mendukung properti 'konversi' maupun 'faktor_konversi')
+            // 1. Cari faktor konversi dari master jenis kayu
             let faktorKonversi = 0.67; // Default jika master data tidak ketemu
             if (state.master && state.master['jenis_kayu']) {
                 const itemKayu = state.master['jenis_kayu'].find(
@@ -2742,7 +2742,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const { error } = await api.from('stok_kayu').insert([payload]);
                     if (error) throw error;
                     
-                    // ✅ Notifikasi Alert menggunakan SM & M3 yang aktif
+                    // Notifikasi Alert menggunakan SM & M3 yang aktif
                     alert(`Data berhasil disimpan!\n${activeSM} SM x ${faktorKonversi} = ${activeM3.toFixed(2)} M³`);
                 }
 
@@ -2769,7 +2769,6 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         if (typeof initLoginHandler === 'function') initLoginHandler();
     }
-});
 
     // ==========================================
     // EVENT LISTENER PAGINATION RINCIAN MUTASI
