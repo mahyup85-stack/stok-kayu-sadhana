@@ -2548,91 +2548,66 @@ async function exportRekapSaldoPDF() {
         doc.text(`Periode: ${filterBulan} ${filterTahun} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 38, { align: "center" });
 
         // =========================================================
-        // 3. DETEKSI & AMBIL DATA DARI SEMUA KEMUNGKINAN LOKASI STATE
+        // 3. AMBIL DATA LANGSUNG DARI TABEL DOM DI LAYAR
         // =========================================================
-        let rekapList = [];
-
-        // Evaluasi fungsi jika tersedia
-        const fnData = typeof getProcessedRekapData === 'function' ? getProcessedRekapData() : null;
-
-        // Cek bertahap seluruh properti yang mungkin menampung data
-        const candidates = [
-            fnData,
-            fnData?.filtered,
-            fnData?.data,
-            state?.rekapData,
-            state?.rekapData?.filtered,
-            state?.rekapData?.data,
-            state?.filteredRekap,
-            state?.currentRekapData,
-            state?.rekapList,
-            window.rekapData
-        ];
-
-        for (const candidate of candidates) {
-            if (Array.isArray(candidate) && candidate.length > 0) {
-                rekapList = candidate;
-                break;
-            }
-        }
-
-        // Helper fungsi konversi angka (menerima float, int, maupun string berformat "136,01")
-        const parseNum = (val) => {
-            if (val === null || val === undefined || val === '') return 0;
-            if (typeof val === 'number') return isNaN(val) ? 0 : val;
-            let str = String(val).replace(/\./g, '').replace(',', '.').trim();
-            let parsed = parseFloat(str);
-            return isNaN(parsed) ? 0 : parsed;
-        };
-
         const tableBody = [];
         let gTotalAwalBap = 0, gTotalAwalLhp = 0, gTotalBap = 0, gTotalLhp = 0, gTotalKirim = 0, gTotalSaldoBap = 0, gTotalSaldoLhp = 0;
 
-        rekapList.forEach((item, index) => {
-            // Evaluasi nama-nama properti alternatif yang umum digunakan
-            const saldo_awal_BAP = parseNum(item.saldo_awal_bap ?? item.saldo_awal_BAP ?? item.awal_bap);
-            const saldo_awal_LHP = parseNum(item.saldo_awal_lhp ?? item.saldo_awal_LHP ?? item.awal_lhp);
-            
-            const BAP = parseNum(item.bap_m3 ?? item.bap ?? item.masuk_bap ?? item.m_bap);
-            const LHP = parseNum(item.lhp_m3 ?? item.lhp ?? item.masuk_lhp ?? item.m_lhp);
-            const Kirim = parseNum(item.kirim_m3 ?? item.kirim ?? item.keluar ?? item.k_m3);
-            
-            // Mengambil saldo langsung atau kalkulasi otomatis
-            let saldo_BAP = parseNum(item.saldo_bap ?? item.saldo_BAP);
-            let saldo_LHP = parseNum(item.saldo_lhp ?? item.saldo_LHP);
+        // Cari elemen tabel rekap yang sedang tampil di UI
+        const rows = document.querySelectorAll("table tbody tr");
 
-            if (saldo_BAP === 0 && (saldo_awal_BAP !== 0 || BAP !== 0 || LHP !== 0)) {
-                saldo_BAP = saldo_awal_BAP + BAP - LHP;
-            }
-            if (saldo_LHP === 0 && (saldo_awal_LHP !== 0 || LHP !== 0 || Kirim !== 0)) {
-                saldo_LHP = saldo_awal_LHP + LHP - Kirim;
-            }
+        const parseDomNum = (text) => {
+            if (!text) return 0;
+            let str = text.trim().replace(/\./g, '').replace(',', '.');
+            let num = parseFloat(str);
+            return isNaN(num) ? 0 : num;
+        };
 
-            // Accumulate global total
-            gTotalAwalBap += saldo_awal_BAP;
-            gTotalAwalLhp += saldo_awal_LHP;
-            gTotalBap += BAP;
-            gTotalLhp += LHP;
-            gTotalKirim += Kirim;
-            gTotalSaldoBap += saldo_BAP;
-            gTotalSaldoLhp += saldo_LHP;
+        let rowCount = 0;
+        rows.forEach((row) => {
+            const cols = row.querySelectorAll("td");
+            // Abaikan baris kosong atau baris "Tidak ada data"
+            if (cols.length < 5) return;
+
+            rowCount++;
+            // Mengambil teks tiap sel tabel HTML
+            const jenisKayu = cols[0]?.innerText.trim() || '-';
+            const tpk = cols[1]?.innerText.trim() || '-';
+            const petak = cols[2]?.innerText.trim() || '-';
+
+            const saldoAwalBap = parseDomNum(cols[3]?.innerText);
+            const saldoAwalLhp = parseDomNum(cols[4]?.innerText);
+            const bap = parseDomNum(cols[5]?.innerText);
+            const lhp = parseDomNum(cols[6]?.innerText);
+            const kirim = parseDomNum(cols[7]?.innerText);
+            const saldoBap = parseDomNum(cols[8]?.innerText);
+            const saldoLhp = parseDomNum(cols[9]?.innerText);
+
+            // Akumulasi Total Keseluruhan
+            gTotalAwalBap += saldoAwalBap;
+            gTotalAwalLhp += saldoAwalLhp;
+            gTotalBap += bap;
+            gTotalLhp += lhp;
+            gTotalKirim += kirim;
+            gTotalSaldoBap += saldoBap;
+            gTotalSaldoLhp += saldoLhp;
 
             tableBody.push([
-                index + 1,
-                item.jenis_kayu || item.jenisKayu || item.jenis || '-',
-                item.tpk || item.nama_tpk || '-',
-                item.petak || item.no_petak || '-',
-                saldo_awal_BAP.toFixed(2),
-                saldo_awal_LHP.toFixed(2),
-                BAP.toFixed(2),
-                LHP.toFixed(2),
-                Kirim.toFixed(2),
-                saldo_BAP.toFixed(2),
-                saldo_LHP.toFixed(2)
+                rowCount,
+                jenisKayu,
+                tpk,
+                petak,
+                saldoAwalBap.toFixed(2),
+                saldoAwalLhp.toFixed(2),
+                bap.toFixed(2),
+                lhp.toFixed(2),
+                kirim.toFixed(2),
+                saldoBap.toFixed(2),
+                saldoLhp.toFixed(2)
             ]);
         });
 
-        // Total Row
+        // Baris Total Rekap (11 Kolom)
         tableBody.push([
             { content: 'TOTAL KESELURUHAN', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
             { content: gTotalAwalBap.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
@@ -2643,7 +2618,6 @@ async function exportRekapSaldoPDF() {
             { content: gTotalSaldoBap.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
             { content: gTotalSaldoLhp.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
         ]);
-        console.log("Data Rekap terdeteksi:", rekapList);
 
         // =========================================================
         // 4. GENERATE TABEL REKAP SALDO
