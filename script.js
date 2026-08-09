@@ -2643,6 +2643,7 @@ async function exportRekapSaldoPDF() {
             { content: gTotalSaldoBap.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
             { content: gTotalSaldoLhp.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
         ]);
+        console.log("Data Rekap terdeteksi:", rekapList);
 
         // =========================================================
         // 4. GENERATE TABEL REKAP SALDO
