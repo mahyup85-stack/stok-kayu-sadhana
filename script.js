@@ -586,35 +586,27 @@ window.updatePetakRincianByTPK = function () {
 let isAppInitializing = false;
 
 async function startApp() {
-    // 1. CEK FLAG: Jika sedang dalam proses inisialisasi, hentikan eksekusi ganda
-    if (typeof isAppInitializing !== 'undefined' && isAppInitializing) {
-        console.warn("⚠️ startApp() sedang berjalan, mengabaikan panggilan duplikat.");
-        return;
-    }
+    if (typeof isAppInitializing !== 'undefined' && isAppInitializing) return;
 
     try {
         if (typeof isAppInitializing !== 'undefined') isAppInitializing = true;
         if (typeof showLoading === 'function') showLoading(true);
 
-        const URL = 'https://fcccuqnyxuwsrddlookt.supabase.co';
-        const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjY2N1cW55eHV3c3JkZGxvb2t0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NDU2NzQsImV4cCI6MjA4NTQyMTY3NH0.w9p0yxWW1CtLm3Gj3uD1z3P1eWQxW_hB288iUwkfCd8';
-
-        if (!window.api && window.supabase) {
-            window.api = window.supabase.createClient(URL, KEY);
+        // Pastikan 'api' dan 'supabase' terhubung jika CDN sempat terlambat dimuat
+        if (!api && window.supabase) {
+            api = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            supabase = api;
         }
 
-        // 2. Tarik Data Master & Load Rincian Mutasi Pertama Kali (Server-Side)
+        // Tarik Master & Rincian secara paralel
         await Promise.all([
             typeof loadDataMaster === 'function' ? loadDataMaster() : Promise.resolve(),
             typeof loadDataRincianMutasi === 'function' ? loadDataRincianMutasi() : Promise.resolve()
         ]);
 
-        // 3. Inisialisasi Pencarian Live Dashboard (Jika ada)
         if (typeof window.initLiveSearchDashboard === 'function') {
             window.initLiveSearchDashboard();
         }
-
-        console.log("✅ Aplikasi Siap: Data Master & Rincian Mutasi Server-Side Sinkron.");
 
     } catch (err) {
         console.error("❌ Gagal memulai aplikasi:", err.message || err);
@@ -2155,12 +2147,11 @@ async function loadDataRincianMutasi() {
         const fPetak = document.getElementById("filter-rincian-petak")?.value;
         const fKet   = document.getElementById("filter-rincian-ket")?.value;
 
-        // Format Tanggal ISO YYYY-MM-DD untuk Query Supabase
+        // Format Tanggal ISO YYYY-MM-DD untuk Query
         const startDate = (fTFrom && fBFrom) ? `${fTFrom}-${String(fBFrom).padStart(2, '0')}-01` : '2000-01-01';
         const lastDay   = (fTTo && fBTo) ? new Date(fTTo, fBTo, 0).getDate() : 31;
         const endDate   = (fTTo && fBTo) ? `${fTTo}-${String(fBTo).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}` : '2099-12-31';
 
-        // Set State Status Filter
         state.hasAppliedFilter = true;
         const page = state.currentPage || 1;
         const pageSize = state.rowsPerPage || 10;
@@ -2168,9 +2159,9 @@ async function loadDataRincianMutasi() {
         const end = start + pageSize - 1;
 
         // =========================================================
-        // QUERY 1: HITUNG SALDO AWAL DI SERVER (Hanya transaksi sebelum startDate)
+        // QUERY 1: HITUNG SALDO AWAL (Hanya transaksi sebelum startDate)
         // =========================================================
-        let querySaldoAwal = supabase
+        let querySaldoAwal = api
             .from('stok_kayu')
             .select('masuk_m3, keluar_m3, keterangan')
             .lt('tanggal', startDate)
@@ -2189,7 +2180,39 @@ async function loadDataRincianMutasi() {
         });
 
         // =========================================================
-        // QUERY 2: AMBIL DATA PERIODE BERJALAN + PAGINATION (.range)
+        // QUERY 2: AMBIL AKUMULASI MUTASI SEBELUM HALAMAN AKTIF (JIKA PAGE > 1)
+        // =========================================================
+        let prevPageMutasiSum = 0;
+        if (start > 0) {
+            let queryPrevMutasi = api
+                .from('stok_kayu')
+                .select('masuk_m3, keluar_m3, keterangan')
+                .gte('tanggal', startDate)
+                .lte('tanggal', endDate)
+                .not('keterangan', 'ilike', '%LHP%');
+
+            if (fTPK) queryPrevMutasi = queryPrevMutasi.eq('tpk', fTPK);
+            if (fJenis) queryPrevMutasi = queryPrevMutasi.eq('jenis_kayu', fJenis);
+            if (fPetak) queryPrevMutasi = queryPrevMutasi.eq('petak', fPetak);
+            if (fKet) queryPrevMutasi = queryPrevMutasi.ilike('keterangan', `%${fKet}%`);
+
+            // Ambil semua baris transaksi dari awal periode s/d sebelum index 'start'
+            const { data: dataPrevMutasi, error: errPrev } = await queryPrevMutasi
+                .order('tanggal', { ascending: true })
+                .range(0, start - 1);
+
+            if (errPrev) throw errPrev;
+
+            dataPrevMutasi?.forEach(d => {
+                prevPageMutasiSum += (parseFloat(d.masuk_m3 || 0) - parseFloat(d.keluar_m3 || 0));
+            });
+        }
+
+        // Simpan Saldo Awal Khusus Halaman Aktif ke State
+        state.pageStartSaldo = saldoAwal + prevPageMutasiSum;
+
+        // =========================================================
+        // QUERY 3: AMBIL DATA PERIODE BERJALAN HALAMAN AKTIF (.range)
         // =========================================================
         let queryMutasi = api
             .from('stok_kayu')
@@ -2202,14 +2225,13 @@ async function loadDataRincianMutasi() {
         if (fPetak) queryMutasi = queryMutasi.eq('petak', fPetak);
         if (fKet) queryMutasi = queryMutasi.ilike('keterangan', `%${fKet}%`);
 
-        // Urutkan Tanggal ASC
         const { data: mutasiData, count, error: errMutasi } = await queryMutasi
             .order('tanggal', { ascending: true })
             .range(start, end);
 
         if (errMutasi) throw errMutasi;
 
-        // 2. Mapping Data dan Simpan ke State Global
+        // Save to Global State
         state.totalRows = count || 0;
         state.saldoAwal = saldoAwal;
         state.filteredData = (mutasiData || []).map(d => ({
@@ -2220,13 +2242,13 @@ async function loadDataRincianMutasi() {
             jenis: d.jenis_kayu
         }));
 
-        // 3. Trigger Render UI dan Pagination Controls
+        // Render Views
         if (typeof renderRincian === 'function') renderRincian();
         if (typeof window.renderPaginationControls === 'function') window.renderPaginationControls();
 
     } catch (err) {
         console.error("Gagal memuat rincian mutasi server-side:", err);
-        alert("Gagal memuat data mutasi: " + err.message);
+        alert("Gagal memuat data mutasi: " + (err.message || err));
     } finally {
         if (typeof showLoading === 'function') showLoading(false);
     }
@@ -2242,7 +2264,7 @@ function renderRincian() {
         return;
     }
 
-    // 1. Ambil Data dari State (Data yang dikirim Supabase hanya data halaman aktif)
+    // 1. Ambil Data dari State
     const dataHalamanIni = state.filteredData || [];
     const totalRows = state.totalRows || 0;
     const rowsPerPage = state.rowsPerPage || 25;
@@ -2270,27 +2292,36 @@ function renderRincian() {
     if (dataHalamanIni.length === 0 && state.currentPage === 1) {
         htmlContent += '<tr><td colspan="8" class="text-center" style="padding: 15px;">Tidak ada transaksi pada periode ini</td></tr>';
     } else {
-        // Asumsi Running Saldo dimulai dari Saldo Awal (atau disesuaikan dengan akumulasi)
-        let runningSaldo = saldoAwal;
+        // Ambil Saldo Awal Halaman dari state (Dioper dari loadDataRincianMutasi)
+        let runningSaldo = (typeof state.pageStartSaldo !== 'undefined') ? state.pageStartSaldo : saldoAwal;
 
         dataHalamanIni.forEach(d => {
             const valP = parseFloat(d.p || d.masuk_m3 || 0);
             const valM = parseFloat(d.m || d.keluar_m3 || 0);
             const ket  = (d.ket || d.keterangan || "").toUpperCase();
 
-            let mskTampil = valP;
-            let klrTampil = valM;
+            let mskTampil = 0;
+            let klrTampil = 0;
+            let mskHitungFisik = 0;
+            let klrHitungFisik = 0;
 
             if (ket.includes("KIRIM")) {
-                mskTampil = 0;
                 klrTampil = valM;
+                klrHitungFisik = valM;
             } else if (ket.includes("LHP")) {
                 mskTampil = valP;
-                klrTampil = 0;
+                // LOGIKA KRUSIAL: LHP hanya dokumen administrasi, JANGAN hitung ke saldo fisik
+                mskHitungFisik = 0; 
+            } else {
+                // BAP / Fisik Masuk & Keluar Biasa
+                mskTampil = valP;
+                klrTampil = valM;
+                mskHitungFisik = valP;
+                klrHitungFisik = valM;
             }
 
-            // Hitung akumulasi running saldo per baris
-            runningSaldo += (mskTampil - klrTampil);
+            // Update running saldo fisik
+            runningSaldo += (mskHitungFisik - klrHitungFisik);
 
             const rowStyle = ket.includes('LHP') ? 'background-color: #f9fafb; color: #6b7280;' : '';
 
@@ -2310,7 +2341,6 @@ function renderRincian() {
 
     // 4. BARIS GRAND TOTAL (TAMPILKAN HANYA DI HALAMAN TERAKHIR)
     if (state.currentPage === totalPages && totalRows > 0) {
-        // Ambil Grand Total Masuk & Keluar Fisik dari state (dikalkulasi dari server/state)
         const totalMasuk = state.totalMasukFisik || 0;
         const totalKeluar = state.totalKeluarFisik || 0;
         const saldoAkhir = saldoAwal + (totalMasuk - totalKeluar);
@@ -2326,7 +2356,7 @@ function renderRincian() {
 
     body.innerHTML = htmlContent;
 
-    // 5. UPDATE DOKUMEN TEXT INFO PAGINATION
+    // 5. UPDATE TEXT INFO PAGINATION
     if (pageInfo) {
         pageInfo.innerText = `Halaman ${state.currentPage} dari ${totalPages}`;
     }
