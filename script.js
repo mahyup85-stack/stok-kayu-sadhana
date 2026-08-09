@@ -592,10 +592,14 @@ async function startApp() {
         if (typeof isAppInitializing !== 'undefined') isAppInitializing = true;
         if (typeof showLoading === 'function') showLoading(true);
 
-        // Pastikan 'api' dan 'supabase' terhubung jika CDN sempat terlambat dimuat
+        // Pastikan instance 'api' terhubung jika CDN sempat terlambat dimuat
         if (!api && window.supabase) {
             api = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
             supabase = api;
+        }
+
+        if (!api) {
+            throw new Error("Gagal menginisialisasi Supabase Client. Periksa koneksi atau library CDN Supabase.");
         }
 
         // Tarik Master & Rincian secara paralel
@@ -607,6 +611,8 @@ async function startApp() {
         if (typeof window.initLiveSearchDashboard === 'function') {
             window.initLiveSearchDashboard();
         }
+
+        console.log("✅ Aplikasi Siap: Data Master & Rincian Mutasi Server-Side Sinkron.");
 
     } catch (err) {
         console.error("❌ Gagal memulai aplikasi:", err.message || err);
