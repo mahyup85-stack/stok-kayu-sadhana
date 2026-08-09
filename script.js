@@ -2543,35 +2543,38 @@ async function exportRekapSaldoPDF() {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         doc.setTextColor(71, 85, 105);
-        const filterBulan = state.filter?.dariBulan || "Semua";
-        const filterTahun = state.filter?.dariTahun || new Date().getFullYear();
+        const filterBulan = state?.filter?.dariBulan || "Semua";
+        const filterTahun = state?.filter?.dariTahun || new Date().getFullYear();
         doc.text(`Periode: ${filterBulan} ${filterTahun} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 38, { align: "center" });
 
         // =========================================================
-        // 3. AMBIL DATA REKAP SALDO (DI-PROTEKSI TERHADAP NULL)
+        // 3. AMBIL DATA REKAP SALDO (PENYESUAIAN STRUKTUR DATA)
         // =========================================================
         const rawData = typeof getProcessedRekapData === 'function' 
             ? getProcessedRekapData() 
-            : state.rekapData;
+            : state?.rekapData;
 
-        // Validasi agar rekapList tidak bernilai null/undefined
-        const rekapList = Array.isArray(rawData) 
-            ? rawData 
-            : (rawData?.filtered || rawData?.data || []);
+        // Mendapatkan array data secara fleksibel
+        let rekapList = [];
+        if (Array.isArray(rawData)) {
+            rekapList = rawData;
+        } else if (rawData && typeof rawData === 'object') {
+            rekapList = rawData.filtered || rawData.data || rawData.items || [];
+        }
 
         const tableBody = [];
         let gTotalAwalBap = 0, gTotalAwalLhp = 0, gTotalBap = 0, gTotalLhp = 0, gTotalKirim = 0, gTotalSaldoBap = 0, gTotalSaldoLhp = 0;
 
-        // Iterasi kini dijamin aman dari TypeError
         rekapList.forEach((item, index) => {
-            const saldo_awal_BAP = parseFloat(item.saldo_awal_BAP || 0);
-            const saldo_awal_LHP = parseFloat(item.saldo_awal_LHP || 0);
-            const BAP = parseFloat(item.bap || item.masuk || 0);
-            const LHP = parseFloat(item.lhp || item.keluar || 0);
-            const Kirim = parseFloat(item.kirim || 0);
+            // Membaca nilai dari properti dengan penamaan alternatif (m3 / non-m3)
+            const saldo_awal_BAP = parseFloat(item.saldo_awal_bap || item.saldo_awal_BAP || item.awal_bap || 0);
+            const saldo_awal_LHP = parseFloat(item.saldo_awal_lhp || item.saldo_awal_LHP || item.awal_lhp || 0);
+            const BAP = parseFloat(item.bap_m3 || item.bap || item.masuk_bap || 0);
+            const LHP = parseFloat(item.lhp_m3 || item.lhp || item.masuk_lhp || 0);
+            const Kirim = parseFloat(item.kirim_m3 || item.kirim || item.keluar || 0);
             
-            const saldo_BAP = parseFloat(item.saldo_BAP ?? (saldo_awal_BAP + BAP - LHP));
-            const saldo_LHP = parseFloat(item.saldo_LHP ?? (saldo_awal_LHP + LHP - Kirim));
+            const saldo_BAP = parseFloat(item.saldo_bap ?? item.saldo_BAP ?? (saldo_awal_BAP + BAP - LHP));
+            const saldo_LHP = parseFloat(item.saldo_lhp ?? item.saldo_LHP ?? (saldo_awal_LHP + LHP - Kirim));
 
             // Akumulasi Total Keseluruhan
             gTotalAwalBap += saldo_awal_BAP;
@@ -2584,7 +2587,7 @@ async function exportRekapSaldoPDF() {
 
             tableBody.push([
                 index + 1,
-                item.jenis_kayu || '-',
+                item.jenis_kayu || item.jenis || '-',
                 item.tpk || '-',
                 item.petak || '-',
                 saldo_awal_BAP.toFixed(2),
