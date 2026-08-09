@@ -1689,8 +1689,11 @@ function hitungKonversi(jenisKayu, volumeM3) {
     return volumeM3 * faktor;
 }
 
+// ==========================================
+// 1. RENDER REKAP SALDO (FULL SERVER-SIDE via RPC)
+// ==========================================
 window.renderRekapSaldo = async function () {
-    const tableBody = document.getElementById("rekap-table-body");
+    const tableBody = document.getElementById("rekap-table-body") || document.getElementById("tabel-rekap-body");
     if (!tableBody) return;
 
     if (typeof showLoading === 'function') showLoading(true);
@@ -1701,7 +1704,7 @@ window.renderRekapSaldo = async function () {
         return num.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     };
 
-    // 1. Ambil Nilai Filter Periode & Kategori
+    // Ambil Nilai Filter Periode & Kategori dari UI
     const fBulanDari = document.getElementById("filter-dari-bulan")?.value || 1;
     const fTahunDari = parseInt(document.getElementById("filter-dari-tahun")?.value, 10) || new Date().getFullYear();
     const fBulanSampai = document.getElementById("filter-sampai-bulan")?.value || 12;
@@ -1715,7 +1718,7 @@ window.renderRekapSaldo = async function () {
     const periodeAkhir = parseInt(fTahunSampai) * 100 + parseInt(fBulanSampai);
 
     try {
-        // 2. PERBAIKAN: Gunakan api.rpc (bukan supabase.rpc)
+        // Panggil RPC Supabase untuk kalkulasi saldo di PostgreSQL
         const { data, error } = await api.rpc('get_rekap_saldo_kayu', {
             p_periode_mulai: periodeMulai,
             p_periode_akhir: periodeAkhir,
@@ -1726,7 +1729,7 @@ window.renderRekapSaldo = async function () {
 
         if (error) throw error;
 
-        // 3. Filter Baris yang Semuanya Nol
+        // Filter Baris yang Seluruh Saldonya Nol
         const rows = (data || []).filter(r => {
             const sBap = parseFloat(r.saldo_awal_bap || 0) + parseFloat(r.bap || 0) - parseFloat(r.lhp || 0);
             const sLhp = parseFloat(r.saldo_awal_lhp || 0) + parseFloat(r.lhp || 0) - parseFloat(r.kirim || 0);
@@ -1742,11 +1745,11 @@ window.renderRekapSaldo = async function () {
         });
 
         if (rows.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="10" class="text-center">Tidak ada data untuk periode ini</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="10" class="text-center p-4">Tidak ada data rekap untuk periode ini</td></tr>';
             return;
         }
 
-        // 4. Render Data & Hitung Grand Total
+        // Render Data & Hitung Total Keseluruhan
         let gTotalAwalBap = 0, gTotalAwalLhp = 0, gTotalBap = 0, gTotalLhp = 0, gTotalKirim = 0;
         let gTotalSaldoBap = 0, gTotalSaldoLhp = 0;
 
@@ -1783,7 +1786,7 @@ window.renderRekapSaldo = async function () {
                 </tr>`;
         }).join('');
 
-        // 5. Baris Total Keseluruhan
+        // Baris Total
         html += `
             <tr style="background-color: #f3f4f6; font-weight: bold; border-top: 2px solid #374151;">
                 <td colspan="3" class="text-center">TOTAL KESELURUHAN</td>
@@ -1807,42 +1810,8 @@ window.renderRekapSaldo = async function () {
     }
 };
 
-window.renderRekapTable = function () {
-    console.log("Memulai Render Tabel Rekap...");
-
-    // 1. Ambil nilai filter dari UI
-    const tahunDari = document.getElementById('filter-rincian-tahun-dari')?.value;
-    const tahunSampai = document.getElementById('filter-rincian-tahun-sampai')?.value;
-    const jenisKayu = document.getElementById('filter-jenis')?.value;
-
-    // 2. Filter data berdasarkan input
-    let dataFiltered = [...state.data];
-
-    if (tahunDari) {
-        dataFiltered = dataFiltered.filter(d => d.tanggal.split('-')[0] >= tahunDari);
-    }
-    if (tahunSampai) {
-        dataFiltered = dataFiltered.filter(d => d.tanggal.split('-')[0] <= tahunSampai);
-    }
-    if (jenisKayu) {
-        dataFiltered = dataFiltered.filter(d => d.jenis_kayu === jenisKayu);
-    }
-
-    // 3. Logika untuk menampilkan ke HTML Tabel Rekap Anda
-    // (Sesuaikan ID 'tabel-rekap-body' dengan ID <tbody> di HTML Anda)
-    const tbody = document.getElementById('tabel-rekap-body');
-    if (!tbody) return;
-
-    tbody.innerHTML = dataFiltered.map((d, index) => `
-        <tr>
-            <td>${index + 1}</td>
-            <td>${d.tanggal}</td>
-            <td>${d.jenis_kayu}</td>
-            <td>${d.masuk || 0}</td>
-            <td>${d.keluar || 0}</td>
-        </tr>
-    `).join('');
-};
+// Aliaskan renderRekapTable ke renderRekapSaldo agar kompatibel jika ada event listener lama
+window.renderRekapTable = window.renderRekapSaldo;
 
 // Helper untuk memproses data rekap (filter + grouping)
 function getProcessedRekapData() {
@@ -2014,73 +1983,7 @@ function renderHistoriMutasi() {
     }).join('');
 }
 
-window.renderRingkasanStok = function () {
-    const tableBody = document.getElementById("rekap-table-body");
-    if (!tableBody) return;
 
-    // 1. Ambil nilai filter dari dropdown
-    const filterTPK = document.getElementById("filter-tpk").value;
-    const filterJenis = document.getElementById("filter-jenis").value;
-    const filterPetak = document.getElementById("filter-petak").value;
-
-    // 2. Filter data mentah berdasarkan pilihan user
-    let filtered = state.data.filter(d => {
-        const matchTPK = !filterTPK || d.tpk === filterTPK;
-        const matchJenis = !filterJenis || d.jenis_kayu === filterJenis;
-        const matchPetak = !filterPetak || d.petak === filterPetak;
-        return matchTPK && matchJenis && matchPetak;
-    });
-
-    // 3. Logika grouping (mengelompokkan data unik)
-    const summary = {};
-    filtered.forEach(d => {
-        const key = `${d.tpk}-${d.jenis_kayu}-${d.petak}`;
-        if (!summary[key]) {
-            summary[key] = {
-                tpk: d.tpk || '-',
-                jenis: d.jenis_kayu || '-',
-                petak: d.petak || '-',
-                masuk: 0,
-                keluar: 0,
-                // Inisialisasi properti tambahan dengan 0 agar tidak undefined
-                saldoAwal: 0,
-                bap: 0,
-                lhp: 0,
-                kirim: 0,
-                saldoBAP: 0,
-                saldoLHP: 0
-            };
-        }
-        summary[key].masuk += (parseFloat(d.masuk_m3) || 0);
-        summary[key].keluar += (parseFloat(d.keluar_m3) || 0);
-
-        // Contoh logika jika Anda punya kategori di database (opsional)
-        // if(d.keterangan === 'BAP') summary[key].bap += d.masuk_m3;
-    });
-
-    // 4. Render ke tabel
-    const results = Object.values(summary);
-    if (results.length === 0) {
-        // Sesuaikan colspan dengan jumlah kolom di <thead> (misal ada 10 kolom)
-        tableBody.innerHTML = '<tr><td colspan="9" class="text-center">Data tidak ditemukan</td></tr>';
-        return;
-    }
-
-    tableBody.innerHTML = results.map(r => `
-        <tr>
-            <td>${r.jenis}</td>
-            <td>${r.tpk}</td>
-            <td>${r.petak}</td>
-            <td class="text-right">${r.saldoAwal.toFixed(2)}</td>
-            <td class="text-right">${r.bap.toFixed(2)}</td>
-            <td class="text-right">${r.lhp.toFixed(2)}</td>
-            <td class="text-right">${r.kirim.toFixed(2)}</td>
-            <td class="text-right">${r.saldoBAP.toFixed(2)}</td>
-            <td class="text-right">${r.saldoLHP.toFixed(2)}</td>
-            </td>
-        </tr>
-    `).join('');
-};
 window.renderRekapRincian = function () {
     const body = document.getElementById("rincian-table-body");
     if (!body) return;
