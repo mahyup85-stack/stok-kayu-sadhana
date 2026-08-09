@@ -2191,7 +2191,7 @@ async function loadDataRincianMutasi() {
         // =========================================================
         // QUERY 2: AMBIL DATA PERIODE BERJALAN + PAGINATION (.range)
         // =========================================================
-        let queryMutasi = supabase
+        let queryMutasi = api
             .from('stok_kayu')
             .select('*', { count: 'exact' })
             .gte('tanggal', startDate)
