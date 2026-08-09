@@ -287,16 +287,11 @@ window.renderPaginationControls = function () {
     const container = document.getElementById("pagination-container");
     if (!container) return;
 
-    // 1. Tentukan sumber data secara dinamis (Rincian Mutasi vs Dashboard Utama)
-    let totalRows = 0;
-    if (typeof getProcessedRincianData === 'function' && state.hasAppliedFilter) {
-        const processed = getProcessedRincianData();
-        totalRows = processed?.filtered?.length || 0;
-    } else {
-        totalRows = state.filteredData?.length || state.data?.length || 0;
-    }
+    // 1. Ambil total baris dari Server (state.totalRows diisi dari count Supabase)
+    // Jika belum ada data dari server, fallback ke 0
+    const totalRows = state.totalRows !== undefined ? state.totalRows : (state.data?.length || 0);
 
-    const rowsPerPage = state.rowsPerPage || 10;
+    const rowsPerPage = state.rowsPerPage || 25;
     const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
     const currentPage = state.currentPage || 1;
 
@@ -307,7 +302,7 @@ window.renderPaginationControls = function () {
             <button class="btn-page" onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Prev</button>
             
             <span style="font-size: 0.9rem; font-weight: 500; margin: 0 8px;">
-                Halaman <strong>${currentPage}</strong> dari <strong>${totalPages}</strong>
+                Halaman <strong>${currentPage}</strong> dari <strong>${totalPages}</strong> (Total <strong>${totalRows}</strong> data)
             </span>
             
             <button class="btn-page" onclick="changePage(${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
@@ -318,32 +313,23 @@ window.renderPaginationControls = function () {
     container.innerHTML = html;
 };
 
-// Fungsi pindah halaman (Aman untuk semua modul)
-window.changePage = function (page) {
-    // Hitung total halaman sesuai modul aktif
-    let totalRows = 0;
-    if (typeof getProcessedRincianData === 'function' && state.hasAppliedFilter) {
-        const processed = getProcessedRincianData();
-        totalRows = processed?.filtered?.length || 0;
-    } else {
-        totalRows = state.filteredData?.length || state.data?.length || 0;
-    }
-
+// Fungsi pindah halaman (Server-Side Supabase)
+window.changePage = async function (page) {
+    const totalRows = state.totalRows || 0;
     const rowsPerPage = state.rowsPerPage || 10;
     const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
 
     // Validasi batas halaman
-    if (page < 1 || page > totalPages) return;
+    if (page < 1 || (totalPages > 0 && page > totalPages)) return;
 
-    // Set halaman baru
+    // Set halaman baru di state global
     state.currentPage = page;
 
-    // Render ulang tampilan yang sesuai
-    if (typeof renderRincian === 'function') {
-        renderRincian();
-    }
-    if (typeof renderDashboardTable === 'function') {
-        renderDashboardTable();
+    // Fetch data baru dari Supabase sesuai modul aktif
+    if (typeof loadDataRincianMutasi === 'function' && state.activeTab === 'mutasi') {
+        await loadDataRincianMutasi(); // Fungsi yang memanggil supabase.from().range(...)
+    } else if (typeof loadDashboardData === 'function') {
+        await loadDashboardData();
     }
 
     // Scroll halus ke atas tabel
@@ -1688,154 +1674,114 @@ function hitungKonversi(jenisKayu, volumeM3) {
     return volumeM3 * faktor;
 }
 
-window.renderRekapSaldo = function () {
+window.renderRekapSaldo = async function () {
     const tableBody = document.getElementById("rekap-table-body");
     if (!tableBody) return;
 
-    // Helper untuk format angka aman
-    // Helper untuk format angka aman (BARU - Bebas dari -0.00)
-const formatSaldo = (val) => {
-    let num = parseFloat(val) || 0;
-    // Jika angka sangat mendekati 0 (antara -0.001 sampai 0.001), paksa jadi 0 murni
-    if (Math.abs(num) < 0.0001) num = 0;
-    
-    return num.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
-    // 1. Ambil Nilai Filter Periode (DARI & SAMPAI)
+    if (typeof showLoading === 'function') showLoading(true);
+
+    const formatSaldo = (val) => {
+        let num = parseFloat(val) || 0;
+        if (Math.abs(num) < 0.0001) num = 0;
+        return num.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    // 1. Ambil Nilai Filter Periode & Kategori
     const fBulanDari = document.getElementById("filter-dari-bulan")?.value || 1;
     const fTahunDari = parseInt(document.getElementById("filter-dari-tahun")?.value, 10) || new Date().getFullYear();
     const fBulanSampai = document.getElementById("filter-sampai-bulan")?.value || 12;
-    const fTahunSampai = document.getElementById("filter-sampai-tahun")?.value || 2026;
+    const fTahunSampai = parseInt(document.getElementById("filter-sampai-tahun")?.value, 10) || 2026;
 
-    const filterTPK = document.getElementById("filter-tpk")?.value;
-    const filterJenis = document.getElementById("filter-jenis")?.value;
-    const filterPetak = document.getElementById("filter-petak")?.value;
+    const filterTPK = document.getElementById("filter-tpk")?.value || 'ALL';
+    const filterJenis = document.getElementById("filter-jenis")?.value || 'ALL';
+    const filterPetak = document.getElementById("filter-petak")?.value || 'ALL';
 
-    // Format YYYYMM untuk perbandingan presisi
     const periodeMulai = parseInt(fTahunDari) * 100 + parseInt(fBulanDari);
     const periodeAkhir = parseInt(fTahunSampai) * 100 + parseInt(fBulanSampai);
 
-    const ringkasan = {};
+    try {
+        // 2. Panggil RPC Supabase (Perhitungan dilakukan di server PostgreSQL)
+        const { data, error } = await supabase.rpc('get_rekap_saldo_kayu', {
+            p_periode_mulai: periodeMulai,
+            p_periode_akhir: periodeAkhir,
+            p_tpk: filterTPK,
+            p_jenis: filterJenis,
+            p_petak: filterPetak
+        });
 
-    // 2. Proses data sesuai batasan periode
-    state.data.forEach(d => {
-        // Filter Kategori (TPK, Jenis, Petak)
-        if (filterTPK && d.tpk !== filterTPK) return;
-        if (filterJenis && d.jenis_kayu !== filterJenis) return;
-        if (filterPetak && d.petak !== filterPetak) return;
+        if (error) throw error;
 
-        if (!d.tanggal) return;
-        const [y, m] = d.tanggal.split("-");
-        const periodeData = parseInt(y) * 100 + parseInt(m);
+        // 3. Filter Baris yang Semuanya Nol
+        const rows = (data || []).filter(r => {
+            const sBap = parseFloat(r.saldo_awal_bap) + parseFloat(r.bap) - parseFloat(r.lhp);
+            const sLhp = parseFloat(r.saldo_awal_lhp) + parseFloat(r.lhp) - parseFloat(r.kirim);
+            return (r.saldo_awal_bap != 0 || r.saldo_awal_lhp != 0 || r.bap != 0 || r.lhp != 0 || r.kirim != 0 || sBap != 0 || sLhp != 0);
+        });
 
-        // ABAIKAN DATA DI ATAS PERIODE "SAMPAI"
-        if (periodeData > periodeAkhir) return;
-
-        const key = `${d.jenis_kayu}-${d.tpk}-${d.petak || 'Tanpa Petak'}`;
-
-        // PERBAIKAN 1: Inisialisasi properti saldoAwalBap dan saldoAwalLhp dengan benar
-        if (!ringkasan[key]) {
-            ringkasan[key] = {
-                jenis: d.jenis_kayu, 
-                tpk: d.tpk, 
-                petak: d.petak || '-',
-                saldoAwalBap: 0, 
-                saldoAwalLhp: 0, 
-                bap: 0, 
-                lhp: 0, 
-                kirim: 0
-            };
+        if (rows.length === 0) {
+            tableBody.innerHTML = '<tr><td colspan="10" class="text-center">Tidak ada data untuk periode ini</td></tr>';
+            return;
         }
 
-        const m3 = parseFloat(d.masuk_m3 || d.keluar_m3 || 0);
-        const isBAP = d.keterangan?.toUpperCase().includes('BAP');
+        // 4. Render Data & Hitung Grand Total
+        let gTotalAwalBap = 0, gTotalAwalLhp = 0, gTotalBap = 0, gTotalLhp = 0, gTotalKirim = 0;
+        let gTotalSaldoBap = 0, gTotalSaldoLhp = 0;
 
-        if (periodeData < periodeMulai) {
-            // PERBAIKAN 2: Akumulasi Saldo Awal Terpisah (BAP vs LHP) sebelum periode berjalan
-            if (d.masuk_m3 > 0) {
-                if (isBAP) {
-                    ringkasan[key].saldoAwalBap += m3;
-                } else {
-                    // Kayu terbit LHP mengurangi sisa BAP dan menambah stok LHP
-                    ringkasan[key].saldoAwalBap -= m3;
-                    ringkasan[key].saldoAwalLhp += m3;
-                }
-            } else if (d.keluar_m3 > 0) {
-                // Pengiriman mengurangi stok LHP
-                ringkasan[key].saldoAwalLhp -= m3;
-            }
-        } else {
-            // MASUK KE MUTASI BERJALAN (Antara periode DARI s/d SAMPAI)
-            if (d.masuk_m3 > 0) {
-                if (isBAP) ringkasan[key].bap += m3;
-                else ringkasan[key].lhp += m3;
-            } else if (d.keluar_m3 > 0) {
-                ringkasan[key].kirim += m3;
-            }
-        }
-    });
+        let html = rows.map((r) => {
+            const sAwalBap = parseFloat(r.saldo_awal_bap || 0);
+            const sAwalLhp = parseFloat(r.saldo_awal_lhp || 0);
+            const valBap   = parseFloat(r.bap || 0);
+            const valLhp   = parseFloat(r.lhp || 0);
+            const valKirim = parseFloat(r.kirim || 0);
 
-    // 3. Filter Baris Kosong
-    let rows = Object.values(ringkasan);
+            const sBap = sAwalBap + valBap - valLhp;
+            const sLhp = sAwalLhp + valLhp - valKirim;
 
-    rows = rows.filter(r => {
-        const sBap = r.saldoAwalBap + r.bap - r.lhp;
-        const sLhp = r.saldoAwalLhp + r.lhp - r.kirim;
-        return (r.saldoAwalBap !== 0 || r.saldoAwalLhp !== 0 || r.bap !== 0 || r.lhp !== 0 || r.kirim !== 0 || sBap !== 0 || sLhp !== 0);
-    });
+            gTotalAwalBap += sAwalBap;
+            gTotalAwalLhp += sAwalLhp;
+            gTotalBap += valBap;
+            gTotalLhp += valLhp;
+            gTotalKirim += valKirim;
+            gTotalSaldoBap += sBap;
+            gTotalSaldoLhp += sLhp;
 
-    if (rows.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="10" class="text-center">Tidak ada data untuk periode ini</td></tr>';
-        return;
+            return `
+                <tr>
+                    <td>${r.jenis_kayu}</td>
+                    <td>${r.tpk}</td>
+                    <td class="text-center">${r.petak}</td>
+                    <td class="text-right">${formatSaldo(sAwalBap)}</td>
+                    <td class="text-right">${formatSaldo(sAwalLhp)}</td>
+                    <td class="text-right">${formatSaldo(valBap)}</td>
+                    <td class="text-right">${formatSaldo(valLhp)}</td>
+                    <td class="text-right">${formatSaldo(valKirim)}</td>
+                    <td class="text-right" style="font-weight:bold">${formatSaldo(sBap)}</td>
+                    <td class="text-right" style="font-weight:bold">${formatSaldo(sLhp)}</td>
+                </tr>`;
+        }).join('');
+
+        // 5. Baris Total Keseluruhan
+        html += `
+            <tr style="background-color: #f3f4f6; font-weight: bold; border-top: 2px solid #374151;">
+                <td colspan="3" class="text-center">TOTAL KESELURUHAN</td>
+                <td class="text-right">${formatSaldo(gTotalAwalBap)}</td>
+                <td class="text-right">${formatSaldo(gTotalAwalLhp)}</td>
+                <td class="text-right">${formatSaldo(gTotalBap)}</td>
+                <td class="text-right">${formatSaldo(gTotalLhp)}</td>
+                <td class="text-right">${formatSaldo(gTotalKirim)}</td>
+                <td class="text-right">${formatSaldo(gTotalSaldoBap)}</td>
+                <td class="text-right">${formatSaldo(gTotalSaldoLhp)}</td>
+            </tr>
+        `;
+
+        tableBody.innerHTML = html;
+
+    } catch (err) {
+        console.error("Gagal memuat rekap saldo:", err);
+        tableBody.innerHTML = `<tr><td colspan="10" class="text-center text-red-500">Gagal memuat rekap saldo: ${err.message}</td></tr>`;
+    } finally {
+        if (typeof showLoading === 'function') showLoading(false);
     }
-
-    // 4. Render Data & Hitung Grand Total
-    let gTotalAwalBap = 0, gTotalAwalLhp = 0, gTotalBap = 0, gTotalLhp = 0, gTotalKirim = 0;
-    let gTotalSaldoBap = 0, gTotalSaldoLhp = 0;
-
-    let html = rows.map((r) => {
-        const sBap = r.saldoAwalBap + r.bap - r.lhp;
-        const sLhp = r.saldoAwalLhp + r.lhp - r.kirim;
-
-        // Akumulasi Grand Total
-        gTotalAwalBap += r.saldoAwalBap;
-        gTotalAwalLhp += r.saldoAwalLhp;
-        gTotalBap += r.bap;
-        gTotalLhp += r.lhp;
-        gTotalKirim += r.kirim;
-        gTotalSaldoBap += sBap;
-        gTotalSaldoLhp += sLhp;
-        
-        return `
-            <tr>
-                <td>${r.jenis}</td>
-                <td>${r.tpk}</td>
-                <td class="text-center">${r.petak}</td>
-                <td class="text-right">${formatSaldo(r.saldoAwalBap)}</td>
-                <td class="text-right">${formatSaldo(r.saldoAwalLhp)}</td>
-                <td class="text-right">${formatSaldo(r.bap)}</td>
-                <td class="text-right">${formatSaldo(r.lhp)}</td>
-                <td class="text-right">${formatSaldo(r.kirim)}</td>
-                <td class="text-right" style="font-weight:bold">${formatSaldo(sBap)}</td>
-                <td class="text-right" style="font-weight:bold">${formatSaldo(sLhp)}</td>
-            </tr>`;
-    }).join('');
-
-    // 5. Baris Total Keseluruhan
-    html += `
-        <tr style="background-color: #f3f4f6; font-weight: bold; border-top: 2px solid #374151;">
-            <td colspan="3" class="text-center">TOTAL KESELURUHAN</td>
-            <td class="text-right">${formatSaldo(gTotalAwalBap)}</td>
-            <td class="text-right">${formatSaldo(gTotalAwalLhp)}</td>
-            <td class="text-right">${formatSaldo(gTotalBap)}</td>
-            <td class="text-right">${formatSaldo(gTotalLhp)}</td>
-            <td class="text-right">${formatSaldo(gTotalKirim)}</td>
-            <td class="text-right">${formatSaldo(gTotalSaldoBap)}</td>
-            <td class="text-right">${formatSaldo(gTotalSaldoLhp)}</td>
-        </tr>
-    `;
-
-    tableBody.innerHTML = html;
 };
 
 window.renderRekapTable = function () {
@@ -2195,86 +2141,100 @@ window.renderRekapRincian = function () {
 }
 
 // Helper untuk memproses data rincian (filter + hitung saldo awal)
-function getProcessedRincianData() {
-    // Ambil Filter
-    const fTFrom = document.getElementById("filter-rincian-tahun-dari").value;
-    const fBFrom = document.getElementById("filter-rincian-bulan-dari").value;
-    const fTTo = document.getElementById("filter-rincian-tahun-sampai").value;
-    const fBTo = document.getElementById("filter-rincian-bulan-sampai").value;
-    const fTPK = document.getElementById("filter-rincian-tpk").value;
-    const fJenis = document.getElementById("filter-rincian-jenis").value;
-    const fPetak = document.getElementById("filter-rincian-petak").value;
-    const fKet = document.getElementById("filter-rincian-ket").value.toLowerCase();
+async function loadDataRincianMutasi() {
+    try {
+        if (typeof showLoading === 'function') showLoading(true);
 
-    const fromVal = (fTFrom && fBFrom) ? parseInt(fTFrom) * 100 + parseInt(fBFrom) : 0;
-    const toVal = (fTTo && fBTo) ? parseInt(fTTo) * 100 + parseInt(fBTo) : 999999;
+        // 1. Ambil Nilai Filter dari DOM
+        const fTFrom = document.getElementById("filter-rincian-tahun-dari")?.value;
+        const fBFrom = document.getElementById("filter-rincian-bulan-dari")?.value;
+        const fTTo   = document.getElementById("filter-rincian-tahun-sampai")?.value;
+        const fBTo   = document.getElementById("filter-rincian-bulan-sampai")?.value;
+        const fTPK   = document.getElementById("filter-rincian-tpk")?.value;
+        const fJenis = document.getElementById("filter-rincian-jenis")?.value;
+        const fPetak = document.getElementById("filter-rincian-petak")?.value;
+        const fKet   = document.getElementById("filter-rincian-ket")?.value;
 
-    let saldoAwal = 0;
+        // Format Tanggal ISO YYYY-MM-DD untuk Query Supabase
+        const startDate = (fTFrom && fBFrom) ? `${fTFrom}-${String(fBFrom).padStart(2, '0')}-01` : '2000-01-01';
+        const lastDay   = (fTTo && fBTo) ? new Date(fTTo, fBTo, 0).getDate() : 31;
+        const endDate   = (fTTo && fBTo) ? `${fTTo}-${String(fBTo).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}` : '2099-12-31';
 
-    // 1. Hitung Saldo Awal (Hanya FISIK: Non-LHP)
-    state.data.forEach(d => {
-        const [y, m] = d.tanggal.split("-");
-        const dVal = parseInt(y) * 100 + parseInt(m);
-        const ket = (d.keterangan || "").toUpperCase();
+        // Set State Status Filter
+        state.hasAppliedFilter = true;
+        const page = state.currentPage || 1;
+        const pageSize = state.rowsPerPage || 10;
+        const start = (page - 1) * pageSize;
+        const end = start + pageSize - 1;
 
-        if (dVal < fromVal) {
-            // Filter kategori tetap berlaku
-            if (fTPK && d.tpk !== fTPK) return;
-            if (fJenis && d.jenis_kayu !== fJenis) return;
-            if (fPetak && d.petak !== fPetak) return;
+        // =========================================================
+        // QUERY 1: HITUNG SALDO AWAL DI SERVER (Hanya transaksi sebelum startDate)
+        // =========================================================
+        let querySaldoAwal = supabase
+            .from('stok_kayu')
+            .select('masuk_m3, keluar_m3, keterangan')
+            .lt('tanggal', startDate)
+            .not('keterangan', 'ilike', '%LHP%'); // Eliminasi LHP agar tidak double count saldo fisik
 
-            // LOGIKA KRUSIAL: Jika LHP, jangan hitung ke saldo fisik
-            if (ket.includes("LHP")) return;
+        if (fTPK) querySaldoAwal = querySaldoAwal.eq('tpk', fTPK);
+        if (fJenis) querySaldoAwal = querySaldoAwal.eq('jenis_kayu', fJenis);
+        if (fPetak) querySaldoAwal = querySaldoAwal.eq('petak', fPetak);
 
-            const masuk = parseFloat(d.masuk_m3 || 0);
-            const keluar = parseFloat(d.keluar_m3 || 0);
-            saldoAwal += (masuk - keluar);
-        }
-    });
+        const { data: dataSaldoAwal, error: errSaldo } = await querySaldoAwal;
+        if (errSaldo) throw errSaldo;
 
-    // 2. Filter Data Periode Berjalan
-    let filtered = state.data.filter(d => {
-        const [y, m] = d.tanggal.split("-");
-        const dVal = parseInt(y) * 100 + parseInt(m);
+        let saldoAwal = 0;
+        dataSaldoAwal?.forEach(d => {
+            saldoAwal += (parseFloat(d.masuk_m3 || 0) - parseFloat(d.keluar_m3 || 0));
+        });
 
-        if (dVal < fromVal || dVal > toVal) return false;
-        if (fTPK && d.tpk !== fTPK) return false;
-        if (fJenis && d.jenis_kayu !== fJenis) return false;
-        if (fPetak && d.petak !== fPetak) return false;
-        if (fKet && !(d.keterangan || "").toLowerCase().includes(fKet)) return false;
+        // =========================================================
+        // QUERY 2: AMBIL DATA PERIODE BERJALAN + PAGINATION (.range)
+        // =========================================================
+        let queryMutasi = supabase
+            .from('stok_kayu')
+            .select('*', { count: 'exact' })
+            .gte('tanggal', startDate)
+            .lte('tanggal', endDate);
 
-        return true;
-    }).sort((a, b) => {
-        const dateDiff = new Date(a.tanggal) - new Date(b.tanggal);
-        if (dateDiff !== 0) return dateDiff;
+        if (fTPK) queryMutasi = queryMutasi.eq('tpk', fTPK);
+        if (fJenis) queryMutasi = queryMutasi.eq('jenis_kayu', fJenis);
+        if (fPetak) queryMutasi = queryMutasi.eq('petak', fPetak);
+        if (fKet) queryMutasi = queryMutasi.ilike('keterangan', `%${fKet}%`);
 
-        // Prioritas: Saldo Awal > BAP (Fisik) > LHP (Adm) > KIRIM (Keluar)
-        const getPriority = (k) => {
-            const txt = (k || "").toUpperCase();
-            if (txt.includes("SALDO AWAL")) return 0;
-            if (txt.includes("BAP")) return 1;
-            if (txt.includes("LHP")) return 2;
-            if (txt.includes("KIRIM")) return 3;
-            return 4;
-        };
-        return getPriority(a.keterangan) - getPriority(b.keterangan);
-    });
+        // Urutkan Tanggal ASC
+        const { data: mutasiData, count, error: errMutasi } = await queryMutasi
+            .order('tanggal', { ascending: true })
+            .range(start, end);
 
-    // 3. Mapping Data untuk Render
-    const mappedFiltered = filtered.map(d => ({
-        ...d,
-        p: parseFloat(d.masuk_m3 || 0),
-        m: parseFloat(d.keluar_m3 || 0),
-        ket: d.keterangan || "",
-        jenis: d.jenis_kayu
-    }));
+        if (errMutasi) throw errMutasi;
 
-    return { filtered: mappedFiltered, saldoAwal };
+        // 2. Mapping Data dan Simpan ke State Global
+        state.totalRows = count || 0;
+        state.saldoAwal = saldoAwal;
+        state.filteredData = (mutasiData || []).map(d => ({
+            ...d,
+            p: parseFloat(d.masuk_m3 || 0),
+            m: parseFloat(d.keluar_m3 || 0),
+            ket: d.keterangan || "",
+            jenis: d.jenis_kayu
+        }));
+
+        // 3. Trigger Render UI dan Pagination Controls
+        if (typeof renderRincian === 'function') renderRincian();
+        if (typeof window.renderPaginationControls === 'function') window.renderPaginationControls();
+
+    } catch (err) {
+        console.error("Gagal memuat rincian mutasi server-side:", err);
+        alert("Gagal memuat data mutasi: " + err.message);
+    } finally {
+        if (typeof showLoading === 'function') showLoading(false);
+    }
 }
 
 function renderRincian() {
     const body = document.getElementById("rincian-table-body");
-    const pageInfo = document.getElementById("page-info"); // Elemen teks info halaman (misal: "Halaman 1 dari 10")
+    const pageInfo = document.getElementById("page-info");
     if (!body) return;
 
     if (!state.hasAppliedFilter) {
@@ -2282,74 +2242,23 @@ function renderRincian() {
         return;
     }
 
-    const processed = getProcessedRincianData();
-    if (!processed) return;
-
-    const { filtered, saldoAwal } = processed;
-
-    // --- 1. SETUP PAGINATION ---
-    const totalRows = filtered.length;
-    const rowsPerPage = state.rowsPerPage || 10; // Jumlah baris per halaman
+    // 1. Ambil Data dari State (Data yang dikirim Supabase hanya data halaman aktif)
+    const dataHalamanIni = state.filteredData || [];
+    const totalRows = state.totalRows || 0;
+    const rowsPerPage = state.rowsPerPage || 25;
     const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
+    const saldoAwal = state.saldoAwal || 0;
 
-    // Proteksi halaman aktif
+    // Proteksi Halaman
     if (!state.currentPage || state.currentPage < 1) state.currentPage = 1;
-    if (state.currentPage > totalPages) state.currentPage = totalPages;
-
-    const startIndex = (state.currentPage - 1) * rowsPerPage;
-    const endIndex = startIndex + rowsPerPage;
-
-    // --- 2. HITUNG SALDO BERJALAN SAMPAI HALAMAN SAAT INI ---
-    let runningSaldo = saldoAwal;
-    let totalMasukFisik = 0;
-    let totalKeluarFisik = 0;
-    let totalDokumenLHP = 0;
-    let totalKirim = 0;
-
-    // Hitung akumulasi untuk SEMUA data (guna menghitung Running Saldo awal halaman & Grand Total)
-    const processedDataWithSaldo = filtered.map(d => {
-        const valP = parseFloat(d.p || 0); // Masuk
-        const valM = parseFloat(d.m || 0); // Keluar
-        const ket = (d.ket || "").toUpperCase();
-
-        let mskTampil = 0, klrTampil = 0;
-        let mskHitung = 0, klrHitung = 0;
-
-        if (ket.includes("KIRIM")) {
-            mskTampil = 0; klrTampil = valM;
-            mskHitung = 0; klrHitung = valM;
-            totalKirim += valM;
-        } else if (ket.includes("LHP")) {
-            mskTampil = valP; klrTampil = 0;
-            mskHitung = valP; klrHitung = 0;
-            totalDokumenLHP += valP;
-        } else {
-            mskTampil = valP; klrTampil = valM;
-            mskHitung = valP; klrHitung = valM;
-        }
-
-        runningSaldo += (mskHitung - klrHitung);
-        totalMasukFisik += mskHitung;
-        totalKeluarFisik += klrHitung;
-
-        return {
-            ...d,
-            mskTampil,
-            klrTampil,
-            currentRunningSaldo: runningSaldo
-        };
-    });
-
-    // POTONG DATA HANYA UNTUK HALAMAN SEKARANG
-    const paginatedData = processedDataWithSaldo.slice(startIndex, endIndex);
 
     let htmlContent = "";
 
-    // --- 3. BARIS SALDO AWAL (Tampilkan di halaman 1) ---
+    // 2. TAMPILKAN BARIS SALDO AWAL (HANYA DI HALAMAN 1)
     if (state.currentPage === 1) {
         htmlContent += `
             <tr style="background-color: #f3f4f6; font-style: italic;">
-                <td colspan="5" class="text-center">SALDO AWAL (Sampai Periode Sebelumnya)</td>
+                <td colspan="5" class="text-center font-bold">SALDO AWAL (Sampai Periode Sebelumnya)</td>
                 <td class="text-right">-</td>
                 <td class="text-right">-</td>
                 <td class="text-right font-bold">${saldoAwal.toFixed(2)}</td>
@@ -2357,47 +2266,67 @@ function renderRincian() {
         `;
     }
 
-    // --- 4. RENDER BARIS TERCETAK (PAGINATED) ---
-    paginatedData.forEach(d => {
-        const ket = (d.ket || "").toUpperCase();
-        const rowStyle = ket.includes('LHP') ? 'background-color: #f9fafb; color: #6b7280;' : '';
+    // 3. RENDER BARIS TABEL HALAMAN AKTIF
+    if (dataHalamanIni.length === 0 && state.currentPage === 1) {
+        htmlContent += '<tr><td colspan="8" class="text-center" style="padding: 15px;">Tidak ada transaksi pada periode ini</td></tr>';
+    } else {
+        // Asumsi Running Saldo dimulai dari Saldo Awal (atau disesuaikan dengan akumulasi)
+        let runningSaldo = saldoAwal;
 
-        htmlContent += `
-            <tr style="${rowStyle}">
-                <td>${d.tanggal || '-'}</td>
-                <td>${d.ket || '-'}</td>
-                <td>${d.jenis || '-'}</td>
-                <td>${d.tpk || '-'}</td>
-                <td>${d.petak || '-'}</td>
-                <td class="text-right">${d.mskTampil ? d.mskTampil.toFixed(2) : '-'}</td>
-                <td class="text-right">${d.klrTampil ? d.klrTampil.toFixed(2) : '-'}</td>
-                <td class="text-right font-bold">${d.currentRunningSaldo.toFixed(2)}</td>
-            </tr>`;
-    });
+        dataHalamanIni.forEach(d => {
+            const valP = parseFloat(d.p || d.masuk_m3 || 0);
+            const valM = parseFloat(d.m || d.keluar_m3 || 0);
+            const ket  = (d.ket || d.keterangan || "").toUpperCase();
 
-    // --- 5. BARIS GRAND TOTAL (Tampilkan di halaman terakhir) ---
-    if (state.currentPage === totalPages && (filtered.length > 0 || saldoAwal !== 0)) {
-        if (totalKirim > 0) {
+            let mskTampil = valP;
+            let klrTampil = valM;
+
+            if (ket.includes("KIRIM")) {
+                mskTampil = 0;
+                klrTampil = valM;
+            } else if (ket.includes("LHP")) {
+                mskTampil = valP;
+                klrTampil = 0;
+            }
+
+            // Hitung akumulasi running saldo per baris
+            runningSaldo += (mskTampil - klrTampil);
+
+            const rowStyle = ket.includes('LHP') ? 'background-color: #f9fafb; color: #6b7280;' : '';
+
             htmlContent += `
-                <tr style="background-color: #fef2f2; color: #dc2626; font-size: 0.85rem;">
-                    <td colspan="6" class="text-center">TOTAL PENGIRIMAN</td>
-                    <td class="text-right">${totalKirim.toFixed(2)}</td>
-                    <td class="text-right">-</td>
+                <tr style="${rowStyle}">
+                    <td>${d.tanggal || '-'}</td>
+                    <td>${d.ket || d.keterangan || '-'}</td>
+                    <td>${d.jenis || d.jenis_kayu || '-'}</td>
+                    <td>${d.tpk || '-'}</td>
+                    <td>${d.petak || '-'}</td>
+                    <td class="text-right">${mskTampil ? mskTampil.toFixed(2) : '-'}</td>
+                    <td class="text-right">${klrTampil ? klrTampil.toFixed(2) : '-'}</td>
+                    <td class="text-right font-bold">${runningSaldo.toFixed(2)}</td>
                 </tr>`;
-        }
+        });
+    }
+
+    // 4. BARIS GRAND TOTAL (TAMPILKAN HANYA DI HALAMAN TERAKHIR)
+    if (state.currentPage === totalPages && totalRows > 0) {
+        // Ambil Grand Total Masuk & Keluar Fisik dari state (dikalkulasi dari server/state)
+        const totalMasuk = state.totalMasukFisik || 0;
+        const totalKeluar = state.totalKeluarFisik || 0;
+        const saldoAkhir = saldoAwal + (totalMasuk - totalKeluar);
 
         htmlContent += `
             <tr style="background-color: #f3f4f6; font-weight: bold; border-top: 2px solid #374151;">
                 <td colspan="5" class="text-center">GRAND TOTAL MUTASI FISIK</td>
-                <td class="text-right">${totalMasukFisik.toFixed(2)}</td>
-                <td class="text-right">${totalKeluarFisik.toFixed(2)}</td>
-                <td class="text-right">${runningSaldo.toFixed(2)}</td>
+                <td class="text-right">${totalMasuk.toFixed(2)}</td>
+                <td class="text-right">${totalKeluar.toFixed(2)}</td>
+                <td class="text-right">${saldoAkhir.toFixed(2)}</td>
             </tr>`;
     }
 
     body.innerHTML = htmlContent;
 
-    // Update Teks Pagination jika ada elemennya
+    // 5. UPDATE DOKUMEN TEXT INFO PAGINATION
     if (pageInfo) {
         pageInfo.innerText = `Halaman ${state.currentPage} dari ${totalPages}`;
     }
@@ -3053,8 +2982,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Reset Form & Refresh Data
                 stockForm.reset();
                 if (typeof cancelEdit === 'function') cancelEdit();
-                if (typeof loadMutasiData === 'function') loadMutasiData();
-                if (typeof fetchData === 'function') await fetchData();
+                if (typeof loadDataRincianMutasi === 'function') loadDataRincianMutasi();
 
             } catch (err) {
                 console.error("Database Error:", err);
@@ -3074,38 +3002,58 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof initLoginHandler === 'function') initLoginHandler();
     }
 
-    // ==========================================
-    // EVENT LISTENER PAGINATION RINCIAN MUTASI
-    // ==========================================
+    // =========================================================
+    // EVENT LISTENER NAVIGASI PAGINATION (SERVER-SIDE SUPABASE)
+    // =========================================================
+    
+    // Tombol Next (Selanjutnya)
     document.getElementById("btn-next")?.addEventListener("click", () => {
-        state.currentPage = (state.currentPage || 1) + 1;
-        if (typeof renderRincian === 'function') renderRincian();
+        const totalPages = Math.ceil((state.totalRows || 0) / (state.rowsPerPage || 10)) || 1;
+        if ((state.currentPage || 1) < totalPages) {
+            state.currentPage = (state.currentPage || 1) + 1;
+            loadDataRincianMutasi(); // Panggil data Supabase halaman baru
+        }
     });
 
+    // Tombol Prev (Sebelumnya)
     document.getElementById("btn-prev")?.addEventListener("click", () => {
         if ((state.currentPage || 1) > 1) {
             state.currentPage--;
-            if (typeof renderRincian === 'function') renderRincian();
+            loadDataRincianMutasi(); // Panggil data Supabase halaman baru
         }
     });
 
     // Navigasi ke Halaman Pertama (<<)
     document.getElementById("btn-first")?.addEventListener("click", () => {
         state.currentPage = 1;
-        if (typeof renderRincian === 'function') renderRincian();
+        loadDataRincianMutasi();
     });
 
     // Navigasi ke Halaman Terakhir (>>)
     document.getElementById("btn-last")?.addEventListener("click", () => {
-        if (typeof getProcessedRincianData === 'function') {
-            const processed = getProcessedRincianData();
-            if (processed && processed.filtered) {
-                const rowsPerPage = state.rowsPerPage || 10;
-                state.currentPage = Math.ceil(processed.filtered.length / rowsPerPage) || 1;
-                if (typeof renderRincian === 'function') renderRincian();
-            }
-        }
+        const totalPages = Math.ceil((state.totalRows || 0) / (state.rowsPerPage || 10)) || 1;
+        state.currentPage = totalPages;
+        loadDataRincianMutasi();
     });
 
-}); // Akhir dari DOMContentLoaded
+    // =========================================================
+    // EVENT LISTENER FILTER & LOAD PERTAMA
+    // =========================================================
+    
+    // 1. Tombol Filter Rincian Mutasi
+    document.getElementById("btn-filter-rincian")?.addEventListener("click", () => {
+        state.currentPage = 1; // Reset ke halaman 1 setiap kali filter berubah
+        loadDataRincianMutasi();
+    });
 
+    // 2. Tombol Filter Rekap Saldo
+    document.getElementById("btn-filter-rekap")?.addEventListener("click", () => {
+        if (typeof renderRekapSaldo === 'function') renderRekapSaldo();
+    });
+
+    // 3. Load Data Pertama Kali saat Aplikasi Dibuka
+    if (typeof loadDataRincianMutasi === 'function') {
+        loadDataRincianMutasi();
+    }
+
+}); // Akhir dari DOMContentLoaded
