@@ -237,7 +237,9 @@ function renderDashboardTable(dataToRender = null) {
 
     if (!data || data.length === 0) {
         tableBody.innerHTML = '<tr><td colspan="9" class="text-center">Tidak ada data ditemukan</td></tr>';
-        renderPaginationControls();
+        if (typeof renderPaginationControls === 'function') {
+            renderPaginationControls();
+        }
         return;
     }
 
@@ -259,13 +261,13 @@ function renderDashboardTable(dataToRender = null) {
             <td class="text-center">
                 <input type="checkbox" class="row-checkbox" value="${d.id}">
             </td>
-            <td>${d.tanggal}</td>
+            <td>${d.tanggal || '-'}</td>
             <td>${d.keterangan || '-'}</td>
-            <td>${d.jenis_kayu}</td>
-            <td>${d.tpk}</td>
+            <td>${d.jenis_kayu || '-'}</td>
+            <td>${d.tpk || '-'}</td>
             <td>${d.petak || '-'}</td>
-            <td class="text-right">${formatSaldo(d.masuk_m3)}</td>
-            <td class="text-right">${formatSaldo(d.keluar_m3)}</td>
+            <td class="text-right">${typeof formatSaldo === 'function' ? formatSaldo(d.masuk_m3) : (d.masuk_m3 || '0.00')}</td>
+            <td class="text-right">${typeof formatSaldo === 'function' ? formatSaldo(d.keluar_m3) : (d.keluar_m3 || '0.00')}</td>
             <td>
                 <div style="display: flex; gap: 4px; justify-content: center; align-items: center;">
                     <button type="button" onclick="event.stopPropagation(); window.editData('${d.id}')" class="btn-action" title="Edit">✏️</button>
@@ -281,7 +283,7 @@ function renderDashboardTable(dataToRender = null) {
         container.style.display = isNoPagination ? "none" : "block";
     }
 
-    if (!isNoPagination) {
+    if (!isNoPagination && typeof renderPaginationControls === 'function') {
         renderPaginationControls();
     }
 }
