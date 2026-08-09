@@ -2548,45 +2548,41 @@ async function exportRekapSaldoPDF() {
         doc.text(`Periode: ${filterBulan} ${filterTahun} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 38, { align: "center" });
 
         // =========================================================
-        // 3. AMBIL DATA DARI STATE REKAP YANG BENAR DARI APLIKASI
+        // 3. AMBIL DATA DARI DOM BERDASARKAN #rekap-table-body
         // =========================================================
-        let listData = [];
+        const tableBody = [];
+        let gTotalAwalBap = 0, gTotalAwalLhp = 0, gTotalBap = 0, gTotalLhp = 0, gTotalKirim = 0, gTotalSaldoBap = 0, gTotalSaldoLhp = 0;
 
-        if (typeof getProcessedRekapData === 'function') {
-            const res = getProcessedRekapData();
-            listData = Array.isArray(res) ? res : (res?.filtered || res?.data || []);
-        }
+        // Target spesifik ke ID #rekap-table-body
+        const rows = document.querySelectorAll("#rekap-table-body tr");
 
-        // Fallback jika getProcessedRekapData kosong: cek variabel global rekap yang tepat
-        if (!listData || listData.length === 0) {
-            listData = window.rekapData || window.filteredRekapData || state?.rekapData || state?.filteredRekap || [];
-        }
-
-        const parseNum = (val) => {
-            if (val === null || val === undefined || val === '') return 0;
-            if (typeof val === 'number') return isNaN(val) ? 0 : val;
-            let str = String(val).replace(/\./g, '').replace(',', '.').trim();
+        const parseDomNum = (text) => {
+            if (!text) return 0;
+            let str = text.trim().replace(/\./g, '').replace(',', '.');
             let num = parseFloat(str);
             return isNaN(num) ? 0 : num;
         };
 
-        const tableBody = [];
-        let gTotalAwalBap = 0, gTotalAwalLhp = 0, gTotalBap = 0, gTotalLhp = 0, gTotalKirim = 0, gTotalSaldoBap = 0, gTotalSaldoLhp = 0;
+        let rowCount = 0;
+        rows.forEach((row) => {
+            const cols = row.querySelectorAll("td");
+            // Abaikan baris "Tidak ada data" atau baris kosong
+            if (cols.length < 5) return;
 
-        listData.forEach((item, index) => {
-            const jenisKayu = item.jenis_kayu || item.jenisKayu || item.jenis || '-';
-            const tpk = item.tpk || item.nama_tpk || '-';
-            const petak = item.petak || item.no_petak || '-';
-
-            // Membaca property saldo & mutasi
-            const saldoAwalBap = parseNum(item.saldo_awal_bap ?? item.saldo_awal_BAP ?? item.awal_bap);
-            const saldoAwalLhp = parseNum(item.saldo_awal_lhp ?? item.saldo_awal_LHP ?? item.awal_lhp);
-            const bap = parseNum(item.bap_m3 ?? item.bap ?? item.masuk_bap);
-            const lhp = parseNum(item.lhp_m3 ?? item.lhp ?? item.masuk_lhp);
-            const kirim = parseNum(item.kirim_m3 ?? item.kirim ?? item.keluar);
+            rowCount++;
             
-            const saldoBap = parseNum(item.saldo_bap ?? item.saldo_BAP ?? (saldoAwalBap + bap - lhp));
-            const saldoLhp = parseNum(item.saldo_lhp ?? item.saldo_LHP ?? (saldoAwalLhp + lhp - kirim));
+            // Ekstrak nilai sel tabel
+            const jenisKayu = cols[0]?.innerText.trim() || '-';
+            const tpk = cols[1]?.innerText.trim() || '-';
+            const petak = cols[2]?.innerText.trim() || '-';
+
+            const saldoAwalBap = parseDomNum(cols[3]?.innerText);
+            const saldoAwalLhp = parseDomNum(cols[4]?.innerText);
+            const bap = parseDomNum(cols[5]?.innerText);
+            const lhp = parseDomNum(cols[6]?.innerText);
+            const kirim = parseDomNum(cols[7]?.innerText);
+            const saldoBap = parseDomNum(cols[8]?.innerText);
+            const saldoLhp = parseDomNum(cols[9]?.innerText);
 
             // Akumulasi Total Keseluruhan
             gTotalAwalBap += saldoAwalBap;
@@ -2598,7 +2594,7 @@ async function exportRekapSaldoPDF() {
             gTotalSaldoLhp += saldoLhp;
 
             tableBody.push([
-                index + 1,
+                rowCount,
                 jenisKayu,
                 tpk,
                 petak,
@@ -2612,7 +2608,7 @@ async function exportRekapSaldoPDF() {
             ]);
         });
 
-        // Baris Total Rekap (11 Kolom)
+        // Baris Total Keseluruhan
         tableBody.push([
             { content: 'TOTAL KESELURUHAN', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
             { content: gTotalAwalBap.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
@@ -2625,7 +2621,7 @@ async function exportRekapSaldoPDF() {
         ]);
 
         // =========================================================
-        // 4. GENERATE TABEL REKAP SALDO
+        // 4. GENERATE TABEL PDF
         // =========================================================
         doc.autoTable({
             startY: 44,
@@ -2669,7 +2665,7 @@ async function exportRekapSaldoPDF() {
         });
 
         // =========================================================
-        // 5. DIGITAL STAMP & FOOTER
+        // 5. STAMP & FOOTER
         // =========================================================
         let finalY = doc.lastAutoTable.finalY + 10;
         if (finalY > 160) {
