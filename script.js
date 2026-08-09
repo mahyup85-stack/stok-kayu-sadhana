@@ -2626,7 +2626,7 @@ async function exportRincianMutasiPDF() {
             return;
         }
 
-        // 2. BACAFILTER DARI DOM INPUT / SELECT UNTUK HEADER
+        // 2. BACA FILTER DARI DOM INPUT / SELECT UNTUK HEADER
         const getFilterText = (id) => {
             const el = document.getElementById(id) || document.querySelector(`[name="${id}"]`);
             if (!el) return null;
@@ -2651,41 +2651,6 @@ async function exportRincianMutasiPDF() {
         const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
         const pageWidth = doc.internal.pageSize.getWidth();
         const marginX = 14;
-
-        // 4. ESTRUKTURISASI DAN CLEANING DATA TABEL
-        doc.autoTable({
-            html: tableElement,
-            startY: 51,
-            theme: 'grid',
-            headStyles: {
-                fillColor: [30, 41, 59],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                halign: 'center',
-                fontSize: 8
-            },
-            bodyStyles: { fontSize: 7.5, textColor: [51, 65, 85] },
-            alternateRowStyles: { fillColor: [248, 250, 252] },
-            margin: { left: marginX, right: marginX },
-            didParseCell: function (data) {
-                if (data.section === 'body' || data.section === 'foot') {
-                    const text = data.cell.raw ? data.cell.raw.innerText.trim() : '';
-                    if (!isNaN(parseFloat(text.replace(/\./g, '').replace(',', '.'))) && text.match(/\d/)) {
-                        data.cell.styles.halign = 'right';
-                    }
-                }
-            }
-        });
-
-        doc.save(`Rincian_Mutasi_${new Date().toISOString().slice(0, 10)}.pdf`);
-
-    } catch (err) {
-        console.error("Gagal export PDF rincian:", err);
-        alert("Gagal membuat PDF Rincian: " + err.message);
-    } finally {
-        if (typeof showLoading === 'function') showLoading(false);
-    }
-}
 
         // Kop Surat Perusahaan
         doc.setFont("helvetica", "bold");
@@ -2720,8 +2685,7 @@ async function exportRincianMutasiPDF() {
         doc.setTextColor(71, 85, 105);
         doc.text(`Filter: ${detailFilterTeks}  |  Dicetak: ${tanggalCetak}`, pageWidth / 2, 46, { align: "center" });
 
-        // 4. ESTRUKTURISASI DAN CLEANING DATA TABEL (MEMBUANG BAP YG SUDAH DADI LHP JIKA ADA ATRIBUT DUP)
-        // Memakai doc.autoTable dengan sumber langsung dari elemen HTML
+        // 4. ESTRUKTURISASI DAN CLEANING DATA TABEL
         doc.autoTable({
             html: tableElement,
             startY: 51,
@@ -2737,7 +2701,6 @@ async function exportRincianMutasiPDF() {
             alternateRowStyles: { fillColor: [248, 250, 252] },
             margin: { left: marginX, right: marginX },
             didParseCell: function (data) {
-                // Merapikan perataan teks angka (Masuk M3, Keluar M3)
                 if (data.section === 'body' || data.section === 'foot') {
                     const cellText = data.cell.raw ? data.cell.raw.innerText.trim() : '';
                     if (!isNaN(parseFloat(cellText.replace(/\./g, '').replace(',', '.'))) && cellText.match(/\d/)) {
@@ -2793,12 +2756,10 @@ window.sinkronisasiFilterRincian = function () {
     // 1. Sinkronisasi JENIS KAYU
     const elJenis = document.getElementById('filter-rincian-jenis');
     if (elJenis) {
-        // Ambil data dari state.master.jenis_kayu
-        const masterJenis = state.master.jenis_kayu || [];
+        const masterJenis = (state.master && state.master.jenis_kayu) || [];
         let html = '<option value="">-- Semua Jenis --</option>';
 
         masterJenis.forEach(item => {
-            // Jika item adalah objek {name: "..."}, ambil .name. Jika string, pakai langsung.
             const nama = (typeof item === 'object') ? (item.name || item.nama) : item;
             html += `<option value="${nama}">${nama}</option>`;
         });
@@ -2808,7 +2769,7 @@ window.sinkronisasiFilterRincian = function () {
     // 2. Sinkronisasi TPK
     const elTPK = document.getElementById('filter-rincian-tpk');
     if (elTPK) {
-        const masterTPK = state.master.tpk || [];
+        const masterTPK = (state.master && state.master.tpk) || [];
         let html = '<option value="">-- Pilih TPK --</option>';
 
         masterTPK.forEach(item => {
@@ -2819,7 +2780,7 @@ window.sinkronisasiFilterRincian = function () {
     }
 
     // 3. Sinkronisasi TAHUN (Otomatis 2016 - 2026)
-    const currentYear = 2026;
+    const currentYear = new Date().getFullYear();
     const yearIDs = ['filter-rincian-tahun-dari', 'filter-rincian-tahun-sampai'];
     let yearOptions = '<option value="">Tahun</option>';
 
@@ -2896,52 +2857,40 @@ function populateAllDropdowns(sumberData = [], masterData = {}) {
             listTPK.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
     }
 
-    // 🟢 D. TAMBAHAN BARU: ISI DROPDOWN PETAK (REKAP & RINCIAN)
-    // Ambil data sumber (bisa dari parameter sumberData atau state.data)
+    // D. ISI DROPDOWN PETAK (REKAP & RINCIAN)
     const dataSource = (sumberData && sumberData.length > 0) ? sumberData : (state.data || []);
-
-    // Filter daftar petak unik & bersihkan nilai kosong/null
     const listPetakUnik = [...new Set(dataSource.map(item => item.petak).filter(Boolean))].sort();
 
-    // 1. Dropdown Petak di Rekap Saldo
-    const elFilterPetak = document.getElementById('filter-petak'); // ID filter petak Rekap
+    const elFilterPetak = document.getElementById('filter-petak');
     if (elFilterPetak) {
         elFilterPetak.innerHTML = '<option value="">-- Semua Petak --</option>' +
             listPetakUnik.map(p => `<option value="${p}">${p}</option>`).join('');
-        elFilterPetak.disabled = false; // Buka proteksi klik
+        elFilterPetak.disabled = false;
     }
 
-    // 2. Dropdown Petak di Rincian Saldo / Mutasi
-    const elRincianPetak = document.getElementById('filter-rincian-petak'); // ID filter petak Rincian
+    const elRincianPetak = document.getElementById('filter-rincian-petak');
     if (elRincianPetak) {
         elRincianPetak.innerHTML = '<option value="">-- Semua Petak --</option>' +
             listPetakUnik.map(p => `<option value="${p}">${p}</option>`).join('');
-        elRincianPetak.disabled = false; // Buka proteksi klik
+        elRincianPetak.disabled = false;
     }
 
-    // Panggil fungsi tahun di akhir agar tahun muncul
     if (typeof updateYearDropdowns === 'function') {
         updateYearDropdowns();
     }
 }
 
 function hitungKonversiForm() {
-    // 1. Ambil nilai jenis kayu yang dipilih
     const jenis = document.getElementById('select-jenis-kayu')?.value;
     if (!jenis) return;
 
-    // 2. Ambil nilai input SM (Masuk atau Keluar)
     const smMasuk = parseFloat(document.getElementById('input-masuk-sm')?.value || 0);
     const smKeluar = parseFloat(document.getElementById('input-keluar-sm')?.value || 0);
-    const totalSM = smMasuk || smKeluar; // Ambil nilai yang diisi
+    const totalSM = smMasuk || smKeluar;
 
-    // 3. Ambil faktor konversi SM -> M3 dari state (default 1 jika belum diisi)
     const faktor = (window.state && window.state.konversiKayu) ? (window.state.konversiKayu[jenis] || 1) : 1;
-
-    // 4. Hitung konversi dari SM ke M3
     const hasilM3 = totalSM * faktor;
 
-    // 5. Isi hasil ke kolom M3 (Masuk/Keluar/Readonly Display)
     const inputM3Masuk = document.getElementById('input-masuk-m3');
     const inputM3Keluar = document.getElementById('input-keluar-m3');
     const displayKonversi = document.getElementById('input-hasil-konversi');
@@ -2957,20 +2906,17 @@ function hitungKonversiForm() {
     }
 }
 
-// Expose fungsi ke window jika dipanggil dari HTML
-window.updatePetakByTPK = updatePetakByTPK;
-window.applyRekapFilter = applyRekapFilter;
-window.switchView = switchView;
+// Expose fungsi ke window
+if (typeof updatePetakByTPK !== 'undefined') window.updatePetakByTPK = updatePetakByTPK;
+if (typeof applyRekapFilter !== 'undefined') window.applyRekapFilter = applyRekapFilter;
+if (typeof switchView !== 'undefined') window.switchView = switchView;
 
-// Flag pengunci agar tombol simpan tidak bisa diklik ganda
 let isSubmittingStock = false;
 
-// SINGLE EVENT LISTENER UNTUK INITIALISASI DAN FORM SUBMIT
 document.addEventListener('DOMContentLoaded', () => {
     const stockForm = document.getElementById('stock-form');
 
     if (stockForm) {
-        // Reset atribut onsubmit agar tidak ada pemicu ganda
         stockForm.onsubmit = null;
 
         stockForm.addEventListener('submit', async function (e) {
@@ -2993,7 +2939,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const tpk = getVal('input-tpk');
             const petak = getVal('input-petak')?.trim() || '-';
 
-            // Ambil input SM dari Form (Masuk & Keluar)
             const inSM = parseFloat(getVal('input-in-sm')) || 0;
             const outSM = parseFloat(getVal('input-out-sm')) || 0;
 
@@ -3007,8 +2952,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            // 1. Cari faktor konversi dari master jenis kayu
-            let faktorKonversi = 0.67; // Default jika master data tidak ketemu
+            let faktorKonversi = 0.67;
             if (state.master && state.master['jenis_kayu']) {
                 const itemKayu = state.master['jenis_kayu'].find(
                     k => (k.name && k.name.trim().toLowerCase() === jenis.trim().toLowerCase()) ||
@@ -3019,11 +2963,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // 2. Hitung hasil konversi ke M³
             const inM3 = inSM * faktorKonversi;
             const outM3 = outSM * faktorKonversi;
 
-            // 3. Tentukan mana SM & M3 yang aktif digunakan untuk Notifikasi Alert
             const activeSM = inSM > 0 ? inSM : outSM;
             const activeM3 = inM3 > 0 ? inM3 : outM3;
 
@@ -3043,20 +2985,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (typeof showLoading === 'function') showLoading(true);
 
                 if (editId) {
-                    // MODE UPDATE DATA
                     const { error } = await api.from('stok_kayu').update(payload).eq('id', editId);
                     if (error) throw error;
                     alert("Data berhasil diperbarui!");
                 } else {
-                    // MODE INSERT DATA BARU
                     const { error } = await api.from('stok_kayu').insert([payload]);
                     if (error) throw error;
                     
-                    // Notifikasi Alert menggunakan SM & M3 yang aktif
                     alert(`Data berhasil disimpan!\n${activeSM} SM x ${faktorKonversi} = ${activeM3.toFixed(2)} M³`);
                 }
 
-                // Reset Form & Refresh Data
                 stockForm.reset();
                 if (typeof cancelEdit === 'function') cancelEdit();
                 if (typeof loadDataRincianMutasi === 'function') loadDataRincianMutasi();
@@ -3072,65 +3010,51 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Inisialisasi status Login
-    if (state.isLoggedIn) {
+    if (state && state.isLoggedIn) {
         if (typeof startApp === 'function') startApp();
     } else {
         if (typeof initLoginHandler === 'function') initLoginHandler();
     }
 
-    // =========================================================
-    // EVENT LISTENER NAVIGASI PAGINATION (SERVER-SIDE SUPABASE)
-    // =========================================================
-    
-    // Tombol Next (Selanjutnya)
+    // EVENT LISTENER NAVIGASI PAGINATION
     document.getElementById("btn-next")?.addEventListener("click", () => {
         const totalPages = Math.ceil((state.totalRows || 0) / (state.rowsPerPage || 10)) || 1;
         if ((state.currentPage || 1) < totalPages) {
             state.currentPage = (state.currentPage || 1) + 1;
-            loadDataRincianMutasi(); // Panggil data Supabase halaman baru
+            loadDataRincianMutasi();
         }
     });
 
-    // Tombol Prev (Sebelumnya)
     document.getElementById("btn-prev")?.addEventListener("click", () => {
         if ((state.currentPage || 1) > 1) {
             state.currentPage--;
-            loadDataRincianMutasi(); // Panggil data Supabase halaman baru
+            loadDataRincianMutasi();
         }
     });
 
-    // Navigasi ke Halaman Pertama (<<)
     document.getElementById("btn-first")?.addEventListener("click", () => {
         state.currentPage = 1;
         loadDataRincianMutasi();
     });
 
-    // Navigasi ke Halaman Terakhir (>>)
     document.getElementById("btn-last")?.addEventListener("click", () => {
         const totalPages = Math.ceil((state.totalRows || 0) / (state.rowsPerPage || 10)) || 1;
         state.currentPage = totalPages;
         loadDataRincianMutasi();
     });
 
-    // =========================================================
     // EVENT LISTENER FILTER & LOAD PERTAMA
-    // =========================================================
-    
-    // 1. Tombol Filter Rincian Mutasi
     document.getElementById("btn-filter-rincian")?.addEventListener("click", () => {
-        state.currentPage = 1; // Reset ke halaman 1 setiap kali filter berubah
+        state.currentPage = 1;
         loadDataRincianMutasi();
     });
 
-    // 2. Tombol Filter Rekap Saldo
     document.getElementById("btn-filter-rekap")?.addEventListener("click", () => {
         if (typeof renderRekapSaldo === 'function') renderRekapSaldo();
     });
 
-    // 3. Load Data Pertama Kali saat Aplikasi Dibuka
     if (typeof loadDataRincianMutasi === 'function') {
         loadDataRincianMutasi();
     }
 
-}); // Akhir dari DOMContentLoaded
+});
