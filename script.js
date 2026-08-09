@@ -1694,7 +1694,7 @@ window.renderRekapSaldo = async function () {
     const fBulanDari = document.getElementById("filter-dari-bulan")?.value || 1;
     const fTahunDari = parseInt(document.getElementById("filter-dari-tahun")?.value, 10) || new Date().getFullYear();
     const fBulanSampai = document.getElementById("filter-sampai-bulan")?.value || 12;
-    const fTahunSampai = parseInt(document.getElementById("filter-sampai-tahun")?.value, 10) || 2026;
+    const fTahunSampai = parseInt(document.getElementById("filter-sampai-tahun")?.value, 10) || new Date().getFullYear();
 
     const filterTPK = document.getElementById("filter-tpk")?.value || 'ALL';
     const filterJenis = document.getElementById("filter-jenis")?.value || 'ALL';
@@ -1704,8 +1704,8 @@ window.renderRekapSaldo = async function () {
     const periodeAkhir = parseInt(fTahunSampai) * 100 + parseInt(fBulanSampai);
 
     try {
-        // 2. Panggil RPC Supabase (Perhitungan dilakukan di server PostgreSQL)
-        const { data, error } = await supabase.rpc('get_rekap_saldo_kayu', {
+        // 2. PERBAIKAN: Gunakan api.rpc (bukan supabase.rpc)
+        const { data, error } = await api.rpc('get_rekap_saldo_kayu', {
             p_periode_mulai: periodeMulai,
             p_periode_akhir: periodeAkhir,
             p_tpk: filterTPK,
@@ -1717,9 +1717,17 @@ window.renderRekapSaldo = async function () {
 
         // 3. Filter Baris yang Semuanya Nol
         const rows = (data || []).filter(r => {
-            const sBap = parseFloat(r.saldo_awal_bap) + parseFloat(r.bap) - parseFloat(r.lhp);
-            const sLhp = parseFloat(r.saldo_awal_lhp) + parseFloat(r.lhp) - parseFloat(r.kirim);
-            return (r.saldo_awal_bap != 0 || r.saldo_awal_lhp != 0 || r.bap != 0 || r.lhp != 0 || r.kirim != 0 || sBap != 0 || sLhp != 0);
+            const sBap = parseFloat(r.saldo_awal_bap || 0) + parseFloat(r.bap || 0) - parseFloat(r.lhp || 0);
+            const sLhp = parseFloat(r.saldo_awal_lhp || 0) + parseFloat(r.lhp || 0) - parseFloat(r.kirim || 0);
+            return (
+                (r.saldo_awal_bap && r.saldo_awal_bap != 0) || 
+                (r.saldo_awal_lhp && r.saldo_awal_lhp != 0) || 
+                (r.bap && r.bap != 0) || 
+                (r.lhp && r.lhp != 0) || 
+                (r.kirim && r.kirim != 0) || 
+                sBap != 0 || 
+                sLhp != 0
+            );
         });
 
         if (rows.length === 0) {
@@ -1782,7 +1790,7 @@ window.renderRekapSaldo = async function () {
 
     } catch (err) {
         console.error("Gagal memuat rekap saldo:", err);
-        tableBody.innerHTML = `<tr><td colspan="10" class="text-center text-red-500">Gagal memuat rekap saldo: ${err.message}</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="10" class="text-center text-red-500">Gagal memuat rekap saldo: ${err.message || err}</td></tr>`;
     } finally {
         if (typeof showLoading === 'function') showLoading(false);
     }
