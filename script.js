@@ -2548,35 +2548,67 @@ async function exportRekapSaldoPDF() {
         doc.text(`Periode: ${filterBulan} ${filterTahun} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 38, { align: "center" });
 
         // =========================================================
-        // 3. AMBIL DATA REKAP SALDO (PENYESUAIAN STRUKTUR DATA)
+        // 3. DETEKSI & AMBIL DATA DARI SEMUA KEMUNGKINAN LOKASI STATE
         // =========================================================
-        const rawData = typeof getProcessedRekapData === 'function' 
-            ? getProcessedRekapData() 
-            : state?.rekapData;
-
-        // Mendapatkan array data secara fleksibel
         let rekapList = [];
-        if (Array.isArray(rawData)) {
-            rekapList = rawData;
-        } else if (rawData && typeof rawData === 'object') {
-            rekapList = rawData.filtered || rawData.data || rawData.items || [];
+
+        // Evaluasi fungsi jika tersedia
+        const fnData = typeof getProcessedRekapData === 'function' ? getProcessedRekapData() : null;
+
+        // Cek bertahap seluruh properti yang mungkin menampung data
+        const candidates = [
+            fnData,
+            fnData?.filtered,
+            fnData?.data,
+            state?.rekapData,
+            state?.rekapData?.filtered,
+            state?.rekapData?.data,
+            state?.filteredRekap,
+            state?.currentRekapData,
+            state?.rekapList,
+            window.rekapData
+        ];
+
+        for (const candidate of candidates) {
+            if (Array.isArray(candidate) && candidate.length > 0) {
+                rekapList = candidate;
+                break;
+            }
         }
+
+        // Helper fungsi konversi angka (menerima float, int, maupun string berformat "136,01")
+        const parseNum = (val) => {
+            if (val === null || val === undefined || val === '') return 0;
+            if (typeof val === 'number') return isNaN(val) ? 0 : val;
+            let str = String(val).replace(/\./g, '').replace(',', '.').trim();
+            let parsed = parseFloat(str);
+            return isNaN(parsed) ? 0 : parsed;
+        };
 
         const tableBody = [];
         let gTotalAwalBap = 0, gTotalAwalLhp = 0, gTotalBap = 0, gTotalLhp = 0, gTotalKirim = 0, gTotalSaldoBap = 0, gTotalSaldoLhp = 0;
 
         rekapList.forEach((item, index) => {
-            // Membaca nilai dari properti dengan penamaan alternatif (m3 / non-m3)
-            const saldo_awal_BAP = parseFloat(item.saldo_awal_bap || item.saldo_awal_BAP || item.awal_bap || 0);
-            const saldo_awal_LHP = parseFloat(item.saldo_awal_lhp || item.saldo_awal_LHP || item.awal_lhp || 0);
-            const BAP = parseFloat(item.bap_m3 || item.bap || item.masuk_bap || 0);
-            const LHP = parseFloat(item.lhp_m3 || item.lhp || item.masuk_lhp || 0);
-            const Kirim = parseFloat(item.kirim_m3 || item.kirim || item.keluar || 0);
+            // Evaluasi nama-nama properti alternatif yang umum digunakan
+            const saldo_awal_BAP = parseNum(item.saldo_awal_bap ?? item.saldo_awal_BAP ?? item.awal_bap);
+            const saldo_awal_LHP = parseNum(item.saldo_awal_lhp ?? item.saldo_awal_LHP ?? item.awal_lhp);
             
-            const saldo_BAP = parseFloat(item.saldo_bap ?? item.saldo_BAP ?? (saldo_awal_BAP + BAP - LHP));
-            const saldo_LHP = parseFloat(item.saldo_lhp ?? item.saldo_LHP ?? (saldo_awal_LHP + LHP - Kirim));
+            const BAP = parseNum(item.bap_m3 ?? item.bap ?? item.masuk_bap ?? item.m_bap);
+            const LHP = parseNum(item.lhp_m3 ?? item.lhp ?? item.masuk_lhp ?? item.m_lhp);
+            const Kirim = parseNum(item.kirim_m3 ?? item.kirim ?? item.keluar ?? item.k_m3);
+            
+            // Mengambil saldo langsung atau kalkulasi otomatis
+            let saldo_BAP = parseNum(item.saldo_bap ?? item.saldo_BAP);
+            let saldo_LHP = parseNum(item.saldo_lhp ?? item.saldo_LHP);
 
-            // Akumulasi Total Keseluruhan
+            if (saldo_BAP === 0 && (saldo_awal_BAP !== 0 || BAP !== 0 || LHP !== 0)) {
+                saldo_BAP = saldo_awal_BAP + BAP - LHP;
+            }
+            if (saldo_LHP === 0 && (saldo_awal_LHP !== 0 || LHP !== 0 || Kirim !== 0)) {
+                saldo_LHP = saldo_awal_LHP + LHP - Kirim;
+            }
+
+            // Accumulate global total
             gTotalAwalBap += saldo_awal_BAP;
             gTotalAwalLhp += saldo_awal_LHP;
             gTotalBap += BAP;
@@ -2587,9 +2619,9 @@ async function exportRekapSaldoPDF() {
 
             tableBody.push([
                 index + 1,
-                item.jenis_kayu || item.jenis || '-',
-                item.tpk || '-',
-                item.petak || '-',
+                item.jenis_kayu || item.jenisKayu || item.jenis || '-',
+                item.tpk || item.nama_tpk || '-',
+                item.petak || item.no_petak || '-',
                 saldo_awal_BAP.toFixed(2),
                 saldo_awal_LHP.toFixed(2),
                 BAP.toFixed(2),
@@ -2600,7 +2632,7 @@ async function exportRekapSaldoPDF() {
             ]);
         });
 
-        // Baris Total Rekap (11 Kolom)
+        // Total Row
         tableBody.push([
             { content: 'TOTAL KESELURUHAN', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
             { content: gTotalAwalBap.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
