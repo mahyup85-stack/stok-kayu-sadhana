@@ -587,40 +587,40 @@ let isAppInitializing = false;
 
 async function startApp() {
     // 1. CEK FLAG: Jika sedang dalam proses inisialisasi, hentikan eksekusi ganda
-    if (isAppInitializing) {
+    if (typeof isAppInitializing !== 'undefined' && isAppInitializing) {
         console.warn("⚠️ startApp() sedang berjalan, mengabaikan panggilan duplikat.");
         return;
     }
 
     try {
-        isAppInitializing = true; // Tandai bahwa aplikasi mulai loading
-        showLoading(true);
+        if (typeof isAppInitializing !== 'undefined') isAppInitializing = true;
+        if (typeof showLoading === 'function') showLoading(true);
 
         const URL = 'https://fcccuqnyxuwsrddlookt.supabase.co';
         const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjY2N1cW55eHV3c3JkZGxvb2t0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NDU2NzQsImV4cCI6MjA4NTQyMTY3NH0.w9p0yxWW1CtLm3Gj3uD1z3P1eWQxW_hB288iUwkfCd8';
 
-        if (!api && window.supabase) {
-            api = window.supabase.createClient(URL, KEY);
+        if (!window.api && window.supabase) {
+            window.api = window.supabase.createClient(URL, KEY);
         }
 
-        // 2. Tarik Data Transaksi & Master secara paralel
+        // 2. Tarik Data Master & Load Rincian Mutasi Pertama Kali (Server-Side)
         await Promise.all([
-            fetchData(),
-            loadDataMaster()
+            typeof loadDataMaster === 'function' ? loadDataMaster() : Promise.resolve(),
+            typeof loadDataRincianMutasi === 'function' ? loadDataRincianMutasi() : Promise.resolve()
         ]);
 
-        // 3. Inisialisasi Pencarian Live
+        // 3. Inisialisasi Pencarian Live Dashboard (Jika ada)
         if (typeof window.initLiveSearchDashboard === 'function') {
             window.initLiveSearchDashboard();
         }
 
-        console.log("✅ Aplikasi Siap: Data Transaksi & Master sinkron.");
+        console.log("✅ Aplikasi Siap: Data Master & Rincian Mutasi Server-Side Sinkron.");
 
     } catch (err) {
-        console.error("❌ Gagal memulai aplikasi:", err.message);
+        console.error("❌ Gagal memulai aplikasi:", err.message || err);
     } finally {
-        showLoading(false);
-        isAppInitializing = false; // Reset flag setelah selesai
+        if (typeof showLoading === 'function') showLoading(false);
+        if (typeof isAppInitializing !== 'undefined') isAppInitializing = false;
     }
 }
 
