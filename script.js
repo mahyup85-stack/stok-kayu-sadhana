@@ -7,7 +7,13 @@ const formatSaldo = (val) => {
 };
 
 let api;
-
+const SUPABASE_URL = "https://fcccuqnyxuwsrddlookt.supabase.co/rest/v1/";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjY2N1cW55eHV3c3JkZGxvb2t0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NDU2NzQsImV4cCI6MjA4NTQyMTY3NH0.w9p0yxWW1CtLm3Gj3uD1z3P1eWQxW_hB288iUwkfCd8";
+// Inisialisasi variabel api secara langsung
+let api = (typeof window !== 'undefined' && window.supabase) 
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) 
+    : null;
+let supabase = api;
 // 2. State Management
 let state = {
     isLoggedIn: localStorage.getItem("sadhana_auth") === "true",
@@ -29,7 +35,6 @@ let state = {
     filteredData: [] // Untuk menyimpan hasil pencarian/filter
 };
 // --- FUNGSI MASTER DATA (SINKRON DENGAN SUPABASE) ---
-// Membuka Modal Master
 // 1. Fungsi Buka Modal Master Data & Update Header
 window.openMasterModal = async function (type) {
     state.currentMasterType = type;
@@ -2645,6 +2650,41 @@ async function exportRincianMutasiPDF() {
         const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
         const pageWidth = doc.internal.pageSize.getWidth();
         const marginX = 14;
+
+        // 4. ESTRUKTURISASI DAN CLEANING DATA TABEL
+        doc.autoTable({
+            html: tableElement,
+            startY: 51,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [30, 41, 59],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                halign: 'center',
+                fontSize: 8
+            },
+            bodyStyles: { fontSize: 7.5, textColor: [51, 65, 85] },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            margin: { left: marginX, right: marginX },
+            didParseCell: function (data) {
+                if (data.section === 'body' || data.section === 'foot') {
+                    const text = data.cell.raw ? data.cell.raw.innerText.trim() : '';
+                    if (!isNaN(parseFloat(text.replace(/\./g, '').replace(',', '.'))) && text.match(/\d/)) {
+                        data.cell.styles.halign = 'right';
+                    }
+                }
+            }
+        });
+
+        doc.save(`Rincian_Mutasi_${new Date().toISOString().slice(0, 10)}.pdf`);
+
+    } catch (err) {
+        console.error("Gagal export PDF rincian:", err);
+        alert("Gagal membuat PDF Rincian: " + err.message);
+    } finally {
+        if (typeof showLoading === 'function') showLoading(false);
+    }
+}
 
         // Kop Surat Perusahaan
         doc.setFont("helvetica", "bold");
