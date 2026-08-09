@@ -6,18 +6,19 @@ const formatSaldo = (val) => {
     return rounded.toFixed(2);
 };
 
-const SUPABASE_URL = "https://fcccuqnyxuwsrddlookt.supabase.co/rest/v1/";
+// 1. KREDENSIAL SUPABASE (Gunakan Base URL tanpa '/rest/v1/')
+const SUPABASE_URL = "https://fcccuqnyxuwsrddlookt.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjY2N1cW55eHV3c3JkZGxvb2t0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NDU2NzQsImV4cCI6MjA4NTQyMTY3NH0.w9p0yxWW1CtLm3Gj3uD1z3P1eWQxW_hB288iUwkfCd8";
-// Inisialisasi variabel api secara langsung
+
+// Inisialisasi variabel api (HAPUS 'let supabase = api;')
 let api = (typeof window !== 'undefined' && window.supabase) 
     ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY) 
     : null;
-let supabase = api;
+
 // 2. State Management
 let state = {
     isLoggedIn: localStorage.getItem("sadhana_auth") === "true",
     view: 'dashboard',
-    // KONFIGURASI INI HARUS ADA:
     config: {
         user: "Admin",
         pass: "sadhana-234"
@@ -27,8 +28,7 @@ let state = {
         "jenis_kayu": [],
         "tpk": []
     },
-    tempMasterType: null
-    ,
+    tempMasterType: null,
     currentPage: 1,
     rowsPerPage: 50, // Tampilkan 50 data per halaman agar ringan
     filteredData: [] // Untuk menyimpan hasil pencarian/filter
