@@ -2437,7 +2437,7 @@ function exportToCSV() {
     link.click();
 }
 
-// ===== EXPORT REKAP SALDO TO XLS =====
+// ===== EXPORT REKAP SALDO TO XLS (WITH KOP SURAT) =====
 function exportRekapExcel() {
     const table = document.querySelector("#view-rekap table");
     if (!table || table.rows.length <= 1) {
@@ -2445,8 +2445,75 @@ function exportRekapExcel() {
         return;
     }
 
+    const filterBulan = state?.filter?.dariBulan || "Semua";
+    const filterTahun = state?.filter?.dariTahun || new Date().getFullYear();
+    const tglCetak = new Date().toLocaleDateString('id-ID');
+
+    // CSS Style khusus Excel (Border, Alignments, Font, & Formatting)
+    const style = `
+        <style>
+            table { border-collapse: collapse; font-family: Calibri, sans-serif; }
+            th, td { border: 1px solid #cbd5e1; padding: 6px; font-size: 11pt; }
+            th { background-color: #1e293b; color: #ffffff; text-align: center; font-weight: bold; }
+            .kop-title { font-size: 16pt; font-weight: bold; color: #1e293b; }
+            .kop-sub { font-size: 10pt; color: #64748b; italic: true; }
+            .report-title { font-size: 14pt; font-weight: bold; color: #0f172a; text-align: center; }
+            .report-sub { font-size: 10pt; color: #475569; text-align: center; }
+            .text-center { text-align: center; }
+            .text-right { text-align: right; }
+            .bold { font-weight: bold; }
+        </style>
+    `;
+
+    // HTML Kop Perusahaan & Judul Laporan (Menggunakan Merge Colspan 11)
+    const kopHeaderHtml = `
+        <table>
+            <tr><td colspan="11" class="kop-title">PT. SADHANA ARIFNUSA</td></tr>
+            <tr><td colspan="11" class="kop-sub">Kawasan Pengelolaan Hutan & TPK Terpadu</td></tr>
+            <tr><td colspan="11" class="kop-sub" style="border-bottom: 2px solid #1e293b;">Jl. Raya Labuhan Lombok - Sambelia | Telp: -</td></tr>
+            <tr><td colspan="11"></td></tr> <!-- Baris Kosong -->
+            <tr><td colspan="11" class="report-title">LAPORAN REKAPITULASI SALDO STOK KAYU</td></tr>
+            <tr><td colspan="11" class="report-sub">Periode: ${filterBulan} ${filterTahun} | Dicetak: ${tglCetak}</td></tr>
+            <tr><td colspan="11"></td></tr> <!-- Baris Kosong -->
+        </table>
+    `;
+
+    // Tanda Tangan / Pengesahan di Bagian Bawah
+    const ttdFooterHtml = `
+        <br/>
+        <table>
+            <tr>
+                <td colspan="8"></td>
+                <td colspan="3" class="text-center">Disetujui Oleh,</td>
+            </tr>
+            <tr style="height: 50px;">
+                <td colspan="8"></td>
+                <td colspan="3"></td>
+            </tr>
+            <tr>
+                <td colspan="8"></td>
+                <td colspan="3" class="text-center bold">( GANISPH )</td>
+            </tr>
+        </table>
+    `;
+
+    // Gabungkan Semua Elemen HTML
+    const fullHtml = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+            <meta charset="utf-8"/>
+            ${style}
+        </head>
+        <body>
+            ${kopHeaderHtml}
+            ${table.outerHTML}
+            ${ttdFooterHtml}
+        </body>
+        </html>
+    `;
+
     const fileName = `Rekap_Stok_Kayu_${new Date().getTime()}.xls`;
-    const url = 'data:application/vnd.ms-excel,' + encodeURIComponent(table.outerHTML);
+    const url = 'data:application/vnd.ms-excel;charset=utf-8,' + encodeURIComponent(fullHtml);
 
     const link = document.createElement("a");
     link.href = url;
@@ -2455,6 +2522,7 @@ function exportRekapExcel() {
 }
 
 // ===== EXPORT RINCIAN MUTASI TO XLS =====
+// ===== EXPORT RINCIAN MUTASI TO XLS (WITH KOP SURAT) =====
 function exportRincianExcel() {
     const table = document.querySelector("#view-rekap-rincian table");
     if (!table || table.rows.length <= 1) {
@@ -2462,12 +2530,77 @@ function exportRincianExcel() {
         return;
     }
 
-    // Menambahkan style agar border muncul di Excel
-    const style = "<style>table { border-collapse: collapse; } td, th { border: 1px solid black; }</style>";
-    const tableHtml = style + table.outerHTML;
+    const filterBulan = state?.filter?.dariBulan || "Semua";
+    const filterTahun = state?.filter?.dariTahun || new Date().getFullYear();
+    const tglCetak = new Date().toLocaleDateString('id-ID');
+
+    // Hitung jumlah kolom tabel rincian secara dinamis agar colspan Kop Surat pas
+    const totalCols = table.rows[0]?.cells?.length || 10;
+
+    // CSS Style khusus Excel (Border, Font, Alignment)
+    const style = `
+        <style>
+            table { border-collapse: collapse; font-family: Calibri, sans-serif; }
+            th, td { border: 1px solid #cbd5e1; padding: 6px; font-size: 11pt; }
+            th { background-color: #1e293b; color: #ffffff; text-align: center; font-weight: bold; }
+            .kop-title { font-size: 16pt; font-weight: bold; color: #1e293b; }
+            .kop-sub { font-size: 10pt; color: #64748b; font-style: italic; }
+            .report-title { font-size: 14pt; font-weight: bold; color: #0f172a; text-align: center; }
+            .report-sub { font-size: 10pt; color: #475569; text-align: center; }
+            .text-center { text-align: center; }
+            .bold { font-weight: bold; }
+        </style>
+    `;
+
+    // Header Kop Perusahaan & Judul Laporan Rincian
+    const kopHeaderHtml = `
+        <table>
+            <tr><td colspan="${totalCols}" class="kop-title">PT. SADHANA ARIFNUSA</td></tr>
+            <tr><td colspan="${totalCols}" class="kop-sub">Kawasan Pengelolaan Hutan & TPK Terpadu</td></tr>
+            <tr><td colspan="${totalCols}" class="kop-sub" style="border-bottom: 2px solid #1e293b;">Jl. Raya Labuhan Lombok - Sambelia | Telp: -</td></tr>
+            <tr><td colspan="${totalCols}"></td></tr> <!-- Baris Kosong -->
+            <tr><td colspan="${totalCols}" class="report-title">LAPORAN RINCIAN MUTASI STOK KAYU</td></tr>
+            <tr><td colspan="${totalCols}" class="report-sub">Periode: ${filterBulan} ${filterTahun} | Dicetak: ${tglCetak}</td></tr>
+            <tr><td colspan="${totalCols}"></td></tr> <!-- Baris Kosong -->
+        </table>
+    `;
+
+    // Tanda Tangan / Pengesahan
+    const ttdFooterHtml = `
+        <br/>
+        <table>
+            <tr>
+                <td colspan="${totalCols - 3}"></td>
+                <td colspan="3" class="text-center">Disetujui Oleh,</td>
+            </tr>
+            <tr style="height: 50px;">
+                <td colspan="${totalCols - 3}"></td>
+                <td colspan="3"></td>
+            </tr>
+            <tr>
+                <td colspan="${totalCols - 3}"></td>
+                <td colspan="3" class="text-center bold">( GANISPH )</td>
+            </tr>
+        </table>
+    `;
+
+    // Penggabungan Dokumen HTML
+    const fullHtml = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head>
+            <meta charset="utf-8"/>
+            ${style}
+        </head>
+        <body>
+            ${kopHeaderHtml}
+            ${table.outerHTML}
+            ${ttdFooterHtml}
+        </body>
+        </html>
+    `;
 
     const fileName = `Rincian_Mutasi_${new Date().getTime()}.xls`;
-    const url = 'data:application/vnd.ms-excel,' + encodeURIComponent(tableHtml);
+    const url = 'data:application/vnd.ms-excel;charset=utf-8,' + encodeURIComponent(fullHtml);
 
     const link = document.createElement("a");
     link.href = url;
