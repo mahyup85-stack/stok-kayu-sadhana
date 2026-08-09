@@ -2553,7 +2553,6 @@ async function exportRekapSaldoPDF() {
         const tableBody = [];
         let gTotalAwalBap = 0, gTotalAwalLhp = 0, gTotalBap = 0, gTotalLhp = 0, gTotalKirim = 0, gTotalSaldoBap = 0, gTotalSaldoLhp = 0;
 
-        // Target spesifik ke ID #rekap-table-body
         const rows = document.querySelectorAll("#rekap-table-body tr");
 
         const parseDomNum = (text) => {
@@ -2565,13 +2564,17 @@ async function exportRekapSaldoPDF() {
 
         let rowCount = 0;
         rows.forEach((row) => {
+            const rowText = row.innerText.toUpperCase();
+            
+            // ABAIKAN baris jika mengandung kata "TOTAL", "SUBTOTAL", atau baris dalam <tfoot>
+            if (rowText.includes("TOTAL") || row.closest("tfoot")) return;
+
             const cols = row.querySelectorAll("td");
-            // Abaikan baris "Tidak ada data" atau baris kosong
             if (cols.length < 5) return;
 
             rowCount++;
             
-            // Ekstrak nilai sel tabel
+            // Ekstrak data kolom
             const jenisKayu = cols[0]?.innerText.trim() || '-';
             const tpk = cols[1]?.innerText.trim() || '-';
             const petak = cols[2]?.innerText.trim() || '-';
@@ -2608,7 +2611,7 @@ async function exportRekapSaldoPDF() {
             ]);
         });
 
-        // Baris Total Keseluruhan
+        // Baris Total Keseluruhan Tunggal (11 Kolom)
         tableBody.push([
             { content: 'TOTAL KESELURUHAN', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
             { content: gTotalAwalBap.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
