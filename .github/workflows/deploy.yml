@@ -1,0 +1,37 @@
+name: Zero Downtime Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy ke WSL2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            # Buat nama rilis berdasarkan timestamp unik
+            RELEASE_NAME=$(date +%Y%m%d%H%M%S)
+            RELEASE_DIR="/var/www/stok-kayu/releases/$RELEASE_NAME"
+
+            # 1. Buat folder rilis baru di background
+            mkdir -p $RELEASE_DIR
+
+            # 2. Pull kode terbaru dari GitHub ke folder rilis baru
+            git clone https://github.com/mahyup85-stack/stok-kayu-sadhana.git $RELEASE_DIR
+
+            # 3. ATOMIC SWITCH: Alihkan symlink 'current' ke rilis baru secara instan
+            ln -sfn $RELEASE_DIR /var/www/stok-kayu/current
+
+            # 4. Reload Nginx
+            sudo service nginx reload
+
+            # 5. Bersihkan rilis lama (hanya simpan 3 rilis terakhir)
+            cd /var/www/stok-kayu/releases && ls -dt * | tail -n +4 | xargs rm -rf
