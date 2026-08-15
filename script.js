@@ -1238,8 +1238,19 @@ function logout() {
 
 // Contoh penyesuaian fungsi edit:
 function editData(id) {
+    // 🛡️ PENGAMAN 1: Cek apakah state.mutasi ada dan berupa Array
+    if (!state.mutasi || !Array.isArray(state.mutasi)) {
+        console.warn("Data mutasi belum dimuat sepenuhnya.");
+        alert("Mohon tunggu sebentar, data sedang diisi...");
+        return;
+    }
+
+    // 🛡️ PENGAMAN 2: Cari data berdasarkan ID
     const data = state.mutasi.find(item => item.id === id);
-    if (!data) return;
+    if (!data) {
+        alert("Data tidak ditemukan!");
+        return;
+    }
 
     // Set nilai form biasa
     document.getElementById('edit-id').value = data.id;
@@ -1250,14 +1261,16 @@ function editData(id) {
     document.getElementById('input-petak').value = data.petak || '';
 
     // ✅ AMBIL LANGSUNG DARI DATABASE (TIDAK ADA LAGI DIBAGI FAKTOR KONVERSI)
-    // Menggunakan fallback '|| 0' jika data lama bernilai null/undefined
+    // Menggunakan fallback jika data lama bernilai null/undefined
     document.getElementById('input-in-sm').value = data.masuk_sm !== undefined && data.masuk_sm !== null ? data.masuk_sm : 0;
     document.getElementById('input-out-sm').value = data.keluar_sm !== undefined && data.keluar_sm !== null ? data.keluar_sm : 0;
 
     // Ubah UI Form ke mode Edit
     document.getElementById('form-mode-title').innerText = 'Edit Data Mutasi';
     document.getElementById('btn-submit').innerText = 'Update Data';
-    document.getElementById('btn-cancel-edit').classList.remove('hidden');
+    
+    const btnCancel = document.getElementById('btn-cancel-edit');
+    if (btnCancel) btnCancel.classList.remove('hidden');
 }
 
 window.deleteData = function(rawId) {
