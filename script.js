@@ -2683,154 +2683,103 @@ async function exportRekapSaldoPDF() {
     }
 }
 
-async function exportRincianMutasiPDF() {
-    try {
-        if (typeof showLoading === 'function') showLoading(true);
+window.exportRincianPDF = function () {
+    // 1. Inisialisasi jsPDF
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape', 'mm', 'a4'); // Gunakan orientasi Landscape agar kolom muat dengan rapi
 
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    // 2. Ambil data rincian mutasi yang sudah terfilter (diurutkan berdasarkan tanggal secara kronologis)
+    let dataMutasi = getFilteredRincianData(); // Ganti dengan fungsi filter rincian Anda jika namanya berbeda
 
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const marginX = 14;
-
-        // 1. KOP SURAT
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(16);
-        doc.setTextColor(30, 41, 59);
-        doc.text("PT. SADHANA ARIFNUSA", marginX, 18);
-
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(100, 116, 139);
-        doc.text("Kawasan Pengelolaan Hutan & TPK Terpadu", marginX, 23);
-        doc.text("Jl. Raya Labuhan Lombok - Sambelia | Telp: -", marginX, 27);
-
-        doc.setLineWidth(0.8);
-        doc.setDrawColor(30, 41, 59);
-        doc.line(marginX, 31, pageWidth - marginX, 31);
-        doc.setLineWidth(0.2);
-        doc.line(marginX, 32, pageWidth - marginX, 32);
-
-        // 2. JUDUL
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
-        doc.setTextColor(15, 23, 42);
-        doc.text("LAPORAN RINCIAN MUTASI STOK KAYU", pageWidth / 2, 42, { align: "center" });
-
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(71, 85, 105);
-        
-        const filterBulan = state?.filter?.dariBulan || "Semua";
-        const filterTahun = state?.filter?.dariTahun || new Date().getFullYear();
-        doc.text(`Periode: ${filterBulan} ${filterTahun} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 47, { align: "center" });
-
-        // 3. AMBIL & FILTER DATA
-        const processed = typeof getProcessedRincianData === 'function' ? getProcessedRincianData() : null;
-        const rawList = processed?.filtered || processed?.data || state?.data || [];
-        const listData = Array.isArray(rawList) ? rawList : [];
-
-        const tableBody = [];
-        let totalMasuk = 0;
-        let totalKeluar = 0;
-        let rowNum = 1;
-
-        listData.forEach((item) => {
-            const tipe = (item.keterangan || item.ket || item.tipe || '').toUpperCase();
-
-            // Filter out BAP to avoid double counting
-            if (tipe.includes('BAP')) return;
-
-            const msk = (tipe.includes('LHP') || tipe === 'MASUK') ? parseFloat(item.masuk_m3 || item.lhp || item.p || 0) : 0;
-            const klr = parseFloat(item.keluar_m3 || item.kirim || item.m || 0);
-
-            totalMasuk += msk;
-            totalKeluar += klr;
-
-            tableBody.push([
-                rowNum++,
-                item.tanggal || '-',
-                item.keterangan || item.ket || '-',
-                item.jenis_kayu || item.jenis || '-',
-                item.tpk || '-',
-                item.petak || '-',
-                msk > 0 ? msk.toFixed(2) : '-',
-                klr > 0 ? klr.toFixed(2) : '-'
-            ]);
-        });
-
-        tableBody.push([
-            { content: 'TOTAL MUTASI', colSpan: 6, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
-            { content: totalMasuk.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
-            { content: totalKeluar.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
-        ]);
-
-        // 4. GENERATE TABLE
-        doc.autoTable({
-            startY: 52,
-            head: [['No', 'Tanggal', 'Keterangan', 'Jenis Kayu', 'TPK', 'Petak', 'Masuk LHP (m³)', 'Keluar (m³)']],
-            body: tableBody,
-            theme: 'grid',
-            headStyles: {
-                fillColor: [30, 41, 59],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                halign: 'center',
-                fontSize: 8
-            },
-            bodyStyles: { fontSize: 8, textColor: [51, 65, 85] },
-            columnStyles: {
-                0: { halign: 'center', cellWidth: 10 },
-                1: { halign: 'center', cellWidth: 22 },
-                2: { halign: 'left' },
-                3: { halign: 'left', cellWidth: 25 },
-                4: { halign: 'center', cellWidth: 20 },
-                5: { halign: 'center', cellWidth: 18 },
-                6: { halign: 'right', cellWidth: 24 },
-                7: { halign: 'right', cellWidth: 22 }
-            },
-            margin: { left: marginX, right: marginX }
-        });
-
-        // 5. FOOTER & DIGITAL STAMP
-        let finalY = doc.lastAutoTable.finalY + 10;
-        if (finalY > 230) {
-            doc.addPage();
-            finalY = 20;
-        }
-
-        const docID = `RINCIAN-SADHANA-${Date.now().toString(36).toUpperCase()}`;
-        const verifyUrl = `https://stok-kayu-sadhana.vercel.app/verify?id=${docID}`;
-
-        if (typeof generateQRCodeBase64 === 'function') {
-            const qrBase64 = await generateQRCodeBase64(verifyUrl);
-            if (qrBase64) doc.addImage(qrBase64, 'PNG', marginX, finalY, 22, 22);
-        }
-
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "bold");
-        doc.text("DOKUMEN INI DITERBITKAN SECARA DIGITAL", marginX + 25, finalY + 5);
-        doc.setFont("helvetica", "normal");
-        doc.text(`ID Dokumen: ${docID}`, marginX + 25, finalY + 9);
-        doc.text("Pindai QR Code untuk verifikasi keaslian laporan.", marginX + 25, finalY + 13);
-
-        const rightAlignX = pageWidth - marginX - 45;
-        doc.text("Disetujui Oleh,", rightAlignX, finalY + 5);
-        doc.setFont("helvetica", "bold");
-        doc.text("( GANISPH )", rightAlignX, finalY + 22);
-
-        doc.save(`Rincian_Mutasi_Stok_Kayu_${new Date().toISOString().slice(0, 10)}.pdf`);
-
-    } catch (err) {
-        console.error("Gagal export PDF Rincian:", err);
-        alert("Gagal membuat PDF Rincian Mutasi: " + err.message);
-    } finally {
-        if (typeof showLoading === 'function') showLoading(false);
+    if (!dataMutasi || dataMutasi.length === 0) {
+        alert("Tidak ada data untuk di-export!");
+        return;
     }
-}
 
-// Ekspos fungsi ke global scope secara eksplisit
-window.exportRincianMutasiPDF = exportRincianMutasiPDF;
+    // Pastikan data terurut berdasarkan tanggal terlama ke terbaru agar hitungan Saldo Running tepat
+    dataMutasi.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
+
+    // 3. Persiapkan Header Tabel (Tambah Header 'Saldo (m³)')
+    const headers = [
+        ["No", "Tanggal", "Keterangan", "Jenis Kayu", "TPK", "Petak", "Masuk (m³)", "Keluar (m³)", "Saldo (m³)"]
+    ];
+
+    // 4. Hitung Running Balance (Saldo Kumulatif Baris demi Baris)
+    let runningBalance = 0;
+    let totalMasuk = 0;
+    let totalKeluar = 0;
+
+    const bodyData = dataMutasi.map((d, index) => {
+        const masuk = parseFloat(d.masuk_m3 || d.masuk) || 0;
+        const keluar = parseFloat(d.keluar_m3 || d.keluar) || 0;
+
+        // Akumulasi Saldo & Total
+        runningBalance += (masuk - keluar);
+        totalMasuk += masuk;
+        totalKeluar += keluar;
+
+        return [
+            index + 1,
+            d.tanggal || '-',
+            d.keterangan || '-',
+            d.jenis_kayu || '-',
+            d.tpk || '-',
+            d.petak || '-',
+            masuk > 0 ? masuk.toFixed(2) : '-',
+            keluar > 0 ? keluar.toFixed(2) : '-',
+            runningBalance.toFixed(2) // 👈 KOLOM SALDO BARU
+        ];
+    });
+
+    // 5. Tambahkan Baris Total Mutasi di Bagian Bawah
+    bodyData.push([
+        { content: 'TOTAL MUTASI', colSpan: 6, styles: { halign: 'center', fontStyle: 'bold' } },
+        { content: totalMasuk.toFixed(2), styles: { fontStyle: 'bold' } },
+        { content: totalKeluar.toFixed(2), styles: { fontStyle: 'bold' } },
+        { content: runningBalance.toFixed(2), styles: { fontStyle: 'bold' } } // 👈 SALDO AKHIR
+    ]);
+
+    // 6. Judul Dokumen PDF
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("LAPORAN RINCIAN MUTASI STOK KAYU", 14, 15);
+
+    // 7. Generate Tabel menggunakan autoTable
+    doc.autoTable({
+        startY: 22,
+        head: headers,
+        body: bodyData,
+        theme: 'grid',
+        headStyles: { 
+            fillColor: [31, 41, 55], // Warna Header Abu Gelap
+            textColor: 255, 
+            halign: 'center',
+            fontStyle: 'bold'
+        },
+        columnStyles: {
+            0: { halign: 'center', cellWidth: 12 }, // No
+            1: { halign: 'center', cellWidth: 25 }, // Tanggal
+            2: { halign: 'left' },                  // Keterangan
+            3: { halign: 'left', cellWidth: 28 },   // Jenis Kayu
+            4: { halign: 'left', cellWidth: 35 },   // TPK
+            5: { halign: 'center', cellWidth: 25 }, // Petak
+            6: { halign: 'right', cellWidth: 25 },  // Masuk
+            7: { halign: 'right', cellWidth: 25 },  // Keluar
+            8: { halign: 'right', cellWidth: 28, fontStyle: 'bold' } // 👈 Saldo (Right Align & Bold)
+        },
+        styles: { fontSize: 8, cellPadding: 2 },
+        didParseCell: function (data) {
+            // Memberi warna abu muda pada baris TOTAL MUTASI
+            if (data.row.index === bodyData.length - 1) {
+                data.cell.styles.fillColor = [243, 244, 246];
+            }
+        }
+    });
+
+    // 8. Simpan File PDF
+    const filename = `Rincian_Mutasi_Stok_Kayu_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(filename);
+};
 
 window.sinkronisasiFilterRincian = function () {
     console.log("🔄 Sinkronisasi Filter Rincian dimulai...");
