@@ -18,6 +18,7 @@ let state = {
         pass: "sadhana-234"
     },
     data: [],
+    mutasi: [],
     master: {
         "jenis_kayu": [],
         "tpk": []
@@ -28,8 +29,7 @@ let state = {
     rowsPerPage: 50, // Tampilkan 50 data per halaman agar ringan
     filteredData: [] // Untuk menyimpan hasil pencarian/filter
 };
-// --- FUNGSI MASTER DATA (SINKRON DENGAN SUPABASE) ---
-// Membuka Modal Master
+
 // 1. Fungsi Buka Modal Master Data & Update Header
 window.openMasterModal = async function (type) {
     state.currentMasterType = type;
