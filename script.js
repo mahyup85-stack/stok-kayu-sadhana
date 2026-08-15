@@ -1238,21 +1238,18 @@ function logout() {
 
 // Contoh penyesuaian fungsi edit:
 function editData(id) {
-    // 🛡️ PENGAMAN 1: Cek apakah state.mutasi ada dan berupa Array
-    if (!state.mutasi || !Array.isArray(state.mutasi)) {
-        console.warn("Data mutasi belum dimuat sepenuhnya.");
-        alert("Mohon tunggu sebentar, data sedang diisi...");
-        return;
-    }
+    // 🛡️ Cari array data yang tersedia (apakah di state.mutasi atau state.data)
+    const listMutasi = state.mutasi || state.data || [];
+    
+    // 🛡️ Cari item menggunakan '==' (bukan '===')
+    const data = listMutasi.find(item => item.id == id);
 
-    // 🛡️ PENGAMAN 2: Cari data berdasarkan ID
-    const data = state.mutasi.find(item => item.id === id);
     if (!data) {
         alert("Data tidak ditemukan!");
         return;
     }
 
-    // Set nilai form biasa
+    // Set nilai form
     document.getElementById('edit-id').value = data.id;
     document.getElementById('input-date').value = data.tanggal;
     document.getElementById('input-ket').value = data.keterangan;
@@ -1260,12 +1257,14 @@ function editData(id) {
     document.getElementById('input-tpk').value = data.tpk;
     document.getElementById('input-petak').value = data.petak || '';
 
-    // ✅ AMBIL LANGSUNG DARI DATABASE (TIDAK ADA LAGI DIBAGI FAKTOR KONVERSI)
-    // Menggunakan fallback jika data lama bernilai null/undefined
-    document.getElementById('input-in-sm').value = data.masuk_sm !== undefined && data.masuk_sm !== null ? data.masuk_sm : 0;
-    document.getElementById('input-out-sm').value = data.keluar_sm !== undefined && data.keluar_sm !== null ? data.keluar_sm : 0;
+    // Ambil SM (jika data lama belum punya masuk_sm, hitung balik sebagai fallback)
+    const inSM = data.masuk_sm ?? (data.masuk_m3 ? Math.round((data.masuk_m3 / 0.67) * 100) / 100 : 0);
+    const outSM = data.keluar_sm ?? (data.keluar_m3 ? Math.round((data.keluar_m3 / 0.67) * 100) / 100 : 0);
 
-    // Ubah UI Form ke mode Edit
+    document.getElementById('input-in-sm').value = inSM;
+    document.getElementById('input-out-sm').value = outSM;
+
+    // Ubah Mode Form
     document.getElementById('form-mode-title').innerText = 'Edit Data Mutasi';
     document.getElementById('btn-submit').innerText = 'Update Data';
     
