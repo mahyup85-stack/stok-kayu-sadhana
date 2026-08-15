@@ -2781,6 +2781,9 @@ window.exportRincianPDF = function () {
     doc.save(filename);
 };
 
+// Ekspos fungsi ke global scope secara eksplisit
+window.exportRincianMutasiPDF = exportRincianMutasiPDF;
+
 window.sinkronisasiFilterRincian = function () {
     console.log("🔄 Sinkronisasi Filter Rincian dimulai...");
 
