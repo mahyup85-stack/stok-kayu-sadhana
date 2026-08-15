@@ -3143,6 +3143,107 @@ function hitungKonversiForm() {
     }
 }
 
+// =========================================================
+// 1. FUNGSI MODAL LHP (Scope Global / Window)
+// =========================================================
+
+window.openLhpModal = function (initialData = {}) {
+    const modal = document.getElementById('modal-lhp');
+    if (!modal) {
+        alert("Elemen modal-lhp tidak ditemukan di HTML! Pastikan struktur HTML modal sudah dipasang.");
+        return;
+    }
+
+    // Populate Dropdown Jenis Kayu & TPK
+    const selJenis = document.getElementById("modal-lhp-jenis");
+    const selTPK = document.getElementById("modal-lhp-tpk");
+
+    if (selJenis && window.state && window.state.master && window.state.master["jenis_kayu"]) {
+        selJenis.innerHTML = '<option value="">-- Pilih Jenis --</option>' +
+            window.state.master["jenis_kayu"].map(item => `<option value="${item.name}">${item.name}</option>`).join("");
+    }
+    if (selTPK && window.state && window.state.master && window.state.master["tpk"]) {
+        selTPK.innerHTML = '<option value="">-- Pilih TPK --</option>' +
+            window.state.master["tpk"].map(item => `<option value="${item.name}">${item.name}</option>`).join("");
+    }
+
+    // Fill Modal Data
+    document.getElementById('modal-lhp-id').value = initialData.id || '';
+    document.getElementById('modal-lhp-date').value = initialData.tanggal || new Date().toISOString().split('T')[0];
+    document.getElementById('modal-lhp-ket').value = initialData.keterangan || 'LHP';
+    document.getElementById('modal-lhp-jenis').value = initialData.jenis || '';
+    document.getElementById('modal-lhp-tpk').value = initialData.tpk || '';
+    document.getElementById('modal-lhp-petak').value = initialData.petak || '';
+    document.getElementById('modal-lhp-in-m3').value = initialData.masuk_m3 || 0;
+    
+
+    modal.classList.remove('hidden');
+};
+
+window.closeLhpModal = function () {
+    const modal = document.getElementById('modal-lhp');
+    if (modal) modal.classList.add('hidden');
+    const form = document.getElementById('form-modal-lhp');
+    if (form) form.reset();
+};
+
+window.saveLhpFromModal = async function (e) {
+    if (e) e.preventDefault();
+
+    const editId = document.getElementById('modal-lhp-id').value;
+    const tanggal = document.getElementById('modal-lhp-date').value;
+    const keterangan = document.getElementById('modal-lhp-ket').value;
+    const jenis = document.getElementById('modal-lhp-jenis').value;
+    const tpk = document.getElementById('modal-lhp-tpk').value;
+    const petak = document.getElementById('modal-lhp-petak').value;
+    const masukM3 = parseFloat(document.getElementById('modal-lhp-in-m3').value) || 0;
+    
+
+    if (!tanggal || !jenis || !tpk) {
+        alert("Harap isi Tanggal, Jenis Kayu, dan TPK!");
+        return;
+    }
+
+    if (masukM3 === 0 && keluarM3 === 0) {
+        alert("Harap masukkan angka Masuk (M³) atau Keluar (M³)!");
+        return;
+    }
+
+    const payload = {
+        tanggal: tanggal,
+        keterangan: keterangan,
+        jenis_kayu: jenis,
+        tpk: tpk,
+        petak: petak || '-',
+        masuk_m3: masukM3,
+        
+    };
+
+    try {
+        if (typeof showLoading === 'function') showLoading(true);
+
+        if (editId) {
+            const { error } = await api.from('stok_kayu').update(payload).eq('id', editId);
+            if (error) throw error;
+            alert("Data LHP berhasil diperbarui!");
+        } else {
+            const { error } = await api.from('stok_kayu').insert([payload]);
+            if (error) throw error;
+            alert("Data LHP berhasil disimpan!");
+        }
+
+        closeLhpModal();
+        if (typeof fetchData === 'function') await fetchData();
+        if (typeof renderDashboardTable === 'function') renderDashboardTable();
+
+    } catch (err) {
+        console.error("Gagal simpan LHP:", err);
+        alert("Gagal menyimpan data LHP: " + (err.message || err));
+    } finally {
+        if (typeof showLoading === 'function') showLoading(false);
+    }
+};
+
 // Expose fungsi ke window jika dipanggil dari HTML
 window.updatePetakByTPK = updatePetakByTPK;
 window.applyRekapFilter = applyRekapFilter;
