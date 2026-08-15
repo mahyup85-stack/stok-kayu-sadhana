@@ -3148,6 +3148,7 @@ function hitungKonversiForm() {
 // =========================================================
 
 // 1. Generate 5 Baris Input Jenis Kayu
+// 1. Generate 5 Baris Input (SINKRON DENGAN HTML 4 KOLOM)
 window.renderLhpInputRows = function() {
     const container = document.getElementById("lhp-rows-container");
     if (!container) return;
@@ -3163,25 +3164,19 @@ window.renderLhpInputRows = function() {
     for (let i = 0; i < 5; i++) {
         rowsHtml += `
             <tr>
-                <td style="padding: 4px; border: 1px solid #ddd;">
+                <td style="padding: 6px; border: 1px solid #ddd;">
                     <select class="form-control lhp-jenis-kayu" onchange="calculateLhpRow(${i})" style="width:100%; padding:6px;">
                         ${optionsHtml}
                     </select>
                 </td>
-                <td style="padding: 4px; border: 1px solid #ddd;">
+                <td style="padding: 6px; border: 1px solid #ddd;">
                     <input type="number" step="0.01" class="form-control lhp-in-sm" oninput="calculateLhpRow(${i})" value="0" style="width:100%; padding:6px;">
                 </td>
-                <td style="padding: 4px; border: 1px solid #ddd;">
-                    <input type="number" step="0.01" class="form-control lhp-out-sm" oninput="calculateLhpRow(${i})" value="0" style="width:100%; padding:6px;">
-                </td>
-                <td style="padding: 4px; border: 1px solid #ddd;">
+                <td style="padding: 6px; border: 1px solid #ddd;">
                     <input type="number" step="0.001" class="form-control lhp-faktor" oninput="calculateLhpRow(${i})" value="0.67" style="width:100%; padding:6px; background:#f9f9f9;">
                 </td>
-                <td style="padding: 4px; border: 1px solid #ddd;">
-                    <input type="number" class="form-control lhp-in-m3" value="0.00" readonly style="width:100%; padding:6px; background:#eee;">
-                </td>
-                <td style="padding: 4px; border: 1px solid #ddd;">
-                    <input type="number" class="form-control lhp-out-m3" value="0.00" readonly style="width:100%; padding:6px; background:#eee;">
+                <td style="padding: 6px; border: 1px solid #ddd;">
+                    <input type="number" step="0.01" class="form-control lhp-in-m3" value="0.00" readonly style="width:100%; padding:6px; background:#eee; font-weight:bold;">
                 </td>
             </tr>
         `;
@@ -3189,7 +3184,7 @@ window.renderLhpInputRows = function() {
     container.innerHTML = rowsHtml;
 };
 
-// 2. Kalkulasi Otomatis per Baris (SM -> M³)
+// 2. Kalkulasi Otomatis (Stapel Meter x Konversi = Meter Kubik)
 window.calculateLhpRow = function(index) {
     const rows = document.querySelectorAll("#lhp-rows-container tr");
     if (!rows[index]) return;
@@ -3198,19 +3193,23 @@ window.calculateLhpRow = function(index) {
     const selJenis = row.querySelector(".lhp-jenis-kayu");
     const inputFaktor = row.querySelector(".lhp-faktor");
     const inSM = parseFloat(row.querySelector(".lhp-in-sm").value) || 0;
-    
 
-    // Set faktor konversi otomatis jika jenis kayu dipilih
+    // Set faktor konversi otomatis saat Jenis Kayu dipilih
     const selectedOption = selJenis.options[selJenis.selectedIndex];
-    if (selectedOption && selectedOption.dataset.faktor && !row.dataset.userFaktorEdited) {
-        inputFaktor.value = selectedOption.dataset.faktor;
+    if (selectedOption && selectedOption.dataset.faktor && selectedOption.value !== "") {
+        // Hanya update jika user belum mengubah nilai faktor secara manual
+        if (!row.dataset.userEditedFaktor) {
+            inputFaktor.value = selectedOption.dataset.faktor;
+        }
     }
+
+    // Tandai jika user mengetik manual di kolom faktor konversi
+    inputFaktor.onkeydown = () => { row.dataset.userEditedFaktor = "true"; };
 
     const faktor = parseFloat(inputFaktor.value) || 0.67;
     
-    // Hitung M3
+    // Hitung Meter Kubik (M³)
     row.querySelector(".lhp-in-m3").value = (inSM * faktor).toFixed(2);
-    
 };
 
 // 3. Membuka Modal LHP
@@ -3218,14 +3217,14 @@ window.openLhpModal = function (initialData = {}) {
     const modal = document.getElementById('modal-lhp');
     if (!modal) return;
 
-    // Populate TPK
+    // Populate Dropdown TPK
     const selTPK = document.getElementById("modal-lhp-tpk");
     if (selTPK && window.state && window.state.master && window.state.master["tpk"]) {
         selTPK.innerHTML = '<option value="">-- Pilih TPK --</option>' +
             window.state.master["tpk"].map(item => `<option value="${item.name}">${item.name}</option>`).join("");
     }
 
-    // Render 5 Baris
+    // Render 5 Baris Form
     renderLhpInputRows();
 
     // Fill Initial Form
@@ -3235,7 +3234,7 @@ window.openLhpModal = function (initialData = {}) {
     document.getElementById('modal-lhp-tpk').value = initialData.tpk || '';
     document.getElementById('modal-lhp-petak').value = initialData.petak || '';
 
-    // Tampilkan modal sebagai Flex Overlay
+    // Tampilkan modal
     modal.style.display = 'flex';
     modal.classList.remove('hidden');
 };
@@ -3250,7 +3249,7 @@ window.closeLhpModal = function () {
     document.getElementById('form-modal-lhp')?.reset();
 };
 
-// 5. Simpan Banyak Data LHP ke Supabase
+// 5. Simpan Data LHP ke Database Supabase
 window.saveLhpFromModal = async function (e) {
     if (e) e.preventDefault();
 
@@ -3271,9 +3270,9 @@ window.saveLhpFromModal = async function (e) {
         const jenis = row.querySelector(".lhp-jenis-kayu").value;
         const inSM = parseFloat(row.querySelector(".lhp-in-sm").value) || 0;
         const inM3 = parseFloat(row.querySelector(".lhp-in-m3").value) || 0;
-        
 
-        if (jenis && (inSM > 0 )) {
+        // Hanya masukkan baris yang jenis kayunya dipilih dan SM > 0
+        if (jenis && inSM > 0) {
             payloadList.push({
                 tanggal: tanggal,
                 keterangan: keterangan,
@@ -3282,13 +3281,14 @@ window.saveLhpFromModal = async function (e) {
                 petak: petak,
                 masuk_sm: inSM,
                 masuk_m3: inM3,
-                
+                keluar_sm: 0,
+                keluar_m3: 0
             });
         }
     });
 
     if (payloadList.length === 0) {
-        alert("Pilih minimal 1 Jenis Kayu dan isi jumlah Masuk/Keluar!");
+        alert("Pilih minimal 1 Jenis Kayu dan isi jumlah Stapel Meter (SM)!");
         return;
     }
 
