@@ -2504,7 +2504,6 @@ async function exportRekapSaldoPDF() {
         doc.setLineWidth(0.6);
         doc.setDrawColor(30, 41, 59);
         doc.line(marginX, 23, pageWidth - marginX, 23);
-
         doc.text("Jl. Raya Labuhan Lombok - Sambelia | Telp: -", marginX, 27);
 
         // =========================================================
@@ -2518,8 +2517,12 @@ async function exportRekapSaldoPDF() {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(9);
         doc.setTextColor(71, 85, 105);
-        const filterBulan = state?.filter?.dariBulan || "Semua";
-        const filterTahun = state?.filter?.dariTahun || new Date().getFullYear();
+        
+        // Cek keberadaan objek 'state' dengan aman
+        const currentFilter = (typeof state !== 'undefined' && state?.filter) ? state.filter : {};
+        const filterBulan = currentFilter.dariBulan || "Semua";
+        const filterTahun = currentFilter.dariTahun || new Date().getFullYear();
+        
         doc.text(`Periode: ${filterBulan} ${filterTahun} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 38, { align: "center" });
 
         // =========================================================
@@ -2586,7 +2589,7 @@ async function exportRekapSaldoPDF() {
             ]);
         });
 
-        // Baris Total Keseluruhan Tunggal (11 Kolom)
+        // Baris Total Keseluruhan (11 Kolom)
         tableBody.push([
             { content: 'TOTAL KESELURUHAN', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
             { content: gTotalAwalBap.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
@@ -2682,6 +2685,9 @@ async function exportRekapSaldoPDF() {
         if (typeof showLoading === 'function') showLoading(false);
     }
 }
+
+// Pastikan fungsi diekspos ke window
+window.exportRekapSaldoPDF = exportRekapSaldoPDF;
 
 window.exportRincianPDF = function () {
     // 1. Inisialisasi jsPDF
@@ -2779,10 +2785,10 @@ window.exportRincianPDF = function () {
     // 8. Simpan File PDF
     const filename = `Rincian_Mutasi_Stok_Kayu_${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(filename);
-};
+}
 
 // Ekspos fungsi ke global scope secara eksplisit
-window.exportRincianMutasiPDF = exportRincianMutasiPDF;
+window.exportRincianMutasiPDF = window.exportRincianPDF;
 
 window.sinkronisasiFilterRincian = function () {
     console.log("🔄 Sinkronisasi Filter Rincian dimulai...");
