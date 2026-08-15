@@ -3,7 +3,7 @@ name: Zero Downtime Deployment
 on:
   push:
     branches:
-      - main
+      - staging
 
 jobs:
   deploy:
@@ -25,7 +25,7 @@ jobs:
             mkdir -p $RELEASE_DIR
 
             # 2. Pull kode terbaru dari GitHub ke folder rilis baru
-            git clone https://github.com/mahyup85-stack/stok-kayu-sadhana.git $RELEASE_DIR
+            git clone -b staging https://github.com/mahyup85-stack/stok-kayu-sadhana.git $RELEASE_DIR
 
             # 3. ATOMIC SWITCH: Alihkan symlink 'current' ke rilis baru secara instan
             ln -sfn $RELEASE_DIR /var/www/stok-kayu/current
