@@ -3144,97 +3144,163 @@ function hitungKonversiForm() {
 }
 
 // =========================================================
-// 1. FUNGSI MODAL LHP (Scope Global / Window)
+// FITUR MODAL LHP MULTI-ROW & AUTOCALC KONVERSI
 // =========================================================
 
+// 1. Generate 5 Baris Input Jenis Kayu
+window.renderLhpInputRows = function() {
+    const container = document.getElementById("lhp-rows-container");
+    if (!container) return;
+
+    let optionsHtml = '<option value="">-- Pilih Jenis --</option>';
+    if (window.state && window.state.master && window.state.master["jenis_kayu"]) {
+        optionsHtml += window.state.master["jenis_kayu"].map(item => 
+            `<option value="${item.name}" data-faktor="${item.konversi || item.faktor_konversi || item.faktor || 0.67}">${item.name}</option>`
+        ).join("");
+    }
+
+    let rowsHtml = '';
+    for (let i = 0; i < 5; i++) {
+        rowsHtml += `
+            <tr>
+                <td style="padding: 4px; border: 1px solid #ddd;">
+                    <select class="form-control lhp-jenis-kayu" onchange="calculateLhpRow(${i})" style="width:100%; padding:6px;">
+                        ${optionsHtml}
+                    </select>
+                </td>
+                <td style="padding: 4px; border: 1px solid #ddd;">
+                    <input type="number" step="0.01" class="form-control lhp-in-sm" oninput="calculateLhpRow(${i})" value="0" style="width:100%; padding:6px;">
+                </td>
+                <td style="padding: 4px; border: 1px solid #ddd;">
+                    <input type="number" step="0.01" class="form-control lhp-out-sm" oninput="calculateLhpRow(${i})" value="0" style="width:100%; padding:6px;">
+                </td>
+                <td style="padding: 4px; border: 1px solid #ddd;">
+                    <input type="number" step="0.001" class="form-control lhp-faktor" oninput="calculateLhpRow(${i})" value="0.67" style="width:100%; padding:6px; background:#f9f9f9;">
+                </td>
+                <td style="padding: 4px; border: 1px solid #ddd;">
+                    <input type="number" class="form-control lhp-in-m3" value="0.00" readonly style="width:100%; padding:6px; background:#eee;">
+                </td>
+                <td style="padding: 4px; border: 1px solid #ddd;">
+                    <input type="number" class="form-control lhp-out-m3" value="0.00" readonly style="width:100%; padding:6px; background:#eee;">
+                </td>
+            </tr>
+        `;
+    }
+    container.innerHTML = rowsHtml;
+};
+
+// 2. Kalkulasi Otomatis per Baris (SM -> M³)
+window.calculateLhpRow = function(index) {
+    const rows = document.querySelectorAll("#lhp-rows-container tr");
+    if (!rows[index]) return;
+
+    const row = rows[index];
+    const selJenis = row.querySelector(".lhp-jenis-kayu");
+    const inputFaktor = row.querySelector(".lhp-faktor");
+    const inSM = parseFloat(row.querySelector(".lhp-in-sm").value) || 0;
+    
+
+    // Set faktor konversi otomatis jika jenis kayu dipilih
+    const selectedOption = selJenis.options[selJenis.selectedIndex];
+    if (selectedOption && selectedOption.dataset.faktor && !row.dataset.userFaktorEdited) {
+        inputFaktor.value = selectedOption.dataset.faktor;
+    }
+
+    const faktor = parseFloat(inputFaktor.value) || 0.67;
+    
+    // Hitung M3
+    row.querySelector(".lhp-in-m3").value = (inSM * faktor).toFixed(2);
+    
+};
+
+// 3. Membuka Modal LHP
 window.openLhpModal = function (initialData = {}) {
     const modal = document.getElementById('modal-lhp');
-    if (!modal) {
-        alert("Elemen modal-lhp tidak ditemukan di HTML! Pastikan struktur HTML modal sudah dipasang.");
-        return;
-    }
+    if (!modal) return;
 
-    // Populate Dropdown Jenis Kayu & TPK
-    const selJenis = document.getElementById("modal-lhp-jenis");
+    // Populate TPK
     const selTPK = document.getElementById("modal-lhp-tpk");
-
-    if (selJenis && window.state && window.state.master && window.state.master["jenis_kayu"]) {
-        selJenis.innerHTML = '<option value="">-- Pilih Jenis --</option>' +
-            window.state.master["jenis_kayu"].map(item => `<option value="${item.name}">${item.name}</option>`).join("");
-    }
     if (selTPK && window.state && window.state.master && window.state.master["tpk"]) {
         selTPK.innerHTML = '<option value="">-- Pilih TPK --</option>' +
             window.state.master["tpk"].map(item => `<option value="${item.name}">${item.name}</option>`).join("");
     }
 
-    // Fill Modal Data
+    // Render 5 Baris
+    renderLhpInputRows();
+
+    // Fill Initial Form
     document.getElementById('modal-lhp-id').value = initialData.id || '';
     document.getElementById('modal-lhp-date').value = initialData.tanggal || new Date().toISOString().split('T')[0];
     document.getElementById('modal-lhp-ket').value = initialData.keterangan || 'LHP';
-    document.getElementById('modal-lhp-jenis').value = initialData.jenis || '';
     document.getElementById('modal-lhp-tpk').value = initialData.tpk || '';
     document.getElementById('modal-lhp-petak').value = initialData.petak || '';
-    document.getElementById('modal-lhp-in-m3').value = initialData.masuk_m3 || 0;
-    
 
+    // Tampilkan modal sebagai Flex Overlay
+    modal.style.display = 'flex';
     modal.classList.remove('hidden');
 };
 
+// 4. Menutup Modal LHP
 window.closeLhpModal = function () {
     const modal = document.getElementById('modal-lhp');
-    if (modal) modal.classList.add('hidden');
-    const form = document.getElementById('form-modal-lhp');
-    if (form) form.reset();
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.add('hidden');
+    }
+    document.getElementById('form-modal-lhp')?.reset();
 };
 
+// 5. Simpan Banyak Data LHP ke Supabase
 window.saveLhpFromModal = async function (e) {
     if (e) e.preventDefault();
 
-    const editId = document.getElementById('modal-lhp-id').value;
     const tanggal = document.getElementById('modal-lhp-date').value;
     const keterangan = document.getElementById('modal-lhp-ket').value;
-    const jenis = document.getElementById('modal-lhp-jenis').value;
     const tpk = document.getElementById('modal-lhp-tpk').value;
-    const petak = document.getElementById('modal-lhp-petak').value;
-    const masukM3 = parseFloat(document.getElementById('modal-lhp-in-m3').value) || 0;
-    
+    const petak = document.getElementById('modal-lhp-petak').value || '-';
 
-    if (!tanggal || !jenis || !tpk) {
-        alert("Harap isi Tanggal, Jenis Kayu, dan TPK!");
+    if (!tanggal || !tpk) {
+        alert("Harap lengkapi Tanggal dan TPK!");
         return;
     }
 
-    if (masukM3 === 0 && keluarM3 === 0) {
-        alert("Harap masukkan angka Masuk (M³) atau Keluar (M³)!");
-        return;
-    }
+    const payloadList = [];
+    const rows = document.querySelectorAll("#lhp-rows-container tr");
 
-    const payload = {
-        tanggal: tanggal,
-        keterangan: keterangan,
-        jenis_kayu: jenis,
-        tpk: tpk,
-        petak: petak || '-',
-        masuk_m3: masukM3,
+    rows.forEach(row => {
+        const jenis = row.querySelector(".lhp-jenis-kayu").value;
+        const inSM = parseFloat(row.querySelector(".lhp-in-sm").value) || 0;
+        const inM3 = parseFloat(row.querySelector(".lhp-in-m3").value) || 0;
         
-    };
+
+        if (jenis && (inSM > 0 )) {
+            payloadList.push({
+                tanggal: tanggal,
+                keterangan: keterangan,
+                jenis_kayu: jenis,
+                tpk: tpk,
+                petak: petak,
+                masuk_sm: inSM,
+                masuk_m3: inM3,
+                
+            });
+        }
+    });
+
+    if (payloadList.length === 0) {
+        alert("Pilih minimal 1 Jenis Kayu dan isi jumlah Masuk/Keluar!");
+        return;
+    }
 
     try {
         if (typeof showLoading === 'function') showLoading(true);
 
-        if (editId) {
-            const { error } = await api.from('stok_kayu').update(payload).eq('id', editId);
-            if (error) throw error;
-            alert("Data LHP berhasil diperbarui!");
-        } else {
-            const { error } = await api.from('stok_kayu').insert([payload]);
-            if (error) throw error;
-            alert("Data LHP berhasil disimpan!");
-        }
+        const { error } = await api.from('stok_kayu').insert(payloadList);
+        if (error) throw error;
 
+        alert(`Berhasil menyimpan ${payloadList.length} data LHP!`);
         closeLhpModal();
         if (typeof fetchData === 'function') await fetchData();
-        if (typeof renderDashboardTable === 'function') renderDashboardTable();
 
     } catch (err) {
         console.error("Gagal simpan LHP:", err);
