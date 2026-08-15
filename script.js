@@ -1240,6 +1240,9 @@ function logout() {
 function editData(id) {
     // 🛡️ Cari array data yang tersedia (apakah di state.mutasi atau state.data)
     const listMutasi = state.mutasi || state.data || [];
+
+    console.log("ID yang diklik:", id);
+    console.log("Isi List Mutasi saat ini:", listMutasi);
     
     // 🛡️ Cari item menggunakan '==' (bukan '===')
     const data = listMutasi.find(item => item.id == id);
