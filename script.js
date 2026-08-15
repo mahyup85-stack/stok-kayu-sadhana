@@ -3269,33 +3269,32 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // =========================================================
-    // 💡 DETEKSI KETIKAN "LHP" DI FORM UTAMA (DITARUH DI SINI)
-    // Pasikan ID input sesuai: 'input-ket' atau 'input-keterangan'
-    // =========================================================
-    const inputKetUtama = document.getElementById("input-ket") || document.getElementById("input-keterangan");
+    
+// 💡 DETEKSI KETIKAN "LHP" DI FORM UTAMA (TERPERBARUI)
+// =========================================================
+const inputKetUtama = document.getElementById("input-ket") || document.getElementById("input-keterangan");
 
-    if (inputKetUtama) {
-        inputKetUtama.addEventListener("input", function (e) {
-            const val = e.target.value.toUpperCase();
-            
-            // Jika kata "LHP" terdeteksi dalam input keterangan
-            if (val.includes("LHP")) {
-                if (typeof openLhpModal === 'function') {
-                    openLhpModal({
-                        tanggal: document.getElementById("input-date")?.value || document.getElementById("input-tanggal")?.value || '',
-                        keterangan: e.target.value,
-                        jenis: document.getElementById("input-jenis")?.value || '',
-                        tpk: document.getElementById("input-tpk")?.value || '',
-                        petak: document.getElementById("input-petak")?.value || ''
-                    });
-                }
-                
-                // Reset input utama agar tidak terproses ganda
-                e.target.value = '';
+if (inputKetUtama) {
+    // Menggunakan event 'change' atau 'blur' agar pengguna selesai mengetik dulu
+    inputKetUtama.addEventListener("change", function (e) {
+        const val = e.target.value.toUpperCase().trim();
+        
+        // Jika kata "LHP" terdeteksi
+        if (val.includes("LHP")) {
+            if (typeof openLhpModal === 'function') {
+                openLhpModal({
+                    tanggal: document.getElementById("input-date")?.value || document.getElementById("input-tanggal")?.value || '',
+                    keterangan: e.target.value,
+                    jenis: document.getElementById("input-jenis")?.value || '',
+                    tpk: document.getElementById("input-tpk")?.value || '',
+                    petak: document.getElementById("input-petak")?.value || ''
+                });
+            } else {
+                alert("Fungsi openLhpModal belum terdefinisi!");
             }
-        });
-    }
+        }
+    });
+}
 
     // Inisialisasi status Login
     if (state.isLoggedIn) {

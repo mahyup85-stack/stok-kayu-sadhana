@@ -701,7 +701,7 @@
 
                 <div class="form-group">
                     <label>Keterangan</label>
-                    <input type="text" id="input-ket" placeholder="BAP, LHP, atau Kirim" required />
+                    <input type="text" id="input-ket" placeholder="BAP, atau Kirim" required />
                 </div>
 
                 <div class="form-group">
@@ -1044,6 +1044,56 @@
             <button type="button" onclick="closeMasterModal()" class="btn-outline" style="width: 100%; margin-top: 15px;">Tutup</button>
         </div>
     </div>
+        <!-- Modal Pop-up Khusus LHP -->
+<div id="modal-lhp" class="modal-backdrop hidden">
+    <div class="modal-content" style="max-width: 550px;">
+        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
+            <h3 id="modal-lhp-title" style="margin: 0; color: var(--primary);">📋 Input Detail LHP</h3>
+            <button type="button" onclick="closeLhpModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
+        </div>
+
+        <form id="form-modal-lhp" onsubmit="saveLhpFromModal(event)">
+            <input type="hidden" id="modal-lhp-id" value="">
+            
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Tanggal</label>
+                <input type="date" id="modal-lhp-date" class="form-control" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Keterangan</label>
+                <input type="text" id="modal-lhp-ket" class="form-control" value="LHP" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+                <div class="form-group">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Jenis Kayu</label>
+                    <select id="modal-lhp-jenis" class="form-control" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;"></select>
+                </div>
+                <div class="form-group">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">TPK</label>
+                    <select id="modal-lhp-tpk" class="form-control" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;"></select>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Petak</label>
+                <input type="text" id="modal-lhp-petak" class="form-control" placeholder="Nomor Petak" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+                <div class="form-group">
+                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Masuk LHP (M³)</label>
+                    <input type="number" id="modal-lhp-in-m3" step="0.01" value="0" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
+                </div>
+                
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" onclick="closeLhpModal()" class="btn-outline" style="padding: 8px 16px; border-radius: 4px; cursor: pointer;">Batal</button>
+                <button type="submit" class="btn-primary" style="padding: 8px 16px; border-radius: 4px; cursor: pointer;">Simpan Data LHP</button>
+            </div>
+        </form>
+    </div>
+</div>
 
     <div id="view-kelola-sandi" class="hidden">
         <div class="card" style="max-width: 400px; margin: 20px auto;">
@@ -1088,61 +1138,6 @@
             </p>
         </div>
     </div>
-    <!-- Modal Pop-up Khusus LHP -->
-<div id="modal-lhp" class="modal-backdrop hidden">
-    <div class="modal-content" style="max-width: 550px;">
-        <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px;">
-            <h3 id="modal-lhp-title" style="margin: 0; color: var(--primary);">📋 Input Detail LHP</h3>
-            <button type="button" onclick="closeLhpModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer;">&times;</button>
-        </div>
-
-        <form id="form-modal-lhp" onsubmit="saveLhpFromModal(event)">
-            <input type="hidden" id="modal-lhp-id" value="">
-            
-            <div class="form-group" style="margin-bottom: 12px;">
-                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Tanggal</label>
-                <input type="date" id="modal-lhp-date" class="form-control" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-            </div>
-
-            <div class="form-group" style="margin-bottom: 12px;">
-                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Keterangan</label>
-                <input type="text" id="modal-lhp-ket" class="form-control" value="LHP" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
-                <div class="form-group">
-                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Jenis Kayu</label>
-                    <select id="modal-lhp-jenis" class="form-control" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;"></select>
-                </div>
-                <div class="form-group">
-                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">TPK</label>
-                    <select id="modal-lhp-tpk" class="form-control" required style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;"></select>
-                </div>
-            </div>
-
-            <div class="form-group" style="margin-bottom: 12px;">
-                <label style="display: block; font-weight: bold; margin-bottom: 5px;">Petak</label>
-                <input type="text" id="modal-lhp-petak" class="form-control" placeholder="Nomor Petak" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
-                <div class="form-group">
-                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Masuk LHP (M³)</label>
-                    <input type="number" id="modal-lhp-in-m3" step="0.01" value="0" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                </div>
-                <div class="form-group">
-                    <label style="display: block; font-weight: bold; margin-bottom: 5px;">Keluar LHP (M³)</label>
-                    <input type="number" id="modal-lhp-out-m3" step="0.01" value="0" style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px;">
-                </div>
-            </div>
-
-            <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                <button type="button" onclick="closeLhpModal()" class="btn-outline" style="padding: 8px 16px; border-radius: 4px; cursor: pointer;">Batal</button>
-                <button type="submit" class="btn-primary" style="padding: 8px 16px; border-radius: 4px; cursor: pointer;">Simpan Data LHP</button>
-            </div>
-        </form>
-    </div>
-</div>
 
     <div id="view-logout" class="hidden">
         <div class="card" style="max-width: 480px; margin: 20px auto; padding: 25px;">
