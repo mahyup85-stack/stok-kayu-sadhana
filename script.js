@@ -1238,38 +1238,36 @@ function logout() {
 
 // Contoh penyesuaian fungsi edit:
 function editData(id) {
-    // Cari array data yang aktif
-    const listMutasi = state.mutasi || state.data || state.filteredData || [];
+    // 🛡️ Ambil dari filteredData atau data (tempat 6656 transaksi kamu berada)
+    const listMutasi = (state.filteredData && state.filteredData.length > 0) 
+        ? state.filteredData 
+        : (state.data || []);
 
-    // 🔍 INTIP DI KONSOL BROWSER (Tekan F12 -> Console)
-    console.log("ID yang diklik:", id);
-    console.log("Isi List Mutasi saat ini:", listMutasi);
-
-    // Cari data dengan perbandingan longgar (==) atau perbandingan string
+    // 🛡️ Cari item menggunakan String() agar cocok (baik ID bertipe angka/teks)
     const data = listMutasi.find(item => String(item.id) === String(id));
 
     if (!data) {
-        console.error("Gagal cocok! ID tidak ditemukan di dalam listMutasi.");
+        console.error("Gagal menemukan ID:", id, "di dalam listMutasi.");
         alert("Data tidak ditemukan!");
         return;
     }
 
-    // Set nilai form jika data ditemukan
+    // Set nilai form biasa
     document.getElementById('edit-id').value = data.id;
-    document.getElementById('input-date').value = data.tanggal;
-    document.getElementById('input-ket').value = data.keterangan;
-    document.getElementById('input-jenis').value = data.jenis_kayu;
-    document.getElementById('input-tpk').value = data.tpk;
+    document.getElementById('input-date').value = data.tanggal || '';
+    document.getElementById('input-ket').value = data.keterangan || '';
+    document.getElementById('input-jenis').value = data.jenis_kayu || '';
+    document.getElementById('input-tpk').value = data.tpk || '';
     document.getElementById('input-petak').value = data.petak || '';
 
-    // Ambil nilai SM (dengan fallback jika data lama)
+    // ✅ AMBIL NILAI SM (Langsung dari DB, dengan fallback presisi jika data lama)
     const inSM = data.masuk_sm ?? (data.masuk_m3 ? Math.round((data.masuk_m3 / 0.67) * 100) / 100 : 0);
     const outSM = data.keluar_sm ?? (data.keluar_m3 ? Math.round((data.keluar_m3 / 0.67) * 100) / 100 : 0);
 
     document.getElementById('input-in-sm').value = inSM;
     document.getElementById('input-out-sm').value = outSM;
 
-    // Ubah UI Form
+    // Ubah UI Form ke mode Edit
     document.getElementById('form-mode-title').innerText = 'Edit Data Mutasi';
     document.getElementById('btn-submit').innerText = 'Update Data';
     
