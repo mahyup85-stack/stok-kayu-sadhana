@@ -2114,6 +2114,9 @@ function getProcessedRincianData() {
     return { filtered: mappedFiltered, saldoAwal };
 }
 
+// Menghubungkan nama getFilteredRincianData ke getProcessedRincianData
+const getFilteredRincianData = getProcessedRincianData;
+
 function renderRincian() {
     const body = document.getElementById("rincian-table-body");
     const pageInfo = document.getElementById("page-info"); // Elemen teks info halaman (misal: "Halaman 1 dari 10")
@@ -2363,7 +2366,7 @@ function exportRekapExcel() {
     link.click();
 }
 
-// ===== EXPORT RINCIAN MUTASI TO XLS =====
+
 // ===== EXPORT RINCIAN MUTASI TO XLS (WITH KOP SURAT) =====
 function exportRincianExcel() {
     const table = document.querySelector("#view-rekap-rincian table");
@@ -2695,8 +2698,8 @@ window.exportRincianPDF = function () {
     const doc = new jsPDF('landscape', 'mm', 'a4'); // Gunakan orientasi Landscape agar kolom muat dengan rapi
 
     // 2. Ambil data rincian mutasi yang sudah terfilter (diurutkan berdasarkan tanggal secara kronologis)
-    let dataMutasi = getFilteredRincianData(); // Ganti dengan fungsi filter rincian Anda jika namanya berbeda
-
+    const { filtered: dataMutasi, saldoAwal } = getProcessedRincianData();
+    
     if (!dataMutasi || dataMutasi.length === 0) {
         alert("Tidak ada data untuk di-export!");
         return;
