@@ -3206,7 +3206,7 @@ window.calculateLhpRow = function(index) {
     // Tandai jika user mengetik manual di kolom faktor konversi
     inputFaktor.onkeydown = () => { row.dataset.userEditedFaktor = "true"; };
 
-    const faktor = parseFloat(inputFaktor.value) || 0.67;
+    const faktor = parseFloat(inputFaktor.value) || 0.00;
     
     // Hitung Meter Kubik (M³)
     row.querySelector(".lhp-in-m3").value = (inSM * faktor).toFixed(2);
