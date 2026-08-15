@@ -1073,6 +1073,93 @@ function showView(viewId) {
     }
 }
 
+// ===================================================
+// LOGIKA MODAL POPUP INPUT LHP
+// ===================================================
+
+// 1. Cek apakah keterangan yang diinput mengandung kata 'LHP'
+function checkLhpTrigger(value) {
+    if (value && value.trim().toUpperCase().includes('LHP')) {
+        openLhpModal();
+    }
+}
+
+// 2. Membuka Modal LHP & Mengisi Dropdown Jenis Kayu
+function openLhpModal() {
+    const modal = document.getElementById('lhp-modal');
+    const selectJenis = document.getElementById('lhp-modal-jenis');
+    const inputMainJenis = document.getElementById('input-jenis');
+
+    if (!modal || !selectJenis) return;
+
+    // Duplikasi isi option Jenis Kayu dari form utama ke modal LHP
+    if (inputMainJenis) {
+        selectJenis.innerHTML = inputMainJenis.innerHTML;
+        selectJenis.value = inputMainJenis.value; // Samakan jika sudah dipilih di awal
+    }
+
+    // Ambil volume SM awal jika sudah pernah diisi di form utama
+    const currentSM = parseFloat(document.getElementById('input-in-sm')?.value) || 0;
+    if (currentSM > 0) {
+        document.getElementById('lhp-modal-sm').value = currentSM;
+    } else {
+        document.getElementById('lhp-modal-sm').value = '';
+    }
+
+    // Buka Modal & Hitung Konversi Awal
+    modal.classList.remove('hidden');
+    calculateLhpVolume();
+}
+
+// 3. Menutup Modal LHP
+function closeLhpModal() {
+    const modal = document.getElementById('lhp-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+// 4. Kalkulasi Otomatis M3 berdasarkan SM * Faktor Konversi
+function calculateLhpVolume() {
+    const jenis = document.getElementById('lhp-modal-jenis')?.value;
+    const smVal = parseFloat(document.getElementById('lhp-modal-sm')?.value) || 0;
+    
+    let faktorKonversi = 1; // Default jika tidak ditemukan
+
+    // Cari faktor konversi dari data Master
+    if (state.master && state.master.jenis_kayu) {
+        const itemKayu = state.master.jenis_kayu.find(k => k.name === jenis || k.jenis_kayu === jenis);
+        if (itemKayu && itemKayu.konversi) {
+            faktorKonversi = parseFloat(itemKayu.konversi);
+        } else if (itemKayu && itemKayu.faktor_konversi) {
+            faktorKonversi = parseFloat(itemKayu.faktor_konversi);
+        }
+    }
+
+    const m3Result = smVal * faktorKonversi;
+
+    // Set nilai ke input modal
+    document.getElementById('lhp-modal-konversi').value = faktorKonversi;
+    document.getElementById('lhp-modal-m3').value = m3Result.toFixed(2);
+}
+
+// 5. Menerapkan Data dari Popup LHP ke Form Utama
+function handleLhpSubmit(event) {
+    event.preventDefault();
+
+    const jenisVal = document.getElementById('lhp-modal-jenis')?.value;
+    const smVal = parseFloat(document.getElementById('lhp-modal-sm')?.value) || 0;
+
+    // Set kembali ke Form Utama
+    if (jenisVal) {
+        document.getElementById('input-jenis').value = jenisVal;
+    }
+    
+    // Set ke Masuk (SM) di form utama
+    document.getElementById('input-in-sm').value = smVal;
+
+    // Tutup popup modal LHP
+    closeLhpModal();
+}
+
 function applyRincianFilters() {
     const selectedTPK = document.getElementById("filter-rincian-tpk").value;
     const selectedJenis = document.getElementById("filter-rincian-jenis").value;
