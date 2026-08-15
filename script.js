@@ -1322,62 +1322,29 @@ function logout() {
 }
 
 
-window.editData = function(id) {
-    const cleanId = String(id).trim();
-    // PERBAIKAN: Gunakan state.data, bukan state.mutasiData
-    const item = state.data ? state.data.find(d => String(d.id).trim() === cleanId) : null;
-    
-    if (!item) {
-        alert("Data tidak ditemukan!");
-        return;
-    }
+// Contoh penyesuaian fungsi edit:
+function editData(id) {
+    const data = state.mutasi.find(item => item.id === id);
+    if (!data) return;
 
-    const setVal = (elementId, value) => {
-        const el = document.getElementById(elementId);
-        if (el) el.value = value || '';
-    };
+    // Set nilai form biasa
+    document.getElementById('edit-id').value = data.id;
+    document.getElementById('input-date').value = data.tanggal;
+    document.getElementById('input-ket').value = data.keterangan;
+    document.getElementById('input-jenis').value = data.jenis_kayu;
+    document.getElementById('input-tpk').value = data.tpk;
+    document.getElementById('input-petak').value = data.petak || '';
 
-    // Cari faktor konversi
-    let faktorKonversi = 1;
-    const jenis = (item.jenis_kayu || '').trim().toLowerCase();
-    
-    if (state.master && state.master['jenis_kayu']) {
-        const itemKayu = state.master['jenis_kayu'].find(
-            k => k.name && k.name.trim().toLowerCase() === jenis
-        );
-        if (itemKayu && itemKayu.konversi) {
-            faktorKonversi = parseFloat(itemKayu.konversi);
-        }
-    }
+    // ✅ AMBIL LANGSUNG DARI DATABASE (TIDAK ADA LAGI DIBAGI FAKTOR KONVERSI)
+    // Menggunakan fallback '|| 0' jika data lama bernilai null/undefined
+    document.getElementById('input-in-sm').value = data.masuk_sm !== undefined && data.masuk_sm !== null ? data.masuk_sm : 0;
+    document.getElementById('input-out-sm').value = data.keluar_sm !== undefined && data.keluar_sm !== null ? data.keluar_sm : 0;
 
-    const valInM3 = parseFloat(item.masuk_m3) || 0;
-    const valOutM3 = parseFloat(item.keluar_m3) || 0;
-
-    // 1. Isi Form dengan data lama
-    setVal('edit-id', item.id);
-    setVal('input-date', item.tanggal);
-    setVal('input-ket', item.keterangan);
-    setVal('input-jenis', item.jenis_kayu);
-    setVal('input-tpk', item.tpk);
-    setVal('input-petak', item.petak);
-    setVal('input-in-sm', valInM3 > 0 ? (valInM3 / faktorKonversi) : 0);
-    setVal('input-out-sm', valOutM3 > 0 ? (valOutM3 / faktorKonversi) : 0);
-
-    // 2. Ubah Tombol & Judul ke Mode Update
-    const titleEl = document.getElementById('form-mode-title');
-    if (titleEl) titleEl.innerText = "Edit Data Mutasi";
-
-    const btnSubmit = document.getElementById('btn-submit');
-    if (btnSubmit) {
-        btnSubmit.innerText = "Update Data";
-    }
-
-    const btnCancel = document.getElementById('btn-cancel-edit');
-    if (btnCancel) btnCancel.classList.remove('hidden');
-
-    // 3. Scroll halus ke bagian form
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-};
+    // Ubah UI Form ke mode Edit
+    document.getElementById('form-mode-title').innerText = 'Edit Data Mutasi';
+    document.getElementById('btn-submit').innerText = 'Update Data';
+    document.getElementById('btn-cancel-edit').classList.remove('hidden');
+}
 
 window.deleteData = function(rawId) {
     const cleanId = parseInt(rawId, 10);
@@ -3317,15 +3284,25 @@ document.addEventListener('DOMContentLoaded', () => {
             const activeSM = inSM > 0 ? inSM : outSM;
             const activeM3 = inM3 > 0 ? inM3 : outM3;
 
+            // =========================================================
+            // 📍 PAYLOAD TERUPDATE (Menambahkan masuk_sm & keluar_sm)
+            // =========================================================
             const payload = {
                 tanggal: date,
                 keterangan: ket,
                 jenis_kayu: jenis,
                 tpk: tpk,
                 petak: petak,
+                
+                // ✅ SIMPAN SM MURNI KE DATABASE
+                masuk_sm: inSM,
+                keluar_sm: outSM,
+                
+                // Simpan M3 hasil konversi
                 masuk_m3: inM3,
                 keluar_m3: outM3
             };
+            // =========================================================
 
             try {
                 if (typeof isSubmittingStock !== 'undefined') isSubmittingStock = true;
@@ -3362,6 +3339,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+});
 
     // Inisialisasi status Login
     if (state.isLoggedIn) {
