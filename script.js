@@ -3253,7 +3253,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-});
+
 
     // Inisialisasi status Login
     if (state.isLoggedIn) {
