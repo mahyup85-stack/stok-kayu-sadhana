@@ -1686,98 +1686,55 @@ function hitungKonversi(jenisKayu, volumeM3) {
     return volumeM3 * faktor;
 }
 
-window.renderRekapSaldo = function () {
-    const tableBody = document.getElementById("rekap-table-body");
-    if (!tableBody) return;
-
-    const dataProcessed = getProcessedRekapData();
-    if (!dataProcessed || dataProcessed.rows.length === 0) {
-        tableBody.innerHTML = '<tr><td colspan="10" class="text-center">Tidak ada data mutasi untuk periode ini</td></tr>';
-        return;
-    }
-
-    const formatSaldo = (val) => {
-        let num = parseFloat(val) || 0;
-        if (Math.abs(num) < 0.0001) num = 0;
-        return num.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    };
-
-    const { rows, totals } = dataProcessed;
-
-    let html = rows.map((r) => `
-        <tr>
-            <td>${r.jenis}</td>
-            <td>${r.tpk}</td>
-            <td class="text-center">${r.petak}</td>
-            <td class="text-right">${formatSaldo(r.sAwalBAP)}</td>
-            <td class="text-right">${formatSaldo(r.sAwalLHP)}</td>
-            <td class="text-right">${formatSaldo(r.bapBerjalan)}</td>
-            <td class="text-right">${formatSaldo(r.lhpBerjalan)}</td>
-            <td class="text-right">${formatSaldo(r.kirimBerjalan)}</td>
-            <td class="text-right" style="font-weight:bold">${formatSaldo(r.sBAP)}</td>
-            <td class="text-right" style="font-weight:bold">${formatSaldo(r.sLHP)}</td>
-        </tr>
-    `).join('');
-
-    // Baris Grand Total
-    html += `
-        <tr style="background-color: #f3f4f6; font-weight: bold; border-top: 2px solid #374151;">
-            <td colspan="3" class="text-center">TOTAL KESELURUHAN</td>
-            <td class="text-right">${formatSaldo(totals.totalSAwalBAP)}</td>
-            <td class="text-right">${formatSaldo(totals.totalSAwalLHP)}</td>
-            <td class="text-right">${formatSaldo(totals.totalBapBerjalan)}</td>
-            <td class="text-right">${formatSaldo(totals.totalLhpBerjalan)}</td>
-            <td class="text-right">${formatSaldo(totals.totalKirimBerjalan)}</td>
-            <td class="text-right">${formatSaldo(totals.totalGrandBAP)}</td>
-            <td class="text-right">${formatSaldo(totals.totalGrandLHP)}</td>
-        </tr>
-    `;
-
-    tableBody.innerHTML = html;
-};
-
-// =========================================================
-// 1. HELPER PEMPROSES DATA REKAP SALDO
-// =========================================================
 function getProcessedRekapData() {
     const allData = (typeof state !== 'undefined' && Array.isArray(state.data)) ? state.data : [];
 
-    // Ambil Filter dengan Fallback ID jika elemen HTML beda nama
     const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
     
-    const fTFrom = getVal("filter-rincian-tahun-dari");
-    const fBFrom = getVal("filter-rincian-bulan-dari");
+    // Ambil Filter Tahun & Bulan (Dari & Sampai)
+    const fTFrom = getVal("filter-rincian-tahun-dari") || getVal("filter-tahun-dari");
+    const fBFrom = getVal("filter-rincian-bulan-dari") || getVal("filter-bulan-dari");
+    const fTTo = getVal("filter-rincian-tahun-sampai") || getVal("filter-tahun-sampai");
+    const fBTo = getVal("filter-rincian-bulan-sampai") || getVal("filter-bulan-sampai");
+
     const fTPK = getVal("filter-rincian-tpk") || getVal("filter-tpk");
-    
-    // Tarik nilai filter jenis kayu (cek ID utama & ID alternatif)
     const fJenis = getVal("filter-rincian-jenis") || getVal("filter-jenis");
 
+    // Konversi Filter ke Angka Integer untuk Pembandingan (Contoh: 2026-03 -> 202603)
     const numTFrom = parseInt(fTFrom, 10);
     const numBFrom = parseInt(fBFrom, 10);
-    const fromVal = (!isNaN(numTFrom) && !isNaN(numBFrom)) ? (numTFrom * 100 + numBFrom) : 0;
+    const numTTo = parseInt(fTTo, 10);
+    const numBTo = parseInt(fBTo, 10);
 
-    // Object temporary untuk grouping data per (Jenis + TPK + Petak)
+    // Tentukan Nilai Batas Bawah dan Batas Atas Periode
+    const fromVal = (!isNaN(numTFrom) && !isNaN(numBFrom)) ? (numTFrom * 100 + numBFrom) : 0;
+    const toVal = (!isNaN(numTTo) && !isNaN(numBTo)) ? (numTTo * 100 + numBTo) : 999999;
+
     const grouped = {};
 
     allData.forEach(d => {
         if (!d.tanggal) return;
 
-        // --- 1. AMBIL PROPERTI DATA FLEKSIBEL ---
-        const itemJenis = String(d.jenis_kayu || d.jenis || '').trim();
-        const itemTPK = String(d.tpk || '').trim();
-        const itemPetak = String(d.petak || '').trim();
-
-        // --- 2. LOGIKA FILTER (CASE-INSENSITIVE & TRIMMED) ---
-        if (fTPK && itemTPK.toLowerCase() !== fTPK.toLowerCase()) return;
-        
-        // Perbaikan Krusial Filter Jenis Kayu
-        if (fJenis && itemJenis.toLowerCase() !== fJenis.toLowerCase()) return;
-
+        // --- 1. PARSING TANGGAL DATA ---
         const parts = d.tanggal.split("-");
         const y = parseInt(parts[0], 10);
         const m = parseInt(parts[1], 10);
         const dVal = (isNaN(y) || isNaN(m)) ? 0 : (y * 100 + m);
 
+        // --- 2. FILTER KETAT BULAN & TAHUN ---
+        // Jika filter dari/sampai diisi, buang data yang ada di LUAR RENTANG TERSEBUT
+        if (fromVal > 0 && dVal < fromVal) return; // Abaikan data sebelum bulan/tahun 'dari'
+        if (toVal < 999999 && dVal > toVal) return; // Abaikan data setelah bulan/tahun 'sampai'
+
+        // --- 3. FILTER TPK & JENIS KAYU ---
+        const itemJenis = String(d.jenis_kayu || d.jenis || '').trim();
+        const itemTPK = String(d.tpk || '').trim();
+        const itemPetak = String(d.petak || '').trim();
+
+        if (fTPK && itemTPK.toLowerCase() !== fTPK.toLowerCase()) return;
+        if (fJenis && itemJenis.toLowerCase() !== fJenis.toLowerCase()) return;
+
+        // --- 4. GROUPING DATA (Hanya Data Berjalan dalam Periode Ini) ---
         const key = `${itemJenis || '-'}_${itemTPK || '-'}_${itemPetak || '-'}`;
 
         if (!grouped[key]) {
@@ -1800,27 +1757,17 @@ function getProcessedRekapData() {
         const valKeluar = parseFloat(d.keluar_m3 || d.m || 0);
         const ket = (d.keterangan || "").toUpperCase();
 
-        // A. PERIODE SEBELUMNYA (Saldo Awal)
-        if (fromVal > 0 && dVal < fromVal) {
-            if (!ket.includes("LHP")) {
-                item.sAwalBAP += (valMasuk - valKeluar);
-            } else {
-                item.sAwalLHP += valMasuk;
-            }
-        } 
-        // B. PERIODE BERJALAN
-        else {
-            if (ket.includes("KIRIM")) {
-                item.kirimBerjalan += valKeluar;
-            } else if (ket.includes("LHP")) {
-                item.lhpBerjalan += valMasuk;
-            } else {
-                item.bapBerjalan += valMasuk;
-            }
+        // Hitung Transaksi Berjalan di Periode Pilihan Ini
+        if (ket.includes("KIRIM")) {
+            item.kirimBerjalan += valKeluar;
+        } else if (ket.includes("LHP")) {
+            item.lhpBerjalan += valMasuk;
+        } else {
+            item.bapBerjalan += valMasuk;
         }
     });
 
-    // Hitung Saldo Akhir & Grand Totals
+    // Hitung Total Rekap Akhir
     const rows = [];
     const totals = {
         totalSAwalBAP: 0, totalSAwalLHP: 0,
@@ -1829,13 +1776,10 @@ function getProcessedRekapData() {
     };
 
     Object.values(grouped).forEach(item => {
-        // Kalkulasi Saldo Akhir
-        item.sBAP = item.sAwalBAP + item.bapBerjalan - item.kirimBerjalan;
-        item.sLHP = item.sAwalLHP + item.lhpBerjalan - item.kirimBerjalan;
+        // Karena hanya menampilkan periode terpilih, Saldo Akhir = Total Transaksi Berjalan Periode Tersebut
+        item.sBAP = item.bapBerjalan - item.kirimBerjalan;
+        item.sLHP = item.lhpBerjalan - item.kirimBerjalan;
 
-        // Akumulasi Total
-        totals.totalSAwalBAP += item.sAwalBAP;
-        totals.totalSAwalLHP += item.sAwalLHP;
         totals.totalBapBerjalan += item.bapBerjalan;
         totals.totalLhpBerjalan += item.lhpBerjalan;
         totals.totalKirimBerjalan += item.kirimBerjalan;
