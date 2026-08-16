@@ -1736,152 +1736,160 @@ window.renderRekapSaldo = function () {
     tableBody.innerHTML = html;
 };
 
-// Helper untuk memproses data rekap (filter + grouping)
-// Helper untuk memproses data rekap (filter + grouping)
+// =========================================================
+// 1. HELPER PEMPROSES DATA REKAP SALDO
+// =========================================================
 function getProcessedRekapData() {
-    // Helper untuk mengambil value elemen HTML dengan aman tanpa crash
-    const getVal = (id) => document.getElementById(id)?.value || '';
-
-    const fDariB = parseInt(getVal("filter-dari-bulan"), 10) || 1;
-    const fDariT = parseInt(getVal("filter-dari-tahun"), 10) || new Date().getFullYear();
-    const fSampaiB = parseInt(getVal("filter-sampai-bulan"), 10) || 12;
-    const fSampaiT = parseInt(getVal("filter-sampai-tahun"), 10) || new Date().getFullYear();
+    const allData = (typeof state !== 'undefined' && Array.isArray(state.data)) ? state.data : [];
     
-    const fH = getVal("filter-tpk");
-    const fJ = getVal("filter-jenis");
-    const fP = getVal("filter-petak");
-    const fK = getVal("filter-ket").toLowerCase();
+    // Ambil Filter (jika ada)
+    const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
+    const fTFrom = getVal("filter-rincian-tahun-dari");
+    const fBFrom = getVal("filter-rincian-bulan-dari");
+    const fTPK = getVal("filter-rincian-tpk");
+    const fJenis = getVal("filter-rincian-jenis");
 
-    // Pastikan state.data tersedia sebelum diolah
-    if (!state.hasAppliedFilter || !Array.isArray(state.data)) return null;
+    const numTFrom = parseInt(fTFrom, 10);
+    const numBFrom = parseInt(fBFrom, 10);
+    const fromVal = (!isNaN(numTFrom) && !isNaN(numBFrom)) ? (numTFrom * 100 + numBFrom) : 0;
 
+    // Object temporary untuk grouping data per (Jenis + TPK + Petak)
     const grouped = {};
-    const sorted = [...state.data].sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal));
 
-    let totalSAwalLHP = 0;
-    let totalSAwalBAP = 0;
-    let totalBapBerjalan = 0;
-    let totalLhpBerjalan = 0;
-    let totalKirimBerjalan = 0;
-    let totalGrandBAP = 0;
-    let totalGrandLHP = 0;
+    allData.forEach(d => {
+        if (!d.tanggal) return;
 
-    const startDate = new Date(fDariT, fDariB - 1, 1);
-    const endDate = new Date(fSampaiT, fSampaiB, 0, 23, 59, 59); // Set sampai akhir hari pada bulan tersebut
+        // Filter opsional berdasarkan UI
+        if (fTPK && String(d.tpk || '').trim() !== fTPK) return;
+        if (fJenis && String(d.jenis_kayu || '').trim() !== fJenis) return;
 
-    sorted.forEach(d => {
-        const dataDate = new Date(d.tanggal);
-        if (isNaN(dataDate.getTime()) || dataDate > endDate) return;
+        const parts = d.tanggal.split("-");
+        const y = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10);
+        const dVal = (isNaN(y) || isNaN(m)) ? 0 : (y * 100 + m);
 
-        // Pemetaan properti database Supabase
-        const tpk = d.tpk || '';
-        const jenis = d.jenis_kayu || '';
-        const petak = d.petak || '-';
-        const ketStr = (d.keterangan || '').toLowerCase();
+        const key = `${d.jenis_kayu || '-'}_${d.tpk || '-'}_${d.petak || '-'}`;
 
-        // Pengecekan Filter
-        if (fH && tpk !== fH) return;
-        if (fJ && jenis !== fJ) return;
-        if (fP && petak !== fP) return;
-        if (fK) {
-            const searchTerms = fK.split(',').map(t => t.trim()).filter(Boolean);
-            const match = searchTerms.some(term => ketStr.includes(term));
-            if (!match) return;
-        }
-
-        const masuk = parseFloat(d.masuk_m3) || 0;
-        const keluar = parseFloat(d.keluar_m3) || 0;
-        const ket = ketStr.toUpperCase();
-
-        const isBefore = dataDate < startDate;
-        const isCurrent = dataDate >= startDate && dataDate <= endDate;
-
-        const key = `${jenis}|${tpk}|${petak}`;
         if (!grouped[key]) {
-            grouped[key] = { 
-                sAwalLHP: 0, 
-                sAwalBAP: 0, 
-                bapBerjalan: 0, 
-                lhpBerjalan: 0, 
+            grouped[key] = {
+                jenis: d.jenis_kayu || '-',
+                tpk: d.tpk || '-',
+                petak: d.petak || '-',
+                sAwalBAP: 0,
+                sAwalLHP: 0,
+                bapBerjalan: 0,
+                lhpBerjalan: 0,
                 kirimBerjalan: 0,
-                hasActivityInPeriod: false // Flag penanda mutasi berjalan
+                sBAP: 0,
+                sLHP: 0
             };
         }
 
-        if (isBefore) {
-            if (ket.includes("SALDO AWAL")) {
-                grouped[key].sAwalLHP += masuk;
-            } else if (ket.includes("LHP")) {
-                grouped[key].sAwalBAP -= masuk;
-                grouped[key].sAwalLHP += masuk;
-            } else if (ket.includes("BAP")) {
-                grouped[key].sAwalBAP += masuk;
-            } else if (ket.includes("KIRIM")) {
-                grouped[key].sAwalLHP -= keluar;
-            }
-        } else if (isCurrent) {
-            grouped[key].hasActivityInPeriod = true; // Tandai ada aktivitas di periode terpilih
+        const item = grouped[key];
+        const valMasuk = parseFloat(d.masuk_m3 || d.p || 0);
+        const valKeluar = parseFloat(d.keluar_m3 || d.m || 0);
+        const ket = (d.keterangan || "").toUpperCase();
 
-            if (ket.includes("SALDO AWAL")) {
-                grouped[key].sAwalLHP += masuk;
+        // A. PERIODE SEBELUMNYA (Saldo Awal)
+        if (fromVal > 0 && dVal < fromVal) {
+            if (!ket.includes("LHP")) {
+                item.sAwalBAP += (valMasuk - valKeluar);
+            } else {
+                item.sAwalLHP += valMasuk;
+            }
+        } 
+        // B. PERIODE BERJALAN
+        else {
+            if (ket.includes("KIRIM")) {
+                item.kirimBerjalan += valKeluar;
             } else if (ket.includes("LHP")) {
-                grouped[key].lhpBerjalan += masuk;
-            } else if (ket.includes("BAP")) {
-                grouped[key].bapBerjalan += masuk;
-            } else if (ket.includes("KIRIM")) {
-                grouped[key].kirimBerjalan += keluar;
+                item.lhpBerjalan += valMasuk;
+            } else {
+                item.bapBerjalan += valMasuk;
             }
         }
     });
 
+    // Hitung Saldo Akhir & Grand Totals
     const rows = [];
-    Object.entries(grouped).forEach(([key, v]) => {
-        const [jen, tpk, pet] = key.split("|");
+    const totals = {
+        totalSAwalBAP: 0, totalSAwalLHP: 0,
+        totalBapBerjalan: 0, totalLhpBerjalan: 0, totalKirimBerjalan: 0,
+        totalGrandBAP: 0, totalGrandLHP: 0
+    };
 
-        // Perhitungan Saldo Akhir
-        const sBAP = (v.sAwalBAP + v.bapBerjalan) - v.lhpBerjalan;
-        const sLHP = (v.sAwalLHP + v.lhpBerjalan) - v.kirimBerjalan;
+    Object.values(grouped).forEach(item => {
+        // Kalkulasi Saldo Akhir
+        item.sBAP = item.sAwalBAP + item.bapBerjalan - item.kirimBerjalan;
+        item.sLHP = item.sAwalLHP + item.lhpBerjalan - item.kirimBerjalan;
 
-        // 🎯 LOGIKA FILTER UTAMA:
-        // Hanya masukkan baris jika ADA MUTASI DI PERIODE TERPILIH (hasActivityInPeriod === true)
-        if (v.hasActivityInPeriod) {
-            totalSAwalBAP += v.sAwalBAP;
-            totalSAwalLHP += v.sAwalLHP;
-            totalBapBerjalan += v.bapBerjalan;
-            totalLhpBerjalan += v.lhpBerjalan;
-            totalKirimBerjalan += v.kirimBerjalan;
-            totalGrandBAP += sBAP;
-            totalGrandLHP += sLHP;
+        // Akumulasi Total
+        totals.totalSAwalBAP += item.sAwalBAP;
+        totals.totalSAwalLHP += item.sAwalLHP;
+        totals.totalBapBerjalan += item.bapBerjalan;
+        totals.totalLhpBerjalan += item.lhpBerjalan;
+        totals.totalKirimBerjalan += item.kirimBerjalan;
+        totals.totalGrandBAP += item.sBAP;
+        totals.totalGrandLHP += item.sLHP;
 
-            rows.push({
-                jenis: jen, 
-                tpk: tpk, 
-                petak: pet,
-                sAwalBAP: v.sAwalBAP,
-                sAwalLHP: v.sAwalLHP,
-                bapBerjalan: v.bapBerjalan,
-                lhpBerjalan: v.lhpBerjalan,
-                kirimBerjalan: v.kirimBerjalan,
-                sBAP, 
-                sLHP
-            });
-        }
+        rows.push(item);
     });
 
-    return {
-        rows,
-        totals: {
-            totalSAwalBAP,
-            totalSAwalLHP, 
-            totalBapBerjalan, 
-            totalLhpBerjalan, 
-            totalKirimBerjalan, 
-            totalGrandBAP, 
-            totalGrandLHP
-        },
-        fDariB, fDariT, fSampaiB, fSampaiT
-    };
+    return { rows, totals };
 }
+
+// =========================================================
+// 2. FUNGSI RENDER TABEL REKAP SALDO
+// =========================================================
+window.renderRekapSaldo = function () {
+    const tableBody = document.getElementById("rekap-table-body");
+    if (!tableBody) return;
+
+    const dataProcessed = getProcessedRekapData();
+    if (!dataProcessed || dataProcessed.rows.length === 0) {
+        tableBody.innerHTML = '<tr><td colspan="10" class="text-center" style="padding: 20px; color: #dc2626;">Tidak ada data mutasi rekap untuk periode ini</td></tr>';
+        return;
+    }
+
+    const formatSaldo = (val) => {
+        let num = parseFloat(val) || 0;
+        if (Math.abs(num) < 0.0001) num = 0;
+        return num.toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    const { rows, totals } = dataProcessed;
+
+    let html = rows.map((r) => `
+        <tr>
+            <td>${r.jenis}</td>
+            <td>${r.tpk}</td>
+            <td class="text-center">${r.petak}</td>
+            <td class="text-right">${formatSaldo(r.sAwalBAP)}</td>
+            <td class="text-right">${formatSaldo(r.sAwalLHP)}</td>
+            <td class="text-right">${formatSaldo(r.bapBerjalan)}</td>
+            <td class="text-right">${formatSaldo(r.lhpBerjalan)}</td>
+            <td class="text-right">${formatSaldo(r.kirimBerjalan)}</td>
+            <td class="text-right" style="font-weight:bold">${formatSaldo(r.sBAP)}</td>
+            <td class="text-right" style="font-weight:bold">${formatSaldo(r.sLHP)}</td>
+        </tr>
+    `).join('');
+
+    // Baris Grand Total
+    html += `
+        <tr style="background-color: #f3f4f6; font-weight: bold; border-top: 2px solid #374151;">
+            <td colspan="3" class="text-center">TOTAL KESELURUHAN</td>
+            <td class="text-right">${formatSaldo(totals.totalSAwalBAP)}</td>
+            <td class="text-right">${formatSaldo(totals.totalSAwalLHP)}</td>
+            <td class="text-right">${formatSaldo(totals.totalBapBerjalan)}</td>
+            <td class="text-right">${formatSaldo(totals.totalLhpBerjalan)}</td>
+            <td class="text-right">${formatSaldo(totals.totalKirimBerjalan)}</td>
+            <td class="text-right">${formatSaldo(totals.totalGrandBAP)}</td>
+            <td class="text-right">${formatSaldo(totals.totalGrandLHP)}</td>
+        </tr>
+    `;
+
+    tableBody.innerHTML = html;
+};
 
 function renderHistoriMutasi() {
     const tableBody = document.getElementById("dashboard-table-body");
