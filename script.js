@@ -1741,13 +1741,16 @@ window.renderRekapSaldo = function () {
 // =========================================================
 function getProcessedRekapData() {
     const allData = (typeof state !== 'undefined' && Array.isArray(state.data)) ? state.data : [];
-    
-    // Ambil Filter (jika ada)
+
+    // Ambil Filter dengan Fallback ID jika elemen HTML beda nama
     const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
+    
     const fTFrom = getVal("filter-rincian-tahun-dari");
     const fBFrom = getVal("filter-rincian-bulan-dari");
-    const fTPK = getVal("filter-rincian-tpk");
-    const fJenis = getVal("filter-rincian-jenis");
+    const fTPK = getVal("filter-rincian-tpk") || getVal("filter-tpk");
+    
+    // Tarik nilai filter jenis kayu (cek ID utama & ID alternatif)
+    const fJenis = getVal("filter-rincian-jenis") || getVal("filter-jenis");
 
     const numTFrom = parseInt(fTFrom, 10);
     const numBFrom = parseInt(fBFrom, 10);
@@ -1759,22 +1762,29 @@ function getProcessedRekapData() {
     allData.forEach(d => {
         if (!d.tanggal) return;
 
-        // Filter opsional berdasarkan UI
-        if (fTPK && String(d.tpk || '').trim() !== fTPK) return;
-        if (fJenis && String(d.jenis_kayu || '').trim() !== fJenis) return;
+        // --- 1. AMBIL PROPERTI DATA FLEKSIBEL ---
+        const itemJenis = String(d.jenis_kayu || d.jenis || '').trim();
+        const itemTPK = String(d.tpk || '').trim();
+        const itemPetak = String(d.petak || '').trim();
+
+        // --- 2. LOGIKA FILTER (CASE-INSENSITIVE & TRIMMED) ---
+        if (fTPK && itemTPK.toLowerCase() !== fTPK.toLowerCase()) return;
+        
+        // Perbaikan Krusial Filter Jenis Kayu
+        if (fJenis && itemJenis.toLowerCase() !== fJenis.toLowerCase()) return;
 
         const parts = d.tanggal.split("-");
         const y = parseInt(parts[0], 10);
         const m = parseInt(parts[1], 10);
         const dVal = (isNaN(y) || isNaN(m)) ? 0 : (y * 100 + m);
 
-        const key = `${d.jenis_kayu || '-'}_${d.tpk || '-'}_${d.petak || '-'}`;
+        const key = `${itemJenis || '-'}_${itemTPK || '-'}_${itemPetak || '-'}`;
 
         if (!grouped[key]) {
             grouped[key] = {
-                jenis: d.jenis_kayu || '-',
-                tpk: d.tpk || '-',
-                petak: d.petak || '-',
+                jenis: itemJenis || '-',
+                tpk: itemTPK || '-',
+                petak: itemPetak || '-',
                 sAwalBAP: 0,
                 sAwalLHP: 0,
                 bapBerjalan: 0,
