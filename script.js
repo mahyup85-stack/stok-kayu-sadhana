@@ -2371,7 +2371,7 @@ async function exportRekapSaldoPDF() {
 
         const { jsPDF } = window.jspdf || {};
         if (!jsPDF) {
-            alert("Library jsPDF belum dimuat. Pastikan script jsPDF sudah terpasang.");
+            alert("Library jsPDF belum dimuat.");
             return;
         }
 
@@ -2410,12 +2410,13 @@ async function exportRekapSaldoPDF() {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.5);
         doc.setTextColor(71, 85, 105);
+        
         const filterBulan = (typeof state !== 'undefined' && state?.filter?.dariBulan) ? state.filter.dariBulan : "Semua";
         const filterTahun = (typeof state !== 'undefined' && state?.filter?.dariTahun) ? state.filter.dariTahun : new Date().getFullYear();
         doc.text(`Periode: ${filterBulan} ${filterTahun} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 38, { align: "center" });
 
         // =========================================================
-        // 3. AMBIL DATA DARI TABEL REKAP SPESIFIK IN DOM
+        // 3. CARI TABEL REKAP DI LAYAR SECARA OTOMATIS
         // =========================================================
         const tableBody = [];
         let gTotalAwalBap = 0, gTotalAwalLhp = 0, gTotalBap = 0, gTotalLhp = 0, gTotalKirim = 0, gTotalSaldoBap = 0, gTotalSaldoLhp = 0;
@@ -2427,25 +2428,42 @@ async function exportRekapSaldoPDF() {
             return isNaN(num) ? 0 : num;
         };
 
-        // KUNCI PERBAIKAN: Gunakan ID spesifik tabel rekap (hindari menyapu tabel mutasi)
-        const rows = document.querySelectorAll("#rekap-saldo-table-body tr, #rekapTableBody tr, #rekapTable tr tbody tr");
+        // Ambil semua tabel yang ada di halaman
+        const allTables = document.querySelectorAll("table");
+        let targetTable = null;
 
+        // Cari tabel yang header-nya memuat kata 'Jenis Kayu' atau 'Saldo BAP'
+        allTables.forEach((tbl) => {
+            if (tbl.offsetParent !== null && (tbl.innerText.includes("Jenis Kayu") || tbl.innerText.includes("Saldo BAP"))) {
+                targetTable = tbl;
+            }
+        });
+
+        if (!targetTable) {
+            alert("Tabel Rekap Saldo tidak ditemukan di layar!");
+            return;
+        }
+
+        const rows = targetTable.querySelectorAll("tbody tr");
         let rowCount = 0;
+
         rows.forEach((row) => {
             const cols = row.querySelectorAll("td");
-            
-            // Filter ketat: Hanya proses jika baris memiliki minimal 10/11 kolom dan bukan baris info/total
-            if (cols.length < 10 || row.innerText.includes("GRAND TOTAL") || row.innerText.includes("TOTAL KESELURUHAN") || row.innerText.includes("Tidak ada")) return;
+            const rowText = row.innerText.toUpperCase();
+
+            // Abaikan baris total, kosong, atau pesan 'tidak ada data'
+            if (cols.length < 5 || rowText.includes("TOTAL") || rowText.includes("TIDAK ADA")) return;
 
             rowCount++;
 
-            // Deteksi apakah kolom pertama [0] adalah nomor urut 'No' atau langsung 'Jenis Kayu'
-            const offset = (isNaN(parseInt(cols[0]?.innerText.trim())) && cols[0]?.innerText.trim().length > 3) ? 0 : 1;
+            // Jika tabel layar memiliki 10 kolom (Jenis Kayu, TPK, Petak, dst.)
+            // atau 11 kolom (termasuk kolom 'No' di paling awal)
+            const hasNoCol = cols.length >= 11;
+            const offset = hasNoCol ? 1 : 0;
 
             const jenisKayu    = cols[0 + offset]?.innerText.trim() || '-';
             const tpk          = cols[1 + offset]?.innerText.trim() || '-';
             const petak        = cols[2 + offset]?.innerText.trim() || '-';
-
             const saldoAwalBap = parseDomNum(cols[3 + offset]?.innerText);
             const saldoAwalLhp = parseDomNum(cols[4 + offset]?.innerText);
             const bap          = parseDomNum(cols[5 + offset]?.innerText);
@@ -2454,7 +2472,7 @@ async function exportRekapSaldoPDF() {
             const saldoBap     = parseDomNum(cols[8 + offset]?.innerText);
             const saldoLhp     = parseDomNum(cols[9 + offset]?.innerText);
 
-            // Akumulasi Total Keseluruhan
+            // Akumulasi Total
             gTotalAwalBap += saldoAwalBap;
             gTotalAwalLhp += saldoAwalLhp;
             gTotalBap += bap;
@@ -2479,11 +2497,11 @@ async function exportRekapSaldoPDF() {
         });
 
         if (tableBody.length === 0) {
-            alert("Tidak ada data Rekap Saldo yang ditemukan di tabel layar! Silakan terapkan filter rekap terlebih dahulu.");
+            alert("Tidak ada baris data yang bisa di-export.");
             return;
         }
 
-        // Baris Total Rekap (11 Kolom)
+        // Baris Grand Total Rekap (11 Kolom)
         tableBody.push([
             { content: 'TOTAL KESELURUHAN', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
             { content: gTotalAwalBap.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
@@ -2496,7 +2514,7 @@ async function exportRekapSaldoPDF() {
         ]);
 
         // =========================================================
-        // 4. GENERATE TABEL REKAP SALDO
+        // 4. GENERATE TABEL PDF AUTO-TABLE
         // =========================================================
         doc.autoTable({
             startY: 44,
@@ -2540,7 +2558,7 @@ async function exportRekapSaldoPDF() {
         });
 
         // =========================================================
-        // 5. DIGITAL STAMP & FOOTER
+        // 5. FOOTER & TANDA TANGAN
         // =========================================================
         let finalY = doc.lastAutoTable.finalY + 10;
         if (finalY > 160) {
@@ -2580,7 +2598,7 @@ async function exportRekapSaldoPDF() {
     }
 }
 
-// Binding Global
+// Global Binding
 window.exportRekapSaldoPdf = exportRekapSaldoPDF;
 window.exportRekapSaldoPDF = exportRekapSaldoPDF;
 
