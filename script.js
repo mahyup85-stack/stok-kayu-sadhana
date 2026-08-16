@@ -2004,10 +2004,9 @@ function getProcessedRincianData() {
 // Aliasing agar tidak ReferenceError jika dipanggil fungsi lain
 const getFilteredRincianData = getProcessedRincianData;
 
-
 function renderRincian() {
     const body = document.getElementById("rincian-table-body");
-    const pageInfo = document.getElementById("page-info"); // Elemen info halaman
+    const pageInfo = document.getElementById("page-info");
     if (!body) return;
 
     if (!state.hasAppliedFilter) {
@@ -2025,21 +2024,20 @@ function renderRincian() {
     const rowsPerPage = state.rowsPerPage || 10;
     const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
 
-    // Proteksi halaman aktif
+    // Proteksi Halaman
     if (!state.currentPage || state.currentPage < 1) state.currentPage = 1;
     if (state.currentPage > totalPages) state.currentPage = totalPages;
 
     const startIndex = (state.currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
 
-    // --- 2. HITUNG SALDO BERJALAN & TOTAL SELURUH DATA ---
+    // --- 2. AKUMULASI SALDO BERJALAN & TOTAL ---
     let runningSaldo = saldoAwal || 0;
     let totalMasukUtama = 0;
     let totalKeluarUtama = 0;
     let totalKirim = 0;
 
     const processedDataWithSaldo = filtered.map(d => {
-        // Normalisasi Properti Data (Aman dari bentrok nama variabel)
         const valP = parseFloat(d.p || d.masuk_m3 || 0); 
         const valM = parseFloat(d.m || d.keluar_m3 || 0);
         const ket = (d.ket || d.keterangan || "").toUpperCase();
@@ -2054,16 +2052,16 @@ function renderRincian() {
             klrHitung = valM;
             totalKirim += valM;
         } else if (ket.includes("LHP")) {
-            // LHP ADALAH MASUK RESMI
+            // LHP MASUK KE SALDO UTAMA
             mskTampil = valP; 
             klrTampil = 0;
             mskHitung = valP; 
             klrHitung = 0;
         } else if (ket.includes("BAP")) {
-            // BAP DITAMPILKAN DI TABEL, TAPI TIDAK MENAMBAH SALDO KEDUA KALINYA
+            // BAP TAMPIL DI TABEL, TAPI TIDAK DIHITUNG GANDA
             mskTampil = valP; 
             klrTampil = 0;
-            mskHitung = 0; // Set 0 agar TIDAK DOUBLE COUNTING dengan LHP!
+            mskHitung = 0; 
             klrHitung = 0;
         } else {
             mskTampil = valP; 
@@ -2072,7 +2070,6 @@ function renderRincian() {
             klrHitung = valM;
         }
 
-        // Akumulasi Saldo Berjalan (Running Balance)
         runningSaldo += (mskHitung - klrHitung);
         totalMasukUtama += mskHitung;
         totalKeluarUtama += klrHitung;
@@ -2087,47 +2084,46 @@ function renderRincian() {
         };
     });
 
-    // POTONG DATA HANYA UNTUK HALAMAN SEKARANG
+    // Potong data sesuai halaman aktif
     const paginatedData = processedDataWithSaldo.slice(startIndex, endIndex);
-
     let htmlContent = "";
 
-    // --- 3. BARIS SALDO AWAL (Tampilkan hanya di Halaman 1) ---
+    // --- 3. BARIS SALDO AWAL (Halaman 1) ---
     if (state.currentPage === 1) {
         htmlContent += `
-            <tr style="background-color: #f3f4f6; font-style: italic; font-weight: 500;">
-                <td colspan="5" class="text-center">SALDO AWAL (Sampai Periode Sebelumnya)</td>
+            <tr style="background-color: #f8fafc; font-style: italic;">
+                <td colspan="5" class="text-center"><strong>SALDO AWAL (Periode Sebelumnya)</strong></td>
                 <td class="text-right">-</td>
                 <td class="text-right">-</td>
-                <td class="text-right font-bold">${saldoAwal.toFixed(2)}</td>
+                <td class="text-right" style="font-weight:bold;">${saldoAwal.toFixed(2)}</td>
             </tr>
         `;
     }
 
-    // --- 4. RENDER BARIS TERCETAK (PAGINATED) ---
+    // --- 4. RENDER DATA PER HALAMAN ---
     if (paginatedData.length === 0) {
         htmlContent += `<tr><td colspan="8" class="text-center" style="padding: 15px;">Tidak ada transaksi pada periode ini.</td></tr>`;
     } else {
         paginatedData.forEach(d => {
             const ket = (d.ketTampil).toUpperCase();
-            // Memberi warna latar beda tipis untuk membedakan jenis dokumen
-            const rowStyle = ket.includes('LHP') ? 'background-color: #f9fafb;' : '';
+            const isLHP = ket.includes('LHP');
+            const rowStyle = isLHP ? 'background-color: #fffbeb; color: #92400e;' : '';
 
             htmlContent += `
                 <tr style="${rowStyle}">
                     <td>${d.tanggal || '-'}</td>
-                    <td>${d.ketTampil}</td>
+                    <td>${isLHP ? `<em>(Adm)</em> ${d.ketTampil}` : d.ketTampil}</td>
                     <td>${d.jenisTampil}</td>
                     <td>${d.tpk || '-'}</td>
-                    <td>${d.petak || '-'}</td>
+                    <td class="text-center">${d.petak || '-'}</td>
                     <td class="text-right">${d.mskTampil > 0 ? d.mskTampil.toFixed(2) : '-'}</td>
                     <td class="text-right">${d.klrTampil > 0 ? d.klrTampil.toFixed(2) : '-'}</td>
-                    <td class="text-right font-bold">${d.currentRunningSaldo.toFixed(2)}</td>
+                    <td class="text-right" style="font-weight:bold">${d.currentRunningSaldo.toFixed(2)}</td>
                 </tr>`;
         });
     }
 
-    // --- 5. BARIS GRAND TOTAL (Tampilkan di Halaman Terakhir) ---
+    // --- 5. GRAND TOTAL (Halaman Terakhir) ---
     if (state.currentPage === totalPages && (filtered.length > 0 || saldoAwal !== 0)) {
         if (totalKirim > 0) {
             htmlContent += `
@@ -2139,7 +2135,7 @@ function renderRincian() {
         }
 
         htmlContent += `
-            <tr style="background-color: #f3f4f6; font-weight: bold; border-top: 2px solid #374151;">
+            <tr style="background-color: #f1f5f9; font-weight: bold; border-top: 2px solid #334155;">
                 <td colspan="5" class="text-center">GRAND TOTAL MUTASI PERIODE INI</td>
                 <td class="text-right">${totalMasukUtama.toFixed(2)}</td>
                 <td class="text-right">${totalKeluarUtama.toFixed(2)}</td>
@@ -2149,11 +2145,17 @@ function renderRincian() {
 
     body.innerHTML = htmlContent;
 
-    // Update Teks Info Halaman
     if (pageInfo) {
         pageInfo.innerText = `Halaman ${state.currentPage} dari ${totalPages}`;
     }
 }
+
+// ---------------------------------------------------------------------
+// ALIASING GLOBAL (Mencegah Uncaught ReferenceError saat onclick HTML)
+// ---------------------------------------------------------------------
+window.renderRincian = renderRincian;
+window.renderRekapRincian = renderRincian; // <-- Penyelamat dari ReferenceError
+
 
 // BACKUP & EXPORT
 function backupData() {
