@@ -2033,16 +2033,15 @@ function renderRincian() {
     const startIndex = (state.currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
 
-    // --- 2. AKUMULASI SALDO BERJALAN & KONSISTENSI LHP/BAP ---
+    // --- 2. AKUMULASI SALDO BERJALAN & LOGIKA BAP (Adm) vs LHP (Utama) ---
     let runningSaldo = parseFloat(saldoAwal || 0);
     let totalMasukUtama = 0;
     let totalKeluarUtama = 0;
-    let totalKirim = 0;
 
     const processedDataWithSaldo = filtered.map((d) => {
         const valP = parseFloat(d.p || 0); 
         const valM = parseFloat(d.m || 0);
-        const ketUpper = String(d.ket).toUpperCase();
+        const ketUpper = String(d.ket || "").toUpperCase();
 
         let mskTampil = 0, klrTampil = 0;
         let mskHitung = 0, klrHitung = 0;
@@ -2052,15 +2051,14 @@ function renderRincian() {
             klrTampil = valM;
             mskHitung = 0; 
             klrHitung = valM;
-            totalKirim += valM;
-        } else if (ketUpper.includes("LHP")) {
-            // LHP adalah dokumen administrasi (Tampil, tapi tidak menambah saldo fisik kedua kali)
+        } else if (ketUpper.includes("BAP")) {
+            // BAP SEKARANG JADI ADM (Tampil di tabel, TAPI TIDAK DIHITUNG ke saldo)
             mskTampil = valP; 
             klrTampil = 0;
             mskHitung = 0; 
             klrHitung = 0;
-        } else if (ketUpper.includes("BAP")) {
-            // BAP adalah penambah saldo fisik utama
+        } else if (ketUpper.includes("LHP")) {
+            // LHP SEKARANG JADI MASUK UTAMA (Tampil dan DIHITUNG ke saldo)
             mskTampil = valP; 
             klrTampil = 0;
             mskHitung = valP; 
@@ -2108,13 +2106,14 @@ function renderRincian() {
         htmlContent += `<tr><td colspan="8" class="text-center" style="padding: 15px;">Tidak ada transaksi di halaman ini.</td></tr>`;
     } else {
         paginatedData.forEach(d => {
-            const isLHP = d.ketTampil.toUpperCase().includes('LHP');
-            const rowStyle = isLHP ? 'background-color: #fffbeb; color: #92400e;' : '';
+            const isBAP = d.ketTampil.toUpperCase().includes('BAP');
+            // Warna highlight abu-abu/kuning tipis untuk baris Administrasi (BAP)
+            const rowStyle = isBAP ? 'background-color: #fffbeb; color: #92400e;' : '';
 
             htmlContent += `
                 <tr style="${rowStyle}">
                     <td>${d.tanggal}</td>
-                    <td>${isLHP ? `<em>(Adm)</em> ${d.ketTampil}` : d.ketTampil}</td>
+                    <td>${isBAP ? `<em>(Adm)</em> ${d.ketTampil}` : d.ketTampil}</td>
                     <td>${d.jenisTampil}</td>
                     <td>${d.tpk}</td>
                     <td class="text-center">${d.petak}</td>
@@ -2125,17 +2124,9 @@ function renderRincian() {
         });
     }
 
-    // --- 5. GRAND TOTAL (Tampil di Hal Terakhir) ---
+    // --- 5. GRAND TOTAL (HANYA MENGHASILKAN BARIS GRAND TOTAL MUTASI) ---
     if (state.currentPage === totalPages) {
-        if (totalKirim > 0) {
-            htmlContent += `
-                <tr style="background-color: #fef2f2; color: #dc2626; font-size: 0.85rem;">
-                    <td colspan="6" class="text-center">TOTAL PENGIRIMAN PERIODE INI</td>
-                    <td class="text-right">${totalKirim.toFixed(2)}</td>
-                    <td class="text-right">-</td>
-                </tr>`;
-        }
-
+        // Baris TOTAL PENGIRIMAN SUDAH DIHAPUS TOTAL DI SINI
         htmlContent += `
             <tr style="background-color: #f1f5f9; font-weight: bold; border-top: 2px solid #334155;">
                 <td colspan="5" class="text-center">GRAND TOTAL MUTASI PERIODE INI</td>
@@ -2151,6 +2142,7 @@ function renderRincian() {
         pageInfo.innerText = `Halaman ${state.currentPage} dari ${totalPages}`;
     }
 }
+
 
 // Global Binding
 window.renderRincian = renderRincian;
