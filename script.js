@@ -2428,31 +2428,18 @@ async function exportRincianPDF() {
             return;
         }
 
-        const { filtered: dataMutasi, saldoAwal } = processed;
+        const { filtered: dataMutasi } = processed;
 
-        if (!dataMutasi || (dataMutasi.length === 0 && (saldoAwal === 0 || saldoAwal === undefined))) {
+        if (!dataMutasi || dataMutasi.length === 0) {
             alert("Tidak ada data mutasi untuk diexport!");
             return;
         }
 
         const tableBody = [];
-        let runningSaldo = parseFloat(saldoAwal || 0);
+        let runningSaldo = 0; // SALDO DIMOULAI DARI 0 (SAMA DENGAN RENDER WEB)
         let totalMasukUtama = 0;
         let totalKeluarUtama = 0;
         let rowCount = 0;
-
-        // Baris 1: Saldo Awal Periode
-        tableBody.push([
-            "-",
-            "-",
-            "SALDO AWAL PERIODE",
-            "-",
-            "-",
-            "-",
-            "-",
-            "-",
-            runningSaldo.toFixed(2)
-        ]);
 
         // Iterasi Data Transaksi Mutasi
         dataMutasi.forEach((d) => {
@@ -2468,11 +2455,11 @@ async function exportRincianPDF() {
                 mskTampil = 0; klrTampil = valM;
                 mskHitung = 0; klrHitung = valM;
             } else if (ketUpper.includes("BAP")) {
-                // BAP SEKARANG JADI ADM (Tampil di PDF, tapi TIDAK DAHITUNG ke saldo)
+                // BAP JADI ADM (Tampil di PDF, tapi TIDAK DIHITUNG ke saldo)
                 mskTampil = valP; klrTampil = 0;
                 mskHitung = 0; klrHitung = 0;
             } else if (ketUpper.includes("LHP")) {
-                // LHP SEKARANG JADI MASUK UTAMA (Tampil dan DIHITUNG ke saldo)
+                // LHP JADI MASUK UTAMA (Tampil dan DIHITUNG ke saldo)
                 mskTampil = valP; klrTampil = 0;
                 mskHitung = valP; klrHitung = 0;
             } else {
@@ -2501,7 +2488,7 @@ async function exportRincianPDF() {
             ]);
         });
 
-        // Baris Grand Total Mutasi
+        // Baris Grand Total Mutasi Periode
         tableBody.push([
             { content: 'GRAND TOTAL MUTASI PERIODE INI', colSpan: 6, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
             { content: totalMasukUtama.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
@@ -2554,7 +2541,6 @@ async function exportRincianPDF() {
         // =========================================================
         let finalY = doc.lastAutoTable.finalY + 10;
         
-        // Cek jika posisi elemen bawah melempar ke halaman baru
         if (finalY > 160) {
             doc.addPage();
             finalY = 20;
@@ -2563,7 +2549,6 @@ async function exportRincianPDF() {
         const docID = `RINCIAN-SADHANA-${Date.now().toString(36).toUpperCase()}`;
         const verifyUrl = `https://stok-kayu-sadhana.vercel.app/verify?id=${docID}`;
         
-        // Render QR Code jika fungsi pendukung ada
         if (typeof generateQRCodeBase64 === 'function') {
             const qrBase64 = await generateQRCodeBase64(verifyUrl);
             if (qrBase64) {
@@ -2571,7 +2556,6 @@ async function exportRincianPDF() {
             }
         }
 
-        // Teks Informasi Keaslian Dokumen
         doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(30, 41, 59);
@@ -2580,13 +2564,11 @@ async function exportRincianPDF() {
         doc.text(`ID Dokumen: ${docID}`, marginX + 22, finalY + 8);
         doc.text("Pindai QR Code untuk verifikasi keaslian rincian mutasi.", marginX + 22, finalY + 12);
 
-        // Blok Tanda Tangan Ganisph
         const rightAlignX = pageWidth - marginX - 45;
         doc.text("Disetujui Oleh,", rightAlignX, finalY + 4);
         doc.setFont("helvetica", "bold");
         doc.text("( GANISPH )", rightAlignX, finalY + 20);
 
-        // Penomoran Halaman Otomatis di Footer
         const totalPages = doc.internal.getNumberOfPages();
         for (let i = 1; i <= totalPages; i++) {
             doc.setPage(i);
@@ -2596,7 +2578,6 @@ async function exportRincianPDF() {
             doc.text(`Halaman ${i} dari ${totalPages}`, pageWidth - marginX, 200, { align: 'right' });
         }
 
-        // Simpan File PDF
         doc.save(`Rincian_Mutasi_Stok_Kayu_${new Date().toISOString().slice(0, 10)}.pdf`);
 
     } catch (err) {
@@ -2607,11 +2588,9 @@ async function exportRincianPDF() {
     }
 }
 
-// ---------------------------------------------------------------------
-// GLOBAL BINDING & ALIASING (Mencegah ReferenceError pada HTML)
-// ---------------------------------------------------------------------
+// Global Exposure & Aliasing
 window.exportRincianPDF = exportRincianPDF;
-window.exportRincianMutasiPDF = exportRincianPDF; // <-- Paling Penting!
+window.exportRincianMutasiPDF = exportRincianPDF;
 
 window.sinkronisasiFilterRincian = function () {
     console.log("🔄 Sinkronisasi Filter Rincian dimulai...");
