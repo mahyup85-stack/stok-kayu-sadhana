@@ -1689,7 +1689,7 @@ function hitungKonversi(jenisKayu, volumeM3) {
 function getProcessedRekapData() {
     const allData = (typeof state !== 'undefined' && Array.isArray(state.data)) ? state.data : [];
 
-    // 1. Pembacaan ID yang PRESISI sesuai HTML view-rekap
+    // 1. Pembacaan ID yang PRESISI sesuai HTML view-rekap (Hanya Bulan, Tahun, TPK, & Jenis)
     const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
     
     const fBFrom = getVal("filter-dari-bulan");
@@ -1699,7 +1699,6 @@ function getProcessedRekapData() {
 
     const fTPK = getVal("filter-tpk");
     const fJenis = getVal("filter-jenis");
-    
 
     // 2. Konversi Rentang Tanggal Filter ke Angka Integer (YYYYMM)
     const numTFrom = parseInt(fTFrom, 10);
@@ -1707,9 +1706,7 @@ function getProcessedRekapData() {
     const numTTo = parseInt(fTTo, 10);
     const numBTo = parseInt(fBTo, 10);
 
-    // fromVal = Batas Bawah Periode Pilihan
     const fromVal = (!isNaN(numTFrom) && !isNaN(numBFrom)) ? (numTFrom * 100 + numBFrom) : 0;
-    // toVal = Batas Atas Periode Pilihan
     const toVal = (!isNaN(numTTo) && !isNaN(numBTo)) ? (numTTo * 100 + numBTo) : 999999;
 
     const grouped = {};
@@ -1723,18 +1720,17 @@ function getProcessedRekapData() {
         const m = parseInt(parts[1], 10);
         const dVal = (isNaN(y) || isNaN(m)) ? 0 : (y * 100 + m);
 
-        // --- FILTER SIFAT TERBUKA & KETAT ---
-        // A. Filter TPK, Jenis, & Petak (Jika diisi)
+        // --- FILTER STRICT TANGGAL (HANYA PERIODE PILIHAN) ---
+        if (fromVal > 0 && dVal < fromVal) return; // Buang data sebelum bulan/tahun 'dari'
+        if (toVal < 999999 && dVal > toVal) return; // Buang data setelah bulan/tahun 'sampai'
+
+        // --- FILTER PROPERTIES (HANYA TPK & JENIS) ---
         const itemJenis = String(d.jenis_kayu || d.jenis || '').trim();
         const itemTPK = String(d.tpk || '').trim();
-        const itemPetak = String(d.petak || '').trim();
+        const itemPetak = String(d.petak || '').trim(); // Tetap diambil untuk ditampilkan di tabel
 
         if (fTPK && itemTPK.toLowerCase() !== fTPK.toLowerCase()) return;
         if (fJenis && itemJenis.toLowerCase() !== fJenis.toLowerCase()) return;
-        if (fPetak && itemPetak.toLowerCase() !== fPetak.toLowerCase()) return;
-
-        // B. Abaikan data yang berada SETELAH periode 'Sampai'
-        if (toVal < 999999 && dVal > toVal) return;
 
         // --- GROUPING DATA PER (JENIS + TPK + PETAK) ---
         const key = `${itemJenis || '-'}_${itemTPK || '-'}_${itemPetak || '-'}`;
@@ -1743,7 +1739,7 @@ function getProcessedRekapData() {
             grouped[key] = {
                 jenis: itemJenis || '-',
                 tpk: itemTPK || '-',
-                petak: itemPetak || '-',
+                petak: itemPetak || '-', // Cukup di-select / ditampilkan di sini
                 sAwalBAP: 0,
                 sAwalLHP: 0,
                 bapBerjalan: 0,
@@ -1759,23 +1755,13 @@ function getProcessedRekapData() {
         const valKeluar = parseFloat(d.keluar_m3 || d.m || 0);
         const ket = (d.keterangan || "").toUpperCase();
 
-        // C. Hitung SALDO AWAL (Data sebelum 'Dari Bulan/Tahun')
-        if (fromVal > 0 && dVal < fromVal) {
-            if (!ket.includes("LHP")) {
-                item.sAwalBAP += (valMasuk - valKeluar);
-            } else {
-                item.sAwalLHP += valMasuk;
-            }
-        } 
-        // D. Hitung MUTASI BERJALAN (Data tepat di dalam Periode Pilihan)
-        else {
-            if (ket.includes("KIRIM")) {
-                item.kirimBerjalan += valKeluar;
-            } else if (ket.includes("LHP")) {
-                item.lhpBerjalan += valMasuk;
-            } else {
-                item.bapBerjalan += valMasuk;
-            }
+        // Hitung Transaksi Berjalan di Periode Terpilih
+        if (ket.includes("KIRIM")) {
+            item.kirimBerjalan += valKeluar;
+        } else if (ket.includes("LHP")) {
+            item.lhpBerjalan += valMasuk;
+        } else {
+            item.bapBerjalan += valMasuk;
         }
     });
 
@@ -1788,11 +1774,9 @@ function getProcessedRekapData() {
     };
 
     Object.values(grouped).forEach(item => {
-        // Formulasi Akurat: Saldo Akhir = Saldo Awal + Masuk Berjalan - Kirim Berjalan
-        item.sBAP = item.sAwalBAP + item.bapBerjalan - item.kirimBerjalan;
-        item.sLHP = item.sAwalLHP + item.lhpBerjalan - item.kirimBerjalan;
+        item.sBAP = item.bapBerjalan - item.kirimBerjalan;
+        item.sLHP = item.lhpBerjalan - item.kirimBerjalan;
 
-        // Akumulasi Baris ke Grand Total
         totals.totalSAwalBAP += item.sAwalBAP;
         totals.totalSAwalLHP += item.sAwalLHP;
         totals.totalBapBerjalan += item.bapBerjalan;
