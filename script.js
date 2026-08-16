@@ -1689,25 +1689,27 @@ function hitungKonversi(jenisKayu, volumeM3) {
 function getProcessedRekapData() {
     const allData = (typeof state !== 'undefined' && Array.isArray(state.data)) ? state.data : [];
 
+    // 1. Pembacaan ID yang PRESISI sesuai HTML view-rekap
     const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
     
-    // Ambil Filter Tahun & Bulan (Dari & Sampai)
-    const fTFrom = getVal("filter-rincian-tahun-dari") || getVal("filter-tahun-dari");
-    const fBFrom = getVal("filter-rincian-bulan-dari") || getVal("filter-bulan-dari");
-    const fTTo = getVal("filter-rincian-tahun-sampai") || getVal("filter-tahun-sampai");
-    const fBTo = getVal("filter-rincian-bulan-sampai") || getVal("filter-bulan-sampai");
+    const fBFrom = getVal("filter-dari-bulan");
+    const fTFrom = getVal("filter-dari-tahun");
+    const fBTo = getVal("filter-sampai-bulan");
+    const fTTo = getVal("filter-sampai-tahun");
 
-    const fTPK = getVal("filter-rincian-tpk") || getVal("filter-tpk");
-    const fJenis = getVal("filter-rincian-jenis") || getVal("filter-jenis");
+    const fTPK = getVal("filter-tpk");
+    const fJenis = getVal("filter-jenis");
+    
 
-    // Konversi Filter ke Angka Integer untuk Pembandingan (Contoh: 2026-03 -> 202603)
+    // 2. Konversi Rentang Tanggal Filter ke Angka Integer (YYYYMM)
     const numTFrom = parseInt(fTFrom, 10);
     const numBFrom = parseInt(fBFrom, 10);
     const numTTo = parseInt(fTTo, 10);
     const numBTo = parseInt(fBTo, 10);
 
-    // Tentukan Nilai Batas Bawah dan Batas Atas Periode
+    // fromVal = Batas Bawah Periode Pilihan
     const fromVal = (!isNaN(numTFrom) && !isNaN(numBFrom)) ? (numTFrom * 100 + numBFrom) : 0;
+    // toVal = Batas Atas Periode Pilihan
     const toVal = (!isNaN(numTTo) && !isNaN(numBTo)) ? (numTTo * 100 + numBTo) : 999999;
 
     const grouped = {};
@@ -1715,26 +1717,26 @@ function getProcessedRekapData() {
     allData.forEach(d => {
         if (!d.tanggal) return;
 
-        // --- 1. PARSING TANGGAL DATA ---
+        // Parsing Tanggal Data Transaksi (Format expected: YYYY-MM-DD)
         const parts = d.tanggal.split("-");
         const y = parseInt(parts[0], 10);
         const m = parseInt(parts[1], 10);
         const dVal = (isNaN(y) || isNaN(m)) ? 0 : (y * 100 + m);
 
-        // --- 2. FILTER KETAT BULAN & TAHUN ---
-        // Jika filter dari/sampai diisi, buang data yang ada di LUAR RENTANG TERSEBUT
-        if (fromVal > 0 && dVal < fromVal) return; // Abaikan data sebelum bulan/tahun 'dari'
-        if (toVal < 999999 && dVal > toVal) return; // Abaikan data setelah bulan/tahun 'sampai'
-
-        // --- 3. FILTER TPK & JENIS KAYU ---
+        // --- FILTER SIFAT TERBUKA & KETAT ---
+        // A. Filter TPK, Jenis, & Petak (Jika diisi)
         const itemJenis = String(d.jenis_kayu || d.jenis || '').trim();
         const itemTPK = String(d.tpk || '').trim();
         const itemPetak = String(d.petak || '').trim();
 
         if (fTPK && itemTPK.toLowerCase() !== fTPK.toLowerCase()) return;
         if (fJenis && itemJenis.toLowerCase() !== fJenis.toLowerCase()) return;
+        if (fPetak && itemPetak.toLowerCase() !== fPetak.toLowerCase()) return;
 
-        // --- 4. GROUPING DATA (Hanya Data Berjalan dalam Periode Ini) ---
+        // B. Abaikan data yang berada SETELAH periode 'Sampai'
+        if (toVal < 999999 && dVal > toVal) return;
+
+        // --- GROUPING DATA PER (JENIS + TPK + PETAK) ---
         const key = `${itemJenis || '-'}_${itemTPK || '-'}_${itemPetak || '-'}`;
 
         if (!grouped[key]) {
@@ -1757,17 +1759,27 @@ function getProcessedRekapData() {
         const valKeluar = parseFloat(d.keluar_m3 || d.m || 0);
         const ket = (d.keterangan || "").toUpperCase();
 
-        // Hitung Transaksi Berjalan di Periode Pilihan Ini
-        if (ket.includes("KIRIM")) {
-            item.kirimBerjalan += valKeluar;
-        } else if (ket.includes("LHP")) {
-            item.lhpBerjalan += valMasuk;
-        } else {
-            item.bapBerjalan += valMasuk;
+        // C. Hitung SALDO AWAL (Data sebelum 'Dari Bulan/Tahun')
+        if (fromVal > 0 && dVal < fromVal) {
+            if (!ket.includes("LHP")) {
+                item.sAwalBAP += (valMasuk - valKeluar);
+            } else {
+                item.sAwalLHP += valMasuk;
+            }
+        } 
+        // D. Hitung MUTASI BERJALAN (Data tepat di dalam Periode Pilihan)
+        else {
+            if (ket.includes("KIRIM")) {
+                item.kirimBerjalan += valKeluar;
+            } else if (ket.includes("LHP")) {
+                item.lhpBerjalan += valMasuk;
+            } else {
+                item.bapBerjalan += valMasuk;
+            }
         }
     });
 
-    // Hitung Total Rekap Akhir
+    // 3. Kalkulasi Akhir Saldo BAP & LHP serta Grand Total
     const rows = [];
     const totals = {
         totalSAwalBAP: 0, totalSAwalLHP: 0,
@@ -1776,10 +1788,13 @@ function getProcessedRekapData() {
     };
 
     Object.values(grouped).forEach(item => {
-        // Karena hanya menampilkan periode terpilih, Saldo Akhir = Total Transaksi Berjalan Periode Tersebut
-        item.sBAP = item.bapBerjalan - item.kirimBerjalan;
-        item.sLHP = item.lhpBerjalan - item.kirimBerjalan;
+        // Formulasi Akurat: Saldo Akhir = Saldo Awal + Masuk Berjalan - Kirim Berjalan
+        item.sBAP = item.sAwalBAP + item.bapBerjalan - item.kirimBerjalan;
+        item.sLHP = item.sAwalLHP + item.lhpBerjalan - item.kirimBerjalan;
 
+        // Akumulasi Baris ke Grand Total
+        totals.totalSAwalBAP += item.sAwalBAP;
+        totals.totalSAwalLHP += item.sAwalLHP;
         totals.totalBapBerjalan += item.bapBerjalan;
         totals.totalLhpBerjalan += item.lhpBerjalan;
         totals.totalKirimBerjalan += item.kirimBerjalan;
