@@ -1736,43 +1736,6 @@ window.renderRekapSaldo = function () {
     tableBody.innerHTML = html;
 };
 
-window.renderRekapTable = function () {
-    console.log("Memulai Render Tabel Rekap...");
-
-    // 1. Ambil nilai filter dari UI
-    const tahunDari = document.getElementById('filter-rincian-tahun-dari')?.value;
-    const tahunSampai = document.getElementById('filter-rincian-tahun-sampai')?.value;
-    const jenisKayu = document.getElementById('filter-jenis')?.value;
-
-    // 2. Filter data berdasarkan input
-    let dataFiltered = [...state.data];
-
-    if (tahunDari) {
-        dataFiltered = dataFiltered.filter(d => d.tanggal.split('-')[0] >= tahunDari);
-    }
-    if (tahunSampai) {
-        dataFiltered = dataFiltered.filter(d => d.tanggal.split('-')[0] <= tahunSampai);
-    }
-    if (jenisKayu) {
-        dataFiltered = dataFiltered.filter(d => d.jenis_kayu === jenisKayu);
-    }
-
-    // 3. Logika untuk menampilkan ke HTML Tabel Rekap Anda
-    // (Sesuaikan ID 'tabel-rekap-body' dengan ID <tbody> di HTML Anda)
-    const tbody = document.getElementById('tabel-rekap-body');
-    if (!tbody) return;
-
-    tbody.innerHTML = dataFiltered.map((d, index) => `
-        <tr>
-            <td>${index + 1}</td>
-            <td>${d.tanggal}</td>
-            <td>${d.jenis_kayu}</td>
-            <td>${d.masuk || 0}</td>
-            <td>${d.keluar || 0}</td>
-        </tr>
-    `).join('');
-};
-
 // Helper untuk memproses data rekap (filter + grouping)
 // Helper untuk memproses data rekap (filter + grouping)
 function getProcessedRekapData() {
