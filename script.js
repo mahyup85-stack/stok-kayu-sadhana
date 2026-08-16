@@ -2375,7 +2375,8 @@ async function exportRekapSaldoPDF() {
             return;
         }
 
-        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        // Menggunakan LANDSCAPE agar 10 Kolom muat dengan presisi
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
         const pageWidth = doc.internal.pageSize.getWidth();
         const marginX = 14;
 
@@ -2422,12 +2423,15 @@ async function exportRekapSaldoPDF() {
         // 3. OLAH DATA REKAP (STATE / DOM FALLBACK)
         // =========================================================
         const tableBody = [];
-        let grandTotalSaldoAwal = 0;
-        let grandTotalMasuk = 0;
-        let grandTotalKeluar = 0;
-        let grandTotalSaldoAkhir = 0;
+        let grandTotalSaldoAwalBap = 0;
+        let grandTotalSaldoAwalLhp = 0;
+        let grandTotalBap = 0;
+        let grandTotalLhp = 0;
+        let grandTotalKirim = 0;
+        let grandTotalSaldoBap = 0;
+        let grandTotalSaldoLhp = 0;
 
-        // Opsi A: Ambil dari fungsi helper jika ada
+        // Opsi A: Ambil dari state / helper
         let rekapData = [];
         if (typeof getProcessedRekapSaldoData === 'function') {
             rekapData = getProcessedRekapSaldoData() || [];
@@ -2437,44 +2441,53 @@ async function exportRekapSaldoPDF() {
 
         if (rekapData && rekapData.length > 0) {
             rekapData.forEach((d, index) => {
-                const sAwal = parseFloat(d.saldoAwal || 0);
-                const msk = parseFloat(d.masuk || 0);
-                const klr = parseFloat(d.keluar || 0);
-                const sAkhir = parseFloat(d.saldoAkhir || (sAwal + msk - klr));
+                const sAwalBap = parseFloat(d.saldoAwalBap || 0);
+                const sAwalLhp = parseFloat(d.saldoAwalLhp || 0);
+                const bap = parseFloat(d.bap || d.masukBap || 0);
+                const lhp = parseFloat(d.lhp || d.masukLhp || 0);
+                const kirim = parseFloat(d.kirim || d.keluar || 0);
+                const sBap = parseFloat(d.saldoBap || (sAwalBap + bap - lhp));
+                const sLhp = parseFloat(d.saldoLhp || (sAwalLhp + lhp - kirim));
 
-                grandTotalSaldoAwal += sAwal;
-                grandTotalMasuk += msk;
-                grandTotalKeluar += klr;
-                grandTotalSaldoAkhir += sAkhir;
+                grandTotalSaldoAwalBap += sAwalBap;
+                grandTotalSaldoAwalLhp += sAwalLhp;
+                grandTotalBap += bap;
+                grandTotalLhp += lhp;
+                grandTotalKirim += kirim;
+                grandTotalSaldoBap += sBap;
+                grandTotalSaldoLhp += sLhp;
 
                 tableBody.push([
                     index + 1,
-                    d.tpk || '-',
                     d.jenisKayu || d.jenis || '-',
-                    sAwal.toFixed(2),
-                    msk > 0 ? msk.toFixed(2) : '-',
-                    klr > 0 ? klr.toFixed(2) : '-',
-                    sAkhir.toFixed(2)
+                    d.tpk || '-',
+                    d.petak || '-',
+                    sAwalBap > 0 ? sAwalBap.toFixed(2) : '-',
+                    sAwalLhp > 0 ? sAwalLhp.toFixed(2) : '-',
+                    bap > 0 ? bap.toFixed(2) : '-',
+                    lhp > 0 ? lhp.toFixed(2) : '-',
+                    kirim > 0 ? kirim.toFixed(2) : '-',
+                    sBap.toFixed(2),
+                    sLhp.toFixed(2)
                 ]);
             });
         } else {
-            // Opsi B (Fallback): Ambil langsung dari elemen Tabel di Layar Web jika State Kosong
+            // Opsi B (Fallback): Ambil langsung dari tabel HTML di layar
             const tableRows = document.querySelectorAll("#rekap-saldo-table-body tr, #rekapTableBody tr, table tbody tr");
-            let validRowCount = 0;
 
             tableRows.forEach((row) => {
                 const cols = row.querySelectorAll("td");
-                // Abaikan jika baris berisi pesan "tidak ada data" atau baris total
                 if (cols.length >= 4 && !row.innerText.includes("Silakan") && !row.innerText.includes("Tidak ada") && !row.innerText.includes("GRAND TOTAL") && !row.innerText.includes("TOTAL")) {
-                    validRowCount++;
                     const rowCells = Array.from(cols).map(c => c.innerText.trim());
                     
-                    // Ekstraksi nilai angka untuk grand total jika 7 kolom
-                    if (cols.length >= 7) {
-                        grandTotalSaldoAwal += parseFloat(rowCells[3]) || 0;
-                        grandTotalMasuk += parseFloat(rowCells[4]) || 0;
-                        grandTotalKeluar += parseFloat(rowCells[5]) || 0;
-                        grandTotalSaldoAkhir += parseFloat(rowCells[6]) || 0;
+                    if (cols.length >= 11) {
+                        grandTotalSaldoAwalBap += parseFloat(rowCells[4]) || 0;
+                        grandTotalSaldoAwalLhp += parseFloat(rowCells[5]) || 0;
+                        grandTotalBap += parseFloat(rowCells[6]) || 0;
+                        grandTotalLhp += parseFloat(rowCells[7]) || 0;
+                        grandTotalKirim += parseFloat(rowCells[8]) || 0;
+                        grandTotalSaldoBap += parseFloat(rowCells[9]) || 0;
+                        grandTotalSaldoLhp += parseFloat(rowCells[10]) || 0;
                     }
                     
                     tableBody.push(rowCells);
@@ -2487,13 +2500,16 @@ async function exportRekapSaldoPDF() {
             return;
         }
 
-        // Baris Grand Total Rekap
+        // Baris Grand Total Rekap (Sintaks Koma Sudah Diperbaiki)
         tableBody.push([
-            { content: 'TOTAL KESELURUHAN', colSpan: 3, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
-            { content: grandTotalSaldoAwal.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
-            { content: grandTotalMasuk.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
-            { content: grandTotalKeluar.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
-            { content: grandTotalSaldoAkhir.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
+            { content: 'TOTAL KESELURUHAN', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: grandTotalSaldoAwalBap.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: grandTotalSaldoAwalLhp.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: grandTotalBap.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: grandTotalLhp.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: grandTotalKirim.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: grandTotalSaldoBap.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }, // Tanda koma diperbaiki
+            { content: grandTotalSaldoLhp.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
         ]);
 
         // =========================================================
@@ -2503,12 +2519,16 @@ async function exportRekapSaldoPDF() {
             startY: 43,
             head: [[
                 'No', 
-                'TPK / Lokasi', 
                 'Jenis Kayu', 
-                'Saldo Awal (m³)', 
-                'Masuk (m³)', 
-                'Keluar (m³)', 
-                'Saldo Akhir (m³)'
+                'TPK',
+                'Petak',
+                'Saldo Awal BAP (m³)', 
+                'Saldo Awal LHP (m³)', 
+                'BAP (m³)', 
+                'LHP (m³)', 
+                'Kirim (m³)', // Tanda koma diperbaiki
+                'Saldo BAP (m³)', 
+                'Saldo LHP (m³)'
             ]],
             body: tableBody,
             theme: 'grid',
@@ -2517,17 +2537,21 @@ async function exportRekapSaldoPDF() {
                 textColor: [255, 255, 255],
                 fontStyle: 'bold',
                 halign: 'center',
-                fontSize: 9
+                fontSize: 8
             },
-            bodyStyles: { fontSize: 8.5, textColor: [51, 65, 85] },
+            bodyStyles: { fontSize: 8, textColor: [51, 65, 85] },
             columnStyles: {
-                0: { halign: 'center', cellWidth: 12 },
+                0: { halign: 'center', cellWidth: 10 },
                 1: { halign: 'left' },
-                2: { halign: 'left' },
-                3: { halign: 'right', cellWidth: 30 },
-                4: { halign: 'right', cellWidth: 30 },
-                5: { halign: 'right', cellWidth: 30 },
-                6: { halign: 'right', cellWidth: 32, fontStyle: 'bold' }
+                2: { halign: 'center', cellWidth: 25 },
+                3: { halign: 'center', cellWidth: 20 },
+                4: { halign: 'right', cellWidth: 25 },
+                5: { halign: 'right', cellWidth: 25 },
+                6: { halign: 'right', cellWidth: 22 },
+                7: { halign: 'right', cellWidth: 22 },
+                8: { halign: 'right', cellWidth: 22 },
+                9: { halign: 'right', cellWidth: 25, fontStyle: 'bold' },
+                10: { halign: 'right', cellWidth: 25, fontStyle: 'bold' }
             },
             margin: { left: marginX, right: marginX }
         });
@@ -2535,11 +2559,11 @@ async function exportRekapSaldoPDF() {
         // =========================================================
         // 5. QR CODE VERIFIKASI & TANDA TANGAN (FOOTER)
         // =========================================================
-        let finalY = doc.lastAutoTable.finalY + 12;
+        let finalY = doc.lastAutoTable.finalY + 10;
         
-        if (finalY > 230) {
+        if (finalY > 160) {
             doc.addPage();
-            finalY = 25;
+            finalY = 20;
         }
 
         const docID = `REKAP-SADHANA-${Date.now().toString(36).toUpperCase()}`;
@@ -2568,10 +2592,10 @@ async function exportRekapSaldoPDF() {
         const totalPages = doc.internal.getNumberOfPages();
         for (let i = 1; i <= totalPages; i++) {
             doc.setPage(i);
-            doc.setFontSize(8);
+            doc.setFontSize(7.5);
             doc.setFont("helvetica", "normal");
             doc.setTextColor(148, 163, 184);
-            doc.text(`Halaman ${i} dari ${totalPages}`, pageWidth - marginX, 287, { align: 'right' });
+            doc.text(`Halaman ${i} dari ${totalPages}`, pageWidth - marginX, 200, { align: 'right' });
         }
 
         doc.save(`Rekap_Saldo_Stok_Kayu_${new Date().toISOString().slice(0, 10)}.pdf`);
