@@ -1885,15 +1885,15 @@ function getProcessedRincianData() {
     // Helper aman dari null / undefined
     const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
     
-    // 1. Ambil Filter dari HTML view-rekap-rincian
+    // 1. Ambil Filter dari HTML
     const fTFrom = getVal("filter-rincian-tahun-dari");
     const fBFrom = getVal("filter-rincian-bulan-dari");
     const fTTo = getVal("filter-rincian-tahun-sampai");
     const fBTo = getVal("filter-rincian-bulan-sampai");
 
-    const fTPK = getVal("filter-rincian-tpk");
-    const fJenis = getVal("filter-rincian-jenis");
-    const fPetak = getVal("filter-rincian-petak");
+    const fTPK = getVal("filter-rincian-tpk").toLowerCase();
+    const fJenis = getVal("filter-rincian-jenis").toLowerCase();
+    const fPetak = getVal("filter-rincian-petak").toLowerCase();
     const fKet = getVal("filter-rincian-ket").toLowerCase();
 
     const numTFrom = parseInt(fTFrom, 10);
@@ -1907,30 +1907,31 @@ function getProcessedRincianData() {
     let saldoAwal = 0;
 
     // -------------------------------------------------------------
-    // STEP 1: HITUNG SALDO AWAL (Hanya Fisik / Non-LHP Sebelum Periode)
+    // STEP 1: HITUNG SALDO AWAL (Hanyahitung BAP/Fisik Sebelum Periode)
     // -------------------------------------------------------------
     allData.forEach(d => {
         if (!d.tanggal) return;
-        const [y, m] = d.tanggal.split("-");
-        const dVal = parseInt(y, 10) * 100 + parseInt(m, 10);
-        const ket = (d.keterangan || "").toUpperCase();
+        const parts = d.tanggal.split("-");
+        if (parts.length < 2) return;
+        
+        const dVal = parseInt(parts[0], 10) * 100 + parseInt(parts[1], 10);
+        const ket = (d.keterangan || d.ket || "").toUpperCase();
 
         if (fromVal > 0 && dVal < fromVal) {
-            // Filter Kategori
-            const itemJenis = String(d.jenis_kayu || d.jenis || '').trim();
-            const itemTPK = String(d.tpk || '').trim();
-            const itemPetak = String(d.petak || '').trim();
+            const itemJenis = String(d.jenis_kayu || d.jenis || '').trim().toLowerCase();
+            const itemTPK = String(d.tpk || '').trim().toLowerCase();
+            const itemPetak = String(d.petak || '').trim().toLowerCase();
 
-            if (fTPK && itemTPK.toLowerCase() !== fTPK.toLowerCase()) return;
-            if (fJenis && itemJenis.toLowerCase() !== fJenis.toLowerCase()) return;
-            if (fPetak && itemPetak.toLowerCase() !== fPetak.toLowerCase()) return;
+            // PENTING: Hanya filter jika inputan user TIDAK KOSONG
+            if (fTPK !== "" && itemTPK !== fTPK) return;
+            if (fJenis !== "" && itemJenis !== fJenis) return;
+            if (fPetak !== "" && itemPetak !== fPetak) return;
 
-            // LOGIKA KRUSIAL ANTI DOUBLE COUNTING SALDO AWAL:
-            // LHP diabaikan di saldo awal karena barang fisik sudah diwakili BAP sebelumnya
+            // KONSISTENSI LOGIKA: Abaikan LHP di Saldo Awal (Karena sudah terwakili BAP)
             if (ket.includes("LHP")) return;
 
-            const masuk = parseFloat(d.masuk_m3 || d.p || 0);
-            const keluar = parseFloat(d.keluar_m3 || d.m || 0);
+            const masuk = parseFloat(d.masuk_m3 || d.p || 0) || 0;
+            const keluar = parseFloat(d.keluar_m3 || d.m || 0) || 0;
             saldoAwal += (masuk - keluar);
         }
     });
@@ -1940,28 +1941,30 @@ function getProcessedRincianData() {
     // -------------------------------------------------------------
     let filtered = allData.filter(d => {
         if (!d.tanggal) return false;
-        const [y, m] = d.tanggal.split("-");
-        const dVal = parseInt(y, 10) * 100 + parseInt(m, 10);
+        const parts = d.tanggal.split("-");
+        if (parts.length < 2) return false;
+        
+        const dVal = parseInt(parts[0], 10) * 100 + parseInt(parts[1], 10);
 
         if (fromVal > 0 && dVal < fromVal) return false;
         if (toVal < 999999 && dVal > toVal) return false;
 
-        const itemJenis = String(d.jenis_kayu || d.jenis || '').trim();
-        const itemTPK = String(d.tpk || '').trim();
-        const itemPetak = String(d.petak || '').trim();
-        const itemKet = String(d.keterangan || '').toLowerCase();
+        const itemJenis = String(d.jenis_kayu || d.jenis || '').trim().toLowerCase();
+        const itemTPK = String(d.tpk || '').trim().toLowerCase();
+        const itemPetak = String(d.petak || '').trim().toLowerCase();
+        const itemKet = String(d.keterangan || d.ket || '').toLowerCase();
 
-        if (fTPK && itemTPK.toLowerCase() !== fTPK.toLowerCase()) return false;
-        if (fJenis && itemJenis.toLowerCase() !== fJenis.toLowerCase()) return false;
-        if (fPetak && itemPetak.toLowerCase() !== fPetak.toLowerCase()) return false;
-        if (fKet && !itemKet.includes(fKet)) return false;
+        // PENTING: Cek keabsahan filter opsional
+        if (fTPK !== "" && itemTPK !== fTPK) return false;
+        if (fJenis !== "" && itemJenis !== fJenis) return false;
+        if (fPetak !== "" && itemPetak !== fPetak) return false;
+        if (fKet !== "" && !itemKet.includes(fKet)) return false;
 
         return true;
     }).sort((a, b) => {
         const dateDiff = new Date(a.tanggal) - new Date(b.tanggal);
         if (dateDiff !== 0) return dateDiff;
 
-        // Prioritas Eksekusi: BAP (Masuk Fisik) -> LHP (Dokumen) -> KIRIM (Keluar)
         const getPriority = (k) => {
             const txt = (k || "").toUpperCase();
             if (txt.includes("SALDO AWAL")) return 0;
@@ -1970,30 +1973,21 @@ function getProcessedRincianData() {
             if (txt.includes("KIRIM")) return 3;
             return 4;
         };
-        return getPriority(a.keterangan) - getPriority(b.keterangan);
+        return getPriority(a.keterangan || a.ket) - getPriority(b.keterangan || b.ket);
     });
 
     // -------------------------------------------------------------
-    // STEP 3: MAPPING & PROTEKSI DOUBLE COUNTING PERIODE BERJALAN
+    // STEP 3: MAPPING DATA
     // -------------------------------------------------------------
     const mappedFiltered = filtered.map(d => {
-        const ketUpper = (d.keterangan || "").toUpperCase();
-        const rawMasuk = parseFloat(d.masuk_m3 || d.p || 0);
-        const rawKeluar = parseFloat(d.keluar_m3 || d.m || 0);
-
-        // Jika aturan Anda: LHP adalah satu-satunya penambah saldo fisik resmi di laporan mutasi,
-        // maka angka BAP di set pEffective = 0 agar tidak menambah Saldo Berjalan (Running Balance)
-        let pEffective = rawMasuk;
-        if (ketUpper.includes("BAP")) {
-            // Catatan: Jika BAP hanya dokumen pencatatan awal dan LHP penegasnya:
-            // pEffective = 0; // Aktifkan ini jika BAP ingin di-nol-kan di kolom Masuk
-        }
+        const rawMasuk = parseFloat(d.masuk_m3 ?? d.p ?? 0) || 0;
+        const rawKeluar = parseFloat(d.keluar_m3 ?? d.m ?? 0) || 0;
 
         return {
             ...d,
-            p: pEffective,
+            p: rawMasuk,
             m: rawKeluar,
-            ket: d.keterangan || "",
+            ket: d.keterangan || d.ket || "",
             jenis: d.jenis_kayu || d.jenis || ""
         };
     });
@@ -2001,7 +1995,7 @@ function getProcessedRincianData() {
     return { filtered: mappedFiltered, saldoAwal };
 }
 
-// Aliasing agar tidak ReferenceError jika dipanggil fungsi lain
+// Aliasing
 const getFilteredRincianData = getProcessedRincianData;
 
 function renderRincian() {
@@ -2023,43 +2017,32 @@ function renderRincian() {
     const { filtered, saldoAwal } = processed;
     const totalRows = filtered.length;
 
-    // JIKA TIDAK ADA DATA SAMA SEKALI
     if (totalRows === 0 && (saldoAwal === 0 || saldoAwal === undefined)) {
         body.innerHTML = '<tr><td colspan="8" class="text-center" style="padding: 20px; color: #64748b;">Tidak ada data mutasi yang sesuai dengan filter.</td></tr>';
         if (pageInfo) pageInfo.innerText = "Halaman 0 dari 0";
         return;
     }
 
-    // --- 1. DEFENSIVE PAGINATION ---
+    // --- 1. PAGINATION CHECK ---
     const rowsPerPage = state.rowsPerPage || 10;
     const totalPages = Math.ceil(totalRows / rowsPerPage) || 1;
 
-    // Reset currentPage jika melebihi batas totalPages setelah filter
     if (!state.currentPage || state.currentPage < 1) state.currentPage = 1;
-    if (state.currentPage > totalPages) state.currentPage = 1; // Auto reset ke Hal 1 jika halaman melebih batas
+    if (state.currentPage > totalPages) state.currentPage = 1;
 
     const startIndex = (state.currentPage - 1) * rowsPerPage;
     const endIndex = startIndex + rowsPerPage;
 
-    // --- 2. AKUMULASI SALDO BERJALAN & DEFENSIVE DATA MAPPING ---
+    // --- 2. AKUMULASI SALDO BERJALAN & KONSISTENSI LHP/BAP ---
     let runningSaldo = parseFloat(saldoAwal || 0);
     let totalMasukUtama = 0;
     let totalKeluarUtama = 0;
     let totalKirim = 0;
 
-    const processedDataWithSaldo = filtered.map((d, index) => {
-        // Safe Parsing: Membaca d.p ATAU d.masuk_m3 ATAU d.masuk
-        const valP = parseFloat(d.p ?? d.masuk_m3 ?? d.masuk ?? 0) || 0; 
-        const valM = parseFloat(d.m ?? d.keluar_m3 ?? d.keluar ?? 0) || 0;
-        
-        // Safe Text Extraction
-        const rawKet = String(d.ket || d.keterangan || d.uraian || '-');
-        const ketUpper = rawKet.toUpperCase();
-
-        const tanggal = d.tanggal || d.tgl || '-';
-        const jenis = d.jenis || d.jenis_kayu || d.kayu || '-';
-        const tpk = d.tpk || '-';
-        const petak = d.petak || '-';
+    const processedDataWithSaldo = filtered.map((d) => {
+        const valP = parseFloat(d.p || 0); 
+        const valM = parseFloat(d.m || 0);
+        const ketUpper = String(d.ket).toUpperCase();
 
         let mskTampil = 0, klrTampil = 0;
         let mskHitung = 0, klrHitung = 0;
@@ -2071,14 +2054,16 @@ function renderRincian() {
             klrHitung = valM;
             totalKirim += valM;
         } else if (ketUpper.includes("LHP")) {
+            // LHP adalah dokumen administrasi (Tampil, tapi tidak menambah saldo fisik kedua kali)
+            mskTampil = valP; 
+            klrTampil = 0;
+            mskHitung = 0; 
+            klrHitung = 0;
+        } else if (ketUpper.includes("BAP")) {
+            // BAP adalah penambah saldo fisik utama
             mskTampil = valP; 
             klrTampil = 0;
             mskHitung = valP; 
-            klrHitung = 0;
-        } else if (ketUpper.includes("BAP")) {
-            mskTampil = valP; 
-            klrTampil = 0;
-            mskHitung = 0; // Cegah double counting dengan LHP
             klrHitung = 0;
         } else {
             mskTampil = valP; 
@@ -2092,22 +2077,21 @@ function renderRincian() {
         totalKeluarUtama += klrHitung;
 
         return {
-            tanggal,
-            ketTampil: rawKet,
-            jenisTampil: jenis,
-            tpk,
-            petak,
+            tanggal: d.tanggal || '-',
+            ketTampil: d.ket || '-',
+            jenisTampil: d.jenis || '-',
+            tpk: d.tpk || '-',
+            petak: d.petak || '-',
             mskTampil,
             klrTampil,
             currentRunningSaldo: runningSaldo
         };
     });
 
-    // Cutting data untuk halaman saat ini
     const paginatedData = processedDataWithSaldo.slice(startIndex, endIndex);
     let htmlContent = "";
 
-    // --- 3. BARIS SALDO AWAL (Halaman 1) ---
+    // --- 3. SALDO AWAL (Tampil di Hal 1) ---
     if (state.currentPage === 1) {
         htmlContent += `
             <tr style="background-color: #f8fafc; font-style: italic;">
@@ -2141,7 +2125,7 @@ function renderRincian() {
         });
     }
 
-    // --- 5. GRAND TOTAL (Halaman Terakhir) ---
+    // --- 5. GRAND TOTAL (Tampil di Hal Terakhir) ---
     if (state.currentPage === totalPages) {
         if (totalKirim > 0) {
             htmlContent += `
@@ -2168,9 +2152,10 @@ function renderRincian() {
     }
 }
 
-// Global binding untuk mencegah ReferenceError
+// Global Binding
 window.renderRincian = renderRincian;
 window.renderRekapRincian = renderRincian;
+window.getProcessedRincianData = getProcessedRincianData;
 
 // BACKUP & EXPORT
 function backupData() {
