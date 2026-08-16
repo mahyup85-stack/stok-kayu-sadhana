@@ -2365,6 +2365,213 @@ function generateQRCodeBase64(text) {
     });
 }
 
+async function exportRekapSaldoPDF() {
+    try {
+        if (typeof showLoading === 'function') showLoading(true);
+
+        const { jsPDF } = window.jspdf || {};
+        if (!jsPDF) {
+            alert("Library jsPDF belum dimuat. Pastikan script jsPDF sudah terpasang.");
+            return;
+        }
+
+        // Inisialisasi dokumen A4 Portrait
+        const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const marginX = 14;
+
+        // =========================================================
+        // 1. KOP SURAT PERUSAHAAN (HEADER)
+        // =========================================================
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.setTextColor(30, 41, 59);
+        doc.text("PT. SADHANA ARIFNUSA", marginX, 15);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text("Kawasan Pengelolaan Hutan & TPK Terpadu", marginX, 20);
+        
+        doc.setLineWidth(0.6);
+        doc.setDrawColor(30, 41, 59);
+        doc.line(marginX, 22, pageWidth - marginX, 22);
+        
+        doc.setFontSize(8);
+        doc.text("Jl. Raya Labuhan Lombok - Sambelia | Telp: -", marginX, 26);
+
+        // =========================================================
+        // 2. JUDUL LAPORAN REKAPITULASI SALDO
+        // =========================================================
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        doc.setTextColor(15, 23, 42);
+        doc.text("LAPORAN REKAPITULASI SALDO STOK KAYU", pageWidth / 2, 33, { align: "center" });
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(71, 85, 105);
+        
+        // Membaca state filter dengan aman
+        const currentFilter = (typeof state !== 'undefined' && state?.filter) ? state.filter : {};
+        const filterBulan = currentFilter.dariBulan || "Semua";
+        const filterTahun = currentFilter.dariTahun || new Date().getFullYear();
+        const filterTPK = currentFilter.tpk || "Semua TPK";
+        
+        doc.text(`Periode: ${filterBulan} ${filterTahun} | TPK: ${filterTPK} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 38, { align: "center" });
+
+        // =========================================================
+        // 3. AMBIL DATA DARI getProcessedRekapSaldoData() ATAU STATE
+        // =========================================================
+        let rekapData = [];
+        if (typeof getProcessedRekapSaldoData === 'function') {
+            rekapData = getProcessedRekapSaldoData();
+        } else if (typeof state !== 'undefined' && state.rekapSaldoData) {
+            rekapData = state.rekapSaldoData;
+        }
+
+        if (!rekapData || rekapData.length === 0) {
+            alert("Tidak ada data Rekap Saldo untuk diexport!");
+            return;
+        }
+
+        const tableBody = [];
+        let grandTotalSaldoAwal = 0;
+        let grandTotalMasuk = 0;
+        let grandTotalKeluar = 0;
+        let grandTotalSaldoAkhir = 0;
+
+        rekapData.forEach((d, index) => {
+            const saldoAwal = parseFloat(d.saldoAwal || 0);
+            const masuk = parseFloat(d.masuk || 0);
+            const keluar = parseFloat(d.keluar || 0);
+            const saldoAkhir = parseFloat(d.saldoAkhir || (saldoAwal + masuk - keluar));
+
+            grandTotalSaldoAwal += saldoAwal;
+            grandTotalMasuk += masuk;
+            grandTotalKeluar += keluar;
+            grandTotalSaldoAkhir += saldoAkhir;
+
+            tableBody.push([
+                index + 1,
+                d.tpk || '-',
+                d.jenisKayu || d.jenis || '-',
+                saldoAwal.toFixed(2),
+                masuk > 0 ? masuk.toFixed(2) : '-',
+                keluar > 0 ? keluar.toFixed(2) : '-',
+                saldoAkhir.toFixed(2)
+            ]);
+        });
+
+        // Baris Grand Total Rekap
+        tableBody.push([
+            { content: 'TOTAL KESELURUHAN', colSpan: 3, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: grandTotalSaldoAwal.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: grandTotalMasuk.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: grandTotalKeluar.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: grandTotalSaldoAkhir.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
+        ]);
+
+        // =========================================================
+        // 4. GENERATE TABEL PDF (jsPDF AutoTable)
+        // =========================================================
+        doc.autoTable({
+            startY: 43,
+            head: [[
+                'No', 
+                'TPK / Lokasi', 
+                'Jenis Kayu', 
+                'Saldo Awal (m³)', 
+                'Masuk (m³)', 
+                'Keluar (m³)', 
+                'Saldo Akhir (m³)'
+            ]],
+            body: tableBody,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [30, 41, 59],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                halign: 'center',
+                fontSize: 9
+            },
+            bodyStyles: { fontSize: 8.5, textColor: [51, 65, 85] },
+            columnStyles: {
+                0: { halign: 'center', cellWidth: 12 },
+                1: { halign: 'left' },
+                2: { halign: 'left' },
+                3: { halign: 'right', cellWidth: 30 },
+                4: { halign: 'right', cellWidth: 30 },
+                5: { halign: 'right', cellWidth: 30 },
+                6: { halign: 'right', cellWidth: 32, fontStyle: 'bold' }
+            },
+            margin: { left: marginX, right: marginX }
+        });
+
+        // =========================================================
+        // 5. QR CODE VERIFIKASI & TANDA TANGAN (FOOTER)
+        // =========================================================
+        let finalY = doc.lastAutoTable.finalY + 12;
+        
+        // Proteksi jika posisi melempar ke halaman baru
+        if (finalY > 230) {
+            doc.addPage();
+            finalY = 25;
+        }
+
+        const docID = `REKAP-SADHANA-${Date.now().toString(36).toUpperCase()}`;
+        const verifyUrl = `https://stok-kayu-sadhana.vercel.app/verify?id=${docID}`;
+        
+        // Render QR Code jika fungsi tersedia
+        if (typeof generateQRCodeBase64 === 'function') {
+            const qrBase64 = await generateQRCodeBase64(verifyUrl);
+            if (qrBase64) {
+                doc.addImage(qrBase64, 'PNG', marginX, finalY, 18, 18);
+            }
+        }
+
+        // Teks Verifikasi Dokumen
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 41, 59);
+        doc.text("DOKUMEN REKAPITULASI RESMI", marginX + 22, finalY + 4);
+        doc.setFont("helvetica", "normal");
+        doc.text(`ID Dokumen: ${docID}`, marginX + 22, finalY + 8);
+        doc.text("Pindai QR Code untuk verifikasi keaslian rekap saldo.", marginX + 22, finalY + 12);
+
+        // Blok Tanda Tangan Ganisph
+        const rightAlignX = pageWidth - marginX - 45;
+        doc.text("Disetujui Oleh,", rightAlignX, finalY + 4);
+        doc.setFont("helvetica", "bold");
+        doc.text("( GANISPH )", rightAlignX, finalY + 20);
+
+        // Footer Nomor Halaman
+        const totalPages = doc.internal.getNumberOfPages();
+        for (let i = 1; i <= totalPages; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(148, 163, 184);
+            doc.text(`Halaman ${i} dari ${totalPages}`, pageWidth - marginX, 287, { align: 'right' });
+        }
+
+        // Simpan PDF
+        doc.save(`Rekap_Saldo_Stok_Kayu_${new Date().toISOString().slice(0, 10)}.pdf`);
+
+    } catch (err) {
+        console.error("Gagal export PDF Rekap Saldo:", err);
+        alert("Gagal membuat PDF Rekap Saldo: " + err.message);
+    } finally {
+        if (typeof showLoading === 'function') showLoading(false);
+    }
+}
+
+// ---------------------------------------------------------------------
+// GLOBAL BINDING (Mencegah Uncaught ReferenceError)
+// ---------------------------------------------------------------------
+window.exportRekapSaldoPdf = exportRekapSaldoPDF;
+window.exportRekapSaldoPDF = exportRekapSaldoPDF;
+
 async function exportRincianPDF() {
     try {
         if (typeof showLoading === 'function') showLoading(true);
