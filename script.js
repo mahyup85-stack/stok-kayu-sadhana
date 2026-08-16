@@ -2375,7 +2375,6 @@ async function exportRekapSaldoPDF() {
             return;
         }
 
-        // Inisialisasi dokumen A4 Portrait
         const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
         const pageWidth = doc.internal.pageSize.getWidth();
         const marginX = 14;
@@ -2412,7 +2411,6 @@ async function exportRekapSaldoPDF() {
         doc.setFontSize(8.5);
         doc.setTextColor(71, 85, 105);
         
-        // Membaca state filter dengan aman
         const currentFilter = (typeof state !== 'undefined' && state?.filter) ? state.filter : {};
         const filterBulan = currentFilter.dariBulan || "Semua";
         const filterTahun = currentFilter.dariTahun || new Date().getFullYear();
@@ -2421,47 +2419,73 @@ async function exportRekapSaldoPDF() {
         doc.text(`Periode: ${filterBulan} ${filterTahun} | TPK: ${filterTPK} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 38, { align: "center" });
 
         // =========================================================
-        // 3. AMBIL DATA DARI getProcessedRekapSaldoData() ATAU STATE
+        // 3. OLAH DATA REKAP (STATE / DOM FALLBACK)
         // =========================================================
-        let rekapData = [];
-        if (typeof getProcessedRekapSaldoData === 'function') {
-            rekapData = getProcessedRekapSaldoData();
-        } else if (typeof state !== 'undefined' && state.rekapSaldoData) {
-            rekapData = state.rekapSaldoData;
-        }
-
-        if (!rekapData || rekapData.length === 0) {
-            alert("Tidak ada data Rekap Saldo untuk diexport!");
-            return;
-        }
-
         const tableBody = [];
         let grandTotalSaldoAwal = 0;
         let grandTotalMasuk = 0;
         let grandTotalKeluar = 0;
         let grandTotalSaldoAkhir = 0;
 
-        rekapData.forEach((d, index) => {
-            const saldoAwal = parseFloat(d.saldoAwal || 0);
-            const masuk = parseFloat(d.masuk || 0);
-            const keluar = parseFloat(d.keluar || 0);
-            const saldoAkhir = parseFloat(d.saldoAkhir || (saldoAwal + masuk - keluar));
+        // Opsi A: Ambil dari fungsi helper jika ada
+        let rekapData = [];
+        if (typeof getProcessedRekapSaldoData === 'function') {
+            rekapData = getProcessedRekapSaldoData() || [];
+        } else if (typeof state !== 'undefined' && state.rekapSaldoData) {
+            rekapData = state.rekapSaldoData || [];
+        }
 
-            grandTotalSaldoAwal += saldoAwal;
-            grandTotalMasuk += masuk;
-            grandTotalKeluar += keluar;
-            grandTotalSaldoAkhir += saldoAkhir;
+        if (rekapData && rekapData.length > 0) {
+            rekapData.forEach((d, index) => {
+                const sAwal = parseFloat(d.saldoAwal || 0);
+                const msk = parseFloat(d.masuk || 0);
+                const klr = parseFloat(d.keluar || 0);
+                const sAkhir = parseFloat(d.saldoAkhir || (sAwal + msk - klr));
 
-            tableBody.push([
-                index + 1,
-                d.tpk || '-',
-                d.jenisKayu || d.jenis || '-',
-                saldoAwal.toFixed(2),
-                masuk > 0 ? masuk.toFixed(2) : '-',
-                keluar > 0 ? keluar.toFixed(2) : '-',
-                saldoAkhir.toFixed(2)
-            ]);
-        });
+                grandTotalSaldoAwal += sAwal;
+                grandTotalMasuk += msk;
+                grandTotalKeluar += klr;
+                grandTotalSaldoAkhir += sAkhir;
+
+                tableBody.push([
+                    index + 1,
+                    d.tpk || '-',
+                    d.jenisKayu || d.jenis || '-',
+                    sAwal.toFixed(2),
+                    msk > 0 ? msk.toFixed(2) : '-',
+                    klr > 0 ? klr.toFixed(2) : '-',
+                    sAkhir.toFixed(2)
+                ]);
+            });
+        } else {
+            // Opsi B (Fallback): Ambil langsung dari elemen Tabel di Layar Web jika State Kosong
+            const tableRows = document.querySelectorAll("#rekap-saldo-table-body tr, #rekapTableBody tr, table tbody tr");
+            let validRowCount = 0;
+
+            tableRows.forEach((row) => {
+                const cols = row.querySelectorAll("td");
+                // Abaikan jika baris berisi pesan "tidak ada data" atau baris total
+                if (cols.length >= 4 && !row.innerText.includes("Silakan") && !row.innerText.includes("Tidak ada") && !row.innerText.includes("GRAND TOTAL") && !row.innerText.includes("TOTAL")) {
+                    validRowCount++;
+                    const rowCells = Array.from(cols).map(c => c.innerText.trim());
+                    
+                    // Ekstraksi nilai angka untuk grand total jika 7 kolom
+                    if (cols.length >= 7) {
+                        grandTotalSaldoAwal += parseFloat(rowCells[3]) || 0;
+                        grandTotalMasuk += parseFloat(rowCells[4]) || 0;
+                        grandTotalKeluar += parseFloat(rowCells[5]) || 0;
+                        grandTotalSaldoAkhir += parseFloat(rowCells[6]) || 0;
+                    }
+                    
+                    tableBody.push(rowCells);
+                }
+            });
+        }
+
+        if (tableBody.length === 0) {
+            alert("Tidak ada data Rekap Saldo yang dapat diexport! Silakan terapkan filter terlebih dahulu.");
+            return;
+        }
 
         // Baris Grand Total Rekap
         tableBody.push([
@@ -2513,7 +2537,6 @@ async function exportRekapSaldoPDF() {
         // =========================================================
         let finalY = doc.lastAutoTable.finalY + 12;
         
-        // Proteksi jika posisi melempar ke halaman baru
         if (finalY > 230) {
             doc.addPage();
             finalY = 25;
@@ -2522,7 +2545,6 @@ async function exportRekapSaldoPDF() {
         const docID = `REKAP-SADHANA-${Date.now().toString(36).toUpperCase()}`;
         const verifyUrl = `https://stok-kayu-sadhana.vercel.app/verify?id=${docID}`;
         
-        // Render QR Code jika fungsi tersedia
         if (typeof generateQRCodeBase64 === 'function') {
             const qrBase64 = await generateQRCodeBase64(verifyUrl);
             if (qrBase64) {
@@ -2530,7 +2552,6 @@ async function exportRekapSaldoPDF() {
             }
         }
 
-        // Teks Verifikasi Dokumen
         doc.setFontSize(8);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(30, 41, 59);
@@ -2539,13 +2560,11 @@ async function exportRekapSaldoPDF() {
         doc.text(`ID Dokumen: ${docID}`, marginX + 22, finalY + 8);
         doc.text("Pindai QR Code untuk verifikasi keaslian rekap saldo.", marginX + 22, finalY + 12);
 
-        // Blok Tanda Tangan Ganisph
         const rightAlignX = pageWidth - marginX - 45;
         doc.text("Disetujui Oleh,", rightAlignX, finalY + 4);
         doc.setFont("helvetica", "bold");
         doc.text("( GANISPH )", rightAlignX, finalY + 20);
 
-        // Footer Nomor Halaman
         const totalPages = doc.internal.getNumberOfPages();
         for (let i = 1; i <= totalPages; i++) {
             doc.setPage(i);
@@ -2555,7 +2574,6 @@ async function exportRekapSaldoPDF() {
             doc.text(`Halaman ${i} dari ${totalPages}`, pageWidth - marginX, 287, { align: 'right' });
         }
 
-        // Simpan PDF
         doc.save(`Rekap_Saldo_Stok_Kayu_${new Date().toISOString().slice(0, 10)}.pdf`);
 
     } catch (err) {
@@ -2566,9 +2584,7 @@ async function exportRekapSaldoPDF() {
     }
 }
 
-// ---------------------------------------------------------------------
-// GLOBAL BINDING (Mencegah Uncaught ReferenceError)
-// ---------------------------------------------------------------------
+// Global Binding
 window.exportRekapSaldoPdf = exportRekapSaldoPDF;
 window.exportRekapSaldoPDF = exportRekapSaldoPDF;
 
