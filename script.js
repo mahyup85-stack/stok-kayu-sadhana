@@ -1962,84 +1962,91 @@ window.renderRekapRincian = function () {
 
 // Helper untuk memproses data rincian (filter + hitung saldo awal)
 function getProcessedRincianData() {
-    // Ambil Filter
-    const fTFrom = document.getElementById("filter-rincian-tahun-dari").value;
-    const fBFrom = document.getElementById("filter-rincian-bulan-dari").value;
-    const fTTo = document.getElementById("filter-rincian-tahun-sampai").value;
-    const fBTo = document.getElementById("filter-rincian-bulan-sampai").value;
-    const fTPK = document.getElementById("filter-rincian-tpk").value;
-    const fJenis = document.getElementById("filter-rincian-jenis").value;
-    const fPetak = document.getElementById("filter-rincian-petak").value;
-    const fKet = document.getElementById("filter-rincian-ket").value.toLowerCase();
+    const allData = (typeof state !== 'undefined' && Array.isArray(state.data)) ? state.data : [];
 
-    const fromVal = (fTFrom && fBFrom) ? parseInt(fTFrom) * 100 + parseInt(fBFrom) : 0;
-    const toVal = (fTTo && fBTo) ? parseInt(fTTo) * 100 + parseInt(fBTo) : 999999;
+    // Filter UI
+    const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
+    const fTFrom = getVal("filter-rincian-tahun-dari") || getVal("filter-dari-tahun");
+    const fBFrom = getVal("filter-rincian-bulan-dari") || getVal("filter-dari-bulan");
+    const fTTo = getVal("filter-rincian-tahun-sampai") || getVal("filter-sampai-tahun");
+    const fBTo = getVal("filter-rincian-bulan-sampai") || getVal("filter-sampai-bulan");
+    const fTPK = getVal("filter-rincian-tpk") || getVal("filter-tpk");
+    const fJenis = getVal("filter-rincian-jenis") || getVal("filter-jenis");
 
-    let saldoAwal = 0;
+    const numTFrom = parseInt(fTFrom, 10);
+    const numBFrom = parseInt(fBFrom, 10);
+    const numTTo = parseInt(fTTo, 10);
+    const numBTo = parseInt(fBTo, 10);
 
-    // 1. Hitung Saldo Awal (Hanya FISIK: Non-LHP)
-    state.data.forEach(d => {
-        const [y, m] = d.tanggal.split("-");
-        const dVal = parseInt(y) * 100 + parseInt(m);
-        const ket = (d.keterangan || "").toUpperCase();
+    const fromVal = (!isNaN(numTFrom) && !isNaN(numBFrom)) ? (numTFrom * 100 + numBFrom) : 0;
+    const toVal = (!isNaN(numTTo) && !isNaN(numBTo)) ? (numTTo * 100 + numBTo) : 999999;
 
-        if (dVal < fromVal) {
-            // Filter kategori tetap berlaku
-            if (fTPK && d.tpk !== fTPK) return;
-            if (fJenis && d.jenis_kayu !== fJenis) return;
-            if (fPetak && d.petak !== fPetak) return;
+    // Filter Data sesuai Parameter
+    let filtered = allData.filter(d => {
+        if (!d.tanggal) return false;
+        
+        const parts = d.tanggal.split("-");
+        const dVal = parseInt(parts[0], 10) * 100 + parseInt(parts[1], 10);
 
-            // LOGIKA KRUSIAL: Jika LHP, jangan hitung ke saldo fisik
-            if (ket.includes("LHP")) return;
+        if (fromVal > 0 && dVal < fromVal) return false;
+        if (toVal < 999999 && dVal > toVal) return false;
 
-            const masuk = parseFloat(d.masuk_m3 || 0);
-            const keluar = parseFloat(d.keluar_m3 || 0);
-            saldoAwal += (masuk - keluar);
-        }
-    });
+        const itemJenis = String(d.jenis_kayu || d.jenis || '').trim();
+        const itemTPK = String(d.tpk || '').trim();
 
-    // 2. Filter Data Periode Berjalan
-    let filtered = state.data.filter(d => {
-        const [y, m] = d.tanggal.split("-");
-        const dVal = parseInt(y) * 100 + parseInt(m);
-
-        if (dVal < fromVal || dVal > toVal) return false;
-        if (fTPK && d.tpk !== fTPK) return false;
-        if (fJenis && d.jenis_kayu !== fJenis) return false;
-        if (fPetak && d.petak !== fPetak) return false;
-        if (fKet && !(d.keterangan || "").toLowerCase().includes(fKet)) return false;
+        if (fTPK && itemTPK.toLowerCase() !== fTPK.toLowerCase()) return false;
+        if (fJenis && itemJenis.toLowerCase() !== fJenis.toLowerCase()) return false;
 
         return true;
-    }).sort((a, b) => {
-        const dateDiff = new Date(a.tanggal) - new Date(b.tanggal);
-        if (dateDiff !== 0) return dateDiff;
-
-        // Prioritas: Saldo Awal > BAP (Fisik) > LHP (Adm) > KIRIM (Keluar)
-        const getPriority = (k) => {
-            const txt = (k || "").toUpperCase();
-            if (txt.includes("SALDO AWAL")) return 0;
-            if (txt.includes("BAP")) return 1;
-            if (txt.includes("LHP")) return 2;
-            if (txt.includes("KIRIM")) return 3;
-            return 4;
-        };
-        return getPriority(a.keterangan) - getPriority(b.keterangan);
     });
 
-    // 3. Mapping Data untuk Render
-    const mappedFiltered = filtered.map(d => ({
-        ...d,
-        p: parseFloat(d.masuk_m3 || 0),
-        m: parseFloat(d.keluar_m3 || 0),
-        ket: d.keterangan || "",
-        jenis: d.jenis_kayu
-    }));
+    // Urutkan berdasarkan Tanggal & ID Ascending
+    filtered.sort((a, b) => new Date(a.tanggal) - new Date(b.tanggal) || (a.id || 0) - (b.id || 0));
 
-    return { filtered: mappedFiltered, saldoAwal };
+    // Hitung Running Balance agar TIDAK DOUBLE COUNTING
+    let currentSaldo = 0;
+    let totalMasuk = 0;
+    let totalKeluar = 0;
+
+    const processedRows = filtered.map(d => {
+        const valMasukRaw = parseFloat(d.masuk_m3 || d.p || 0);
+        const valKeluar = parseFloat(d.keluar_m3 || d.m || 0);
+        const ket = (d.keterangan || "").toUpperCase();
+
+        let valMasukEffective = 0;
+
+        // --- SOLUSI ANTI DOUBLE COUNTING ---
+        // Hanya LHP yang dihitung sebagai barang MASUK fisik ke Saldo Utama
+        if (ket.includes("LHP")) {
+            valMasukEffective = valMasukRaw;
+        } else if (ket.includes("KIRIM")) {
+            valMasukEffective = 0; // Transaksi Kirim adalah barang keluar
+        } else {
+            // Untuk BAP, diset 0 agar tidak menambah saldo (atau diganti sesuai kebutuhan jika BAP murni administratif)
+            valMasukEffective = 0; 
+        }
+
+        currentSaldo += (valMasukEffective - valKeluar);
+        totalMasuk += valMasukEffective;
+        totalKeluar += valKeluar;
+
+        return {
+            ...d,
+            masukEffective: valMasukEffective, // Nilai masuk yang valid (LHP saja)
+            keluarEffective: valKeluar,
+            saldoBerjalan: currentSaldo
+        };
+    });
+
+    return {
+        rows: processedRows,
+        totals: {
+            totalMasuk,
+            totalKeluar,
+            saldoAkhir: currentSaldo
+        }
+    };
 }
-
-// Menghubungkan nama getFilteredRincianData ke getProcessedRincianData
-const getFilteredRincianData = getProcessedRincianData;
 
 function renderRincian() {
     const body = document.getElementById("rincian-table-body");
