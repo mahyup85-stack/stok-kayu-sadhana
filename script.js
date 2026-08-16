@@ -1774,7 +1774,7 @@ function getProcessedRekapData() {
     };
 
     Object.values(grouped).forEach(item => {
-        item.sBAP = item.bapBerjalan - item.kirimBerjalan;
+        item.sBAP = item.bapBerjalan - item.lhpBerjalan;
         item.sLHP = item.lhpBerjalan - item.kirimBerjalan;
 
         totals.totalSAwalBAP += item.sAwalBAP;
