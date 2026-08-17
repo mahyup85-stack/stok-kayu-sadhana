@@ -3133,58 +3133,59 @@ window.editLhpItem = function (data) {
     const modal = document.getElementById('modal-lhp');
     if (!modal) return;
 
-    // Populate Dropdown TPK
+    // 1. Populate Dropdown TPK
     const selTPK = document.getElementById("modal-lhp-tpk");
     if (selTPK && window.state && window.state.master && window.state.master["tpk"]) {
         selTPK.innerHTML = '<option value="">-- Pilih TPK --</option>' +
             window.state.master["tpk"].map(item => `<option value="${item.name}">${item.name}</option>`).join("");
     }
 
-    // Render 5 Baris kosong
+    // 2. Render 5 Baris kosong
     renderLhpInputRows();
 
-    // Isi Header Form
-    document.getElementById('modal-lhp-id').value = data.id || '';
-    document.getElementById('modal-lhp-date').value = data.tanggal || '';
-    document.getElementById('modal-lhp-ket').value = data.keterangan || 'LHP';
-    document.getElementById('modal-lhp-tpk').value = data.tpk || '';
+    // 3. Isi Header Form
+    if (document.getElementById('modal-lhp-id')) document.getElementById('modal-lhp-id').value = data.id || '';
+    if (document.getElementById('modal-lhp-date')) document.getElementById('modal-lhp-date').value = data.tanggal || '';
+    if (document.getElementById('modal-lhp-ket')) document.getElementById('modal-lhp-ket').value = data.keterangan || data.ket || 'LHP';
+    if (document.getElementById('modal-lhp-tpk')) document.getElementById('modal-lhp-tpk').value = data.tpk || '';
 
-    // Masukkan data ke Baris Pertama (Row 0)
+    // 4. Masukkan data ke Baris Pertama (Row 0)
     const firstRow = document.querySelector("#lhp-rows-container tr");
     if (firstRow) {
         const inputPetak = firstRow.querySelector(".lhp-petak-row");
-        if (inputPetak) inputPetak.value = data.petak || '';
-
         const selectJenis = firstRow.querySelector(".lhp-jenis-kayu");
-        if (selectJenis) selectJenis.value = data.jenis_kayu || '';
+        const inputSM = firstRow.querySelector(".lhp-in-sm") || firstRow.querySelectorAll("input")[1]; 
+        const inputFaktor = firstRow.querySelector(".lhp-faktor") || firstRow.querySelectorAll("input")[2];
+        const inputM3 = firstRow.querySelector(".lhp-in-m3") || firstRow.querySelectorAll("input")[3];
 
-        const inputSM = firstRow.querySelector(".lhp-in-sm");
-        if (inputSM) inputSM.value = data.masuk_sm || 0;
+        if (inputPetak) inputPetak.value = data.petak || '';
+        if (selectJenis) selectJenis.value = data.jenis_kayu || data.jenis || '';
 
-        const inputFaktor = firstRow.querySelector(".lhp-faktor");
-        const inM3 = parseFloat(data.masuk_m3) || 0;
-        const inSM = parseFloat(data.masuk_sm) || 0;
+        // FIX 1: Tentukan Faktor Konversi Terlebih Dahulu (Default 0.59)
+        let faktor = parseFloat(data.konversi || data.faktor || 0.59);
+        if (inputFaktor) inputFaktor.value = faktor.toFixed(2);
 
-        let faktor = 0.67;
-        if (inSM > 0 && inM3 > 0) {
-            faktor = (inM3 / inSM).toFixed(3);
-        } else if (selectJenis && selectJenis.selectedIndex >= 0) {
-            const opt = selectJenis.options[selectJenis.selectedIndex];
-            if (opt && opt.dataset.faktor) faktor = opt.dataset.faktor;
+        // FIX 2: Ambil Nilai M3 (35.4)
+        const valM3 = parseFloat(data.masuk_m3 ?? data.m3 ?? data.masuk ?? 0);
+
+        // FIX 3: Ambil SM, Jika NULL/0 Hitung Otomatis dari (M3 / Faktor)
+        let valSM = parseFloat(data.masuk_sm ?? data.sm ?? data.p ?? 0);
+        if ((!valSM || valSM === 0) && valM3 > 0 && faktor > 0) {
+            valSM = valM3 / faktor; // Menghitung SM jika dari database bernilai null
         }
 
-        if (inputFaktor) inputFaktor.value = faktor;
-        calculateLhpRow(0);
+        // Apply ke Input Form
+        if (inputSM) inputSM.value = valSM.toFixed(2);
+        if (inputM3) inputM3.value = valM3.toFixed(2);
     }
 
-    // Ubah teks tombol menjadi "Update Data LHP"
+    // 5. Ubah Teks Tombol
     const submitBtn = modal.querySelector("button[type='submit']");
     if (submitBtn) submitBtn.textContent = "Update Data LHP";
 
     modal.style.display = 'flex';
     modal.classList.remove('hidden');
 };
-
 // 5. Menutup Modal LHP (Sudah Diperbaiki Dari Infinite Loop)
 window.closeLhpModal = function () {
     const modal = document.getElementById('modal-lhp');
@@ -3286,7 +3287,6 @@ window.saveLhpFromModal = async function (e) {
         if (typeof showLoading === 'function') showLoading(false);
     }
 };
-
 
 // Expose fungsi ke window jika dipanggil dari HTML
 window.updatePetakByTPK = updatePetakByTPK;
