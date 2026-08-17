@@ -983,7 +983,9 @@
                     <input type="text" id="filter-rincian-ket" placeholder="Cari Ket...">
                 </div>
                 <div class="filter-actions" style="display: flex; gap: 5px; margin-top: 5px;">
-                    <button onclick="renderRekapRincian()" class="btn-primary">Terapkan Filter</button>
+                    <button onclick="state.hasAppliedFilter = true; state.currentPage = 1; renderRincian();" class="btn-primary">
+                        Terapkan Filter
+                    </button>
                     <button onclick="exportRincianExcel()" class="btn-excel" style="background-color: #27ae60; color: white;">
                         📥 Export Excel
                     </button>
@@ -1044,6 +1046,75 @@
             <button type="button" onclick="closeMasterModal()" class="btn-outline" style="width: 100%; margin-top: 15px;">Tutup</button>
         </div>
     </div>
+
+<!-- Modal Pop-up LHP Melayang (Centered Overlay) -->
+<div id="modal-lhp" class="modal-backdrop hidden" style="
+    position: fixed;
+    top: 0; left: 0; width: 100vw; height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+">
+    <div class="modal-content" style="
+        background: #fff;
+        border-radius: 8px;
+        padding: 24px;
+        width: 90%;
+        max-width: 900px;
+        max-height: 90vh;
+        overflow-y: auto;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    ">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #eee; padding-bottom: 12px; margin-bottom: 15px;">
+            <h3 style="margin: 0; color: #1b4d3e;">📋 Input Detail LHP </h3>
+            <button type="button" onclick="closeLhpModal()" style="background: none; border: none; font-size: 1.8rem; cursor: pointer; color: #666;">&times;</button>
+        </div>
+
+        <form id="form-modal-lhp" onsubmit="saveLhpFromModal(event)">
+            <input type="hidden" id="modal-lhp-id" value="">
+            
+            <!-- Row Header Info (Hanya Tanggal, Keterangan, TPK) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 15px;">
+                <div>
+                    <label style="font-weight: bold; font-size: 0.85rem;">TANGGAL</label>
+                    <input type="date" id="modal-lhp-date" class="form-control" required style="width:100%; padding: 8px; border:1px solid #ccc; border-radius:4px;">
+                </div>
+                <div>
+                    <label style="font-weight: bold; font-size: 0.85rem;">KETERANGAN</label>
+                    <input type="text" id="modal-lhp-ket" class="form-control" value="LHP" required style="width:100%; padding: 8px; border:1px solid #ccc; border-radius:4px;">
+                </div>
+                <div>
+                    <label style="font-weight: bold; font-size: 0.85rem;">TPK</label>
+                    <select id="modal-lhp-tpk" class="form-control" required style="width:100%; padding: 8px; border:1px solid #ccc; border-radius:4px;"></select>
+                </div>
+            </div>
+
+            <!-- Tabel 5 Baris: Petak, Jenis Kayu, SM, Konversi, M3 -->
+            <h4 style="margin: 15px 0 10px 0; color: #333; font-size: 0.95rem;">Rincian Jenis Kayu & Konversi:</h4>
+            <div style="overflow-x: auto;">
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="background: #f4f6f8; text-align: left;">
+                            <th style="padding: 8px; border: 1px solid #ddd; width: 18%;">Petak</th>
+                            <th style="padding: 8px; border: 1px solid #ddd; width: 32%;">Jenis Kayu</th>
+                            <th style="padding: 8px; border: 1px solid #ddd; width: 18%;">Stapel Meter</th>
+                            <th style="padding: 8px; border: 1px solid #ddd; width: 16%;">Konversi</th>
+                            <th style="padding: 8px; border: 1px solid #ddd; width: 16%;">Meter Kubik</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lhp-rows-container">
+                        <!-- 5 Baris di-generate via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button type="button" onclick="closeLhpModal()" style="padding: 10px 20px; border-radius: 4px; border: 1px solid #ccc; background: #fff; cursor: pointer;">Batal</button>
+                <button type="submit" style="padding: 10px 20px; border-radius: 4px; border: none; background: #1b4d3e; color: #fff; font-weight: bold; cursor: pointer;">Simpan Data LHP</button>
+            </div>
+        </form>
+    </div>
+</div>
 
     <div id="view-kelola-sandi" class="hidden">
         <div class="card" style="max-width: 400px; margin: 20px auto;">
