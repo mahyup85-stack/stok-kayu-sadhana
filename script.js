@@ -33,7 +33,7 @@ let state = {
 // 1. Fungsi Buka Modal Master Data & Update Header
 window.openMasterModal = async function (type) {
     state.currentMasterType = type;
-    
+
     const modal = document.getElementById('master-modal');
     const title = document.getElementById('modal-title');
     const listEl = document.getElementById('master-list-body');
@@ -200,7 +200,7 @@ window.deleteMasterItem = async function (id) {
 
     try {
         if (typeof showLoading === 'function') showLoading(true);
-        
+
         const { error } = await api
             .from('master_data')
             .delete()
@@ -314,7 +314,7 @@ window.renderPaginationControls = function () {
             <button class="btn-page" onclick="changePage(${totalPages})" ${currentPage >= totalPages ? 'disabled' : ''}>&raquo;</button>
         </div>
     `;
-    
+
     container.innerHTML = html;
 };
 
@@ -580,7 +580,7 @@ window.updatePetakByTPK = function (tpkSelectId = 'filter-tpk', petakSelectId = 
             opt.textContent = p;
             petakEl.appendChild(opt);
         });
-        
+
         petakEl.disabled = false;
         petakEl.removeAttribute('disabled'); // Memastikan kuncian HTML benar-benar dilepas
     } else {
@@ -752,7 +752,7 @@ async function saveData() {
     const jenis = document.getElementById('input-jenis')?.value || "";
     const tpk = document.getElementById("input-tpk")?.value || "";
     const petak = document.getElementById('input-petak')?.value?.trim() || "-";
-    
+
     // 2. Ambil nilai SM (Stack Meter) dari input Masuk & Keluar
     const masukSM = parseFloat(document.getElementById('input-in-sm')?.value || document.getElementById('input-in')?.value) || 0;
     const keluarSM = parseFloat(document.getElementById('input-out-sm')?.value || document.getElementById('input-out')?.value) || 0;
@@ -788,8 +788,8 @@ async function saveData() {
     const payload = {
         tanggal: tanggalInput,
         keterangan: ket,
-        jenis_kayu: jenis, 
-        tpk: tpk,      
+        jenis_kayu: jenis,
+        tpk: tpk,
         petak: petak,
         masuk_m3: masukM3,   // Nilai M3 yang sudah dikonversi
         keluar_m3: keluarM3   // Nilai M3 yang sudah dikonversi
@@ -831,7 +831,7 @@ async function saveData() {
 // Fungsi untuk memastikan tanggal selalu YYYY-MM-DD (Aman dari Bug Timezone)
 function formatTanggalDB(dateString) {
     if (!dateString) return null;
-    
+
     // Jika format input sudah YYYY-MM-DD dari <input type="date">, langsung kembalikan
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
         return dateString;
@@ -916,8 +916,8 @@ async function restoreData() {
             const importedData = JSON.parse(e.target.result);
 
             // Tentukan letak array data (bisa langsung berupa array atau di dalam properti .data)
-            const rowsToInsert = Array.isArray(importedData) 
-                ? importedData 
+            const rowsToInsert = Array.isArray(importedData)
+                ? importedData
                 : (importedData.data || importedData.stok_kayu || []);
 
             if (!rowsToInsert || rowsToInsert.length === 0) {
@@ -982,7 +982,7 @@ if (state.isLoggedIn) {
     if (loginScr) loginScr.classList.add("hidden");
     if (appCont) appCont.classList.remove("hidden");
     renderUI();
-    
+
 }
 
 
@@ -1237,10 +1237,10 @@ function logout() {
 
 
 // Contoh penyesuaian fungsi edit:
-window.editData = function(id) {
+window.editData = function (id) {
     // 🛡️ Ambil data mutasi dari state
-    const listMutasi = (state.filteredData && state.filteredData.length > 0) 
-        ? state.filteredData 
+    const listMutasi = (state.filteredData && state.filteredData.length > 0)
+        ? state.filteredData
         : (state.data || []);
 
     // 🛡️ Cari item berdasarkan ID
@@ -1281,7 +1281,7 @@ window.editData = function(id) {
         // Ubah UI Form Utama ke mode Edit
         document.getElementById('form-mode-title').innerText = 'Edit Data Mutasi';
         document.getElementById('btn-submit').innerText = 'Update Data';
-        
+
         const btnCancel = document.getElementById('btn-cancel-edit');
         if (btnCancel) btnCancel.classList.remove('hidden');
 
@@ -1290,7 +1290,7 @@ window.editData = function(id) {
     }
 };
 
-window.deleteData = function(rawId) {
+window.deleteData = function (rawId) {
     const cleanId = parseInt(rawId, 10);
     if (isNaN(cleanId)) return alert("ID data tidak valid!");
 
@@ -1332,7 +1332,7 @@ window.deleteData = function(rawId) {
                 if (typeof fetchData === 'function') await fetchData();
                 if (typeof applyFilter === 'function') applyFilter();
                 if (typeof filterData === 'function') filterData();
-                
+
                 if (typeof renderDashboardTable === 'function') renderDashboardTable();
                 if (typeof renderRekapRincian === 'function') renderRekapRincian();
                 if (typeof renderRincian === 'function') renderRincian();
@@ -1353,7 +1353,7 @@ window.deleteData = function(rawId) {
 // ==========================================
 // 2. FUNGSI BATAL EDIT (Kembali ke Mode Simpan)
 // ==========================================
-window.cancelEdit = function() {
+window.cancelEdit = function () {
     const stockForm = document.getElementById('stock-form');
     if (stockForm) stockForm.reset();
 
@@ -1384,7 +1384,7 @@ window.cancelEdit = function() {
 window.deleteSelected = async function () {
     // 💡 Diperbaiki: Mengambil checkbox dengan class '.row-checkbox' yang dicentang
     const checkboxes = document.querySelectorAll('.row-checkbox:checked');
-    
+
     // 💡 Diperbaiki: Mengambil value id (bisa via cb.value atau cb.getAttribute('data-id'))
     const idsToDelete = Array.from(checkboxes).map(cb => cb.value || cb.getAttribute('data-id'));
 
@@ -1406,7 +1406,7 @@ window.deleteSelected = async function () {
         if (error) throw error;
 
         alert(`${idsToDelete.length} data terpilih berhasil dihapus!`);
-        
+
         // Uncheck header 'Select All' jika ada
         const selectAllHeader = document.getElementById('select-all-header');
         if (selectAllHeader) selectAllHeader.checked = false;
@@ -1424,7 +1424,7 @@ window.deleteSelected = async function () {
 };
 
 
-window.toggleSelectAll = function(source) {
+window.toggleSelectAll = function (source) {
     // Ambil semua checkbox baris yang punya class 'row-checkbox'
     const checkboxes = document.querySelectorAll('.row-checkbox');
     checkboxes.forEach(cb => {
@@ -1691,7 +1691,7 @@ function getProcessedRekapData() {
 
     // 1. Pembacaan ID yang PRESISI sesuai HTML view-rekap (Hanya Bulan, Tahun, TPK, & Jenis)
     const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
-    
+
     const fBFrom = getVal("filter-dari-bulan");
     const fTFrom = getVal("filter-dari-tahun");
     const fBTo = getVal("filter-sampai-bulan");
@@ -1884,7 +1884,7 @@ function getProcessedRincianData() {
 
     // Helper aman dari null / undefined
     const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
-    
+
     // 1. Ambil Filter dari HTML
     const fTFrom = getVal("filter-rincian-tahun-dari");
     const fBFrom = getVal("filter-rincian-bulan-dari");
@@ -1913,7 +1913,7 @@ function getProcessedRincianData() {
         if (!d.tanggal) return;
         const parts = d.tanggal.split("-");
         if (parts.length < 2) return;
-        
+
         const dVal = parseInt(parts[0], 10) * 100 + parseInt(parts[1], 10);
         const ket = (d.keterangan || d.ket || "").toUpperCase();
 
@@ -1943,7 +1943,7 @@ function getProcessedRincianData() {
         if (!d.tanggal) return false;
         const parts = d.tanggal.split("-");
         if (parts.length < 2) return false;
-        
+
         const dVal = parseInt(parts[0], 10) * 100 + parseInt(parts[1], 10);
 
         if (fromVal > 0 && dVal < fromVal) return false;
@@ -2039,7 +2039,7 @@ function renderRincian() {
     let totalKeluarUtama = 0;
 
     const processedDataWithSaldo = filtered.map((d) => {
-        const valP = parseFloat(d.p || 0); 
+        const valP = parseFloat(d.p || 0);
         const valM = parseFloat(d.m || 0);
         const ketUpper = String(d.ket || "").toUpperCase();
 
@@ -2047,26 +2047,26 @@ function renderRincian() {
         let mskHitung = 0, klrHitung = 0;
 
         if (ketUpper.includes("KIRIM")) {
-            mskTampil = 0; 
+            mskTampil = 0;
             klrTampil = valM;
-            mskHitung = 0; 
+            mskHitung = 0;
             klrHitung = valM;
         } else if (ketUpper.includes("BAP")) {
             // BAP SEKARANG JADI ADM (Tampil di tabel, TAPI TIDAK DIHITUNG ke saldo)
-            mskTampil = valP; 
+            mskTampil = valP;
             klrTampil = 0;
-            mskHitung = 0; 
+            mskHitung = 0;
             klrHitung = 0;
         } else if (ketUpper.includes("LHP")) {
             // LHP SEKARANG JADI MASUK UTAMA (Tampil dan DIHITUNG ke saldo)
-            mskTampil = valP; 
+            mskTampil = valP;
             klrTampil = 0;
-            mskHitung = valP; 
+            mskHitung = valP;
             klrHitung = 0;
         } else {
-            mskTampil = valP; 
+            mskTampil = valP;
             klrTampil = valM;
-            mskHitung = valP; 
+            mskHitung = valP;
             klrHitung = valM;
         }
 
@@ -2391,7 +2391,7 @@ async function exportRekapSaldoPDF() {
         doc.setFontSize(9);
         doc.setTextColor(100, 116, 139);
         doc.text("Kawasan Pengelolaan Hutan & TPK Terpadu", marginX, 20);
-        
+
         doc.setLineWidth(0.6);
         doc.setDrawColor(30, 41, 59);
         doc.line(marginX, 23, pageWidth - marginX, 23);
@@ -2410,7 +2410,7 @@ async function exportRekapSaldoPDF() {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.5);
         doc.setTextColor(71, 85, 105);
-        
+
         const filterBulan = (typeof state !== 'undefined' && state?.filter?.dariBulan) ? state.filter.dariBulan : "Semua";
         const filterTahun = (typeof state !== 'undefined' && state?.filter?.dariTahun) ? state.filter.dariTahun : new Date().getFullYear();
         doc.text(`Periode: ${filterBulan} ${filterTahun} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 38, { align: "center" });
@@ -2461,16 +2461,16 @@ async function exportRekapSaldoPDF() {
             const hasNoCol = cols.length >= 11;
             const offset = hasNoCol ? 1 : 0;
 
-            const jenisKayu    = cols[0 + offset]?.innerText.trim() || '-';
-            const tpk          = cols[1 + offset]?.innerText.trim() || '-';
-            const petak        = cols[2 + offset]?.innerText.trim() || '-';
+            const jenisKayu = cols[0 + offset]?.innerText.trim() || '-';
+            const tpk = cols[1 + offset]?.innerText.trim() || '-';
+            const petak = cols[2 + offset]?.innerText.trim() || '-';
             const saldoAwalBap = parseDomNum(cols[3 + offset]?.innerText);
             const saldoAwalLhp = parseDomNum(cols[4 + offset]?.innerText);
-            const bap          = parseDomNum(cols[5 + offset]?.innerText);
-            const lhp          = parseDomNum(cols[6 + offset]?.innerText);
-            const kirim        = parseDomNum(cols[7 + offset]?.innerText);
-            const saldoBap     = parseDomNum(cols[8 + offset]?.innerText);
-            const saldoLhp     = parseDomNum(cols[9 + offset]?.innerText);
+            const bap = parseDomNum(cols[5 + offset]?.innerText);
+            const lhp = parseDomNum(cols[6 + offset]?.innerText);
+            const kirim = parseDomNum(cols[7 + offset]?.innerText);
+            const saldoBap = parseDomNum(cols[8 + offset]?.innerText);
+            const saldoLhp = parseDomNum(cols[9 + offset]?.innerText);
 
             // Akumulasi Total
             gTotalAwalBap += saldoAwalBap;
@@ -2519,16 +2519,16 @@ async function exportRekapSaldoPDF() {
         doc.autoTable({
             startY: 44,
             head: [[
-                'No', 
-                'Jenis Kayu', 
-                'TPK', 
-                'Petak', 
-                'Saldo Awal BAP (m³)', 
-                'Saldo Awal LHP (m³)', 
-                'BAP (m³)', 
-                'LHP (m³)', 
-                'Kirim (m³)', 
-                'Saldo BAP (m³)', 
+                'No',
+                'Jenis Kayu',
+                'TPK',
+                'Petak',
+                'Saldo Awal BAP (m³)',
+                'Saldo Awal LHP (m³)',
+                'BAP (m³)',
+                'LHP (m³)',
+                'Kirim (m³)',
+                'Saldo BAP (m³)',
                 'Saldo LHP (m³)'
             ]],
             body: tableBody,
@@ -2568,7 +2568,7 @@ async function exportRekapSaldoPDF() {
 
         const docID = `REKAP-SADHANA-${Date.now().toString(36).toUpperCase()}`;
         const verifyUrl = `https://stok-kayu-sadhana.vercel.app/verify?id=${docID}`;
-        
+
         if (typeof generateQRCodeBase64 === 'function') {
             const qrBase64 = await generateQRCodeBase64(verifyUrl);
             if (qrBase64) {
@@ -2628,11 +2628,11 @@ async function exportRincianPDF() {
         doc.setFontSize(9);
         doc.setTextColor(100, 116, 139);
         doc.text("Kawasan Pengelolaan Hutan & TPK Terpadu", marginX, 20);
-        
+
         doc.setLineWidth(0.6);
         doc.setDrawColor(30, 41, 59);
         doc.line(marginX, 22, pageWidth - marginX, 22);
-        
+
         doc.setFontSize(8);
         doc.text("Jl. Raya Labuhan Lombok - Sambelia | Telp: -", marginX, 26);
 
@@ -2647,13 +2647,13 @@ async function exportRincianPDF() {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.5);
         doc.setTextColor(71, 85, 105);
-        
+
         // Membaca state filter dengan aman
         const currentFilter = (typeof state !== 'undefined' && state?.filter) ? state.filter : {};
         const filterBulan = currentFilter.dariBulan || "Semua";
         const filterTahun = currentFilter.dariTahun || new Date().getFullYear();
         const filterTPK = currentFilter.tpk || "Semua TPK";
-        
+
         doc.text(`Periode: ${filterBulan} ${filterTahun} | TPK: ${filterTPK} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 38, { align: "center" });
 
         // =========================================================
@@ -2680,7 +2680,7 @@ async function exportRincianPDF() {
 
         // Iterasi Data Transaksi Mutasi
         dataMutasi.forEach((d) => {
-            const valP = parseFloat(d.p || d.masuk_m3 || 0); 
+            const valP = parseFloat(d.p || d.masuk_m3 || 0);
             const valM = parseFloat(d.m || d.keluar_m3 || 0);
             const rawKet = String(d.ket || d.keterangan || "-");
             const ketUpper = rawKet.toUpperCase();
@@ -2739,14 +2739,14 @@ async function exportRincianPDF() {
         doc.autoTable({
             startY: 42,
             head: [[
-                'No', 
-                'Tanggal', 
-                'Keterangan / No. Dokumen', 
-                'Jenis Kayu', 
-                'TPK', 
-                'Petak', 
-                'Masuk (m³)', 
-                'Keluar (m³)', 
+                'No',
+                'Tanggal',
+                'Keterangan / No. Dokumen',
+                'Jenis Kayu',
+                'TPK',
+                'Petak',
+                'Masuk (m³)',
+                'Keluar (m³)',
                 'Saldo (m³)'
             ]],
             body: tableBody,
@@ -2777,7 +2777,7 @@ async function exportRincianPDF() {
         // 5. QR CODE VERIFIKASI & TANDA TANGAN (STAMP & FOOTER)
         // =========================================================
         let finalY = doc.lastAutoTable.finalY + 10;
-        
+
         if (finalY > 160) {
             doc.addPage();
             finalY = 20;
@@ -2785,7 +2785,7 @@ async function exportRincianPDF() {
 
         const docID = `RINCIAN-SADHANA-${Date.now().toString(36).toUpperCase()}`;
         const verifyUrl = `https://stok-kayu-sadhana.vercel.app/verify?id=${docID}`;
-        
+
         if (typeof generateQRCodeBase64 === 'function') {
             const qrBase64 = await generateQRCodeBase64(verifyUrl);
             if (qrBase64) {
@@ -3002,7 +3002,7 @@ function hitungKonversiForm() {
 // FITUR MODAL LHP (INPUT & EDIT MULTI-ROW)
 
 // 1. Generate 5 Baris Input (Petak di Paling Kiri)
-window.renderLhpInputRows = function(defaultPetak = '') {
+window.renderLhpInputRows = function (defaultPetak = '') {
     const container = document.getElementById("lhp-rows-container");
     if (!container) return;
 
@@ -3043,7 +3043,7 @@ window.renderLhpInputRows = function(defaultPetak = '') {
 };
 
 // 2. Kalkulasi Otomatis per Baris
-window.calculateLhpRow = function(index) {
+window.calculateLhpRow = function (index) {
     const rows = document.querySelectorAll("#lhp-rows-container tr");
     if (!rows[index]) return;
 
@@ -3053,7 +3053,7 @@ window.calculateLhpRow = function(index) {
     const inSM = parseFloat(row.querySelector(".lhp-in-sm").value) || 0;
 
     const selectedOption = selJenis.options[selJenis.selectedIndex];
-    
+
     if (selectedOption && selectedOption.value !== "") {
         const faktorMaster = parseFloat(selectedOption.dataset.faktor) || 0;
         if (!row.dataset.editedByHand) {
@@ -3104,57 +3104,69 @@ window.openLhpModal = function (initialData = {}) {
 };
 
 // 4. Membuka Modal LHP (Mode Edit)
-window.editLhpItem = function(data) {
+window.editLhpItem = function (data) {
     if (!data) return;
 
     const modal = document.getElementById('modal-lhp');
     if (!modal) return;
 
-    // Populate Dropdown TPK
+    // 1. Populate Dropdown TPK
     const selTPK = document.getElementById("modal-lhp-tpk");
     if (selTPK && window.state && window.state.master && window.state.master["tpk"]) {
         selTPK.innerHTML = '<option value="">-- Pilih TPK --</option>' +
             window.state.master["tpk"].map(item => `<option value="${item.name}">${item.name}</option>`).join("");
     }
 
-    // Render 5 Baris kosong
+    // 2. Render 5 Baris kosong
     renderLhpInputRows();
 
-    // Isi Header Form
-    document.getElementById('modal-lhp-id').value = data.id || '';
-    document.getElementById('modal-lhp-date').value = data.tanggal || '';
-    document.getElementById('modal-lhp-ket').value = data.keterangan || 'LHP';
-    document.getElementById('modal-lhp-tpk').value = data.tpk || '';
+    // 3. Isi Header Form
+    if (document.getElementById('modal-lhp-id')) document.getElementById('modal-lhp-id').value = data.id || '';
+    if (document.getElementById('modal-lhp-date')) document.getElementById('modal-lhp-date').value = data.tanggal || '';
+    if (document.getElementById('modal-lhp-ket')) document.getElementById('modal-lhp-ket').value = data.keterangan || data.ket || 'LHP';
+    if (document.getElementById('modal-lhp-tpk')) document.getElementById('modal-lhp-tpk').value = data.tpk || '';
 
-    // Masukkan data ke Baris Pertama (Row 0)
+    // 4. Masukkan data ke Baris Pertama (Row 0)
     const firstRow = document.querySelector("#lhp-rows-container tr");
     if (firstRow) {
         const inputPetak = firstRow.querySelector(".lhp-petak-row");
+        const selectJenis = firstRow.querySelector(".lhp-jenis-kayu");
+        const inputSM = firstRow.querySelector(".lhp-in-sm");
+        const inputFaktor = firstRow.querySelector(".lhp-faktor");
+        const inputM3 = firstRow.querySelector(".lhp-in-m3");
+
         if (inputPetak) inputPetak.value = data.petak || '';
 
-        const selectJenis = firstRow.querySelector(".lhp-jenis-kayu");
-        if (selectJenis) selectJenis.value = data.jenis_kayu || '';
+        const namaJenis = data.jenis_kayu || data.jenis || '';
+        if (selectJenis) selectJenis.value = namaJenis;
 
-        const inputSM = firstRow.querySelector(".lhp-in-sm");
-        if (inputSM) inputSM.value = data.masuk_sm || 0;
-
-        const inputFaktor = firstRow.querySelector(".lhp-faktor");
-        const inM3 = parseFloat(data.masuk_m3) || 0;
-        const inSM = parseFloat(data.masuk_sm) || 0;
-
-        let faktor = 0.67;
-        if (inSM > 0 && inM3 > 0) {
-            faktor = (inM3 / inSM).toFixed(3);
-        } else if (selectJenis && selectJenis.selectedIndex >= 0) {
-            const opt = selectJenis.options[selectJenis.selectedIndex];
-            if (opt && opt.dataset.faktor) faktor = opt.dataset.faktor;
+        // AMBIL FAKTOR DARI OPTION MASTER DATA (Bukan dari data database lama)
+        let faktor = 0;
+        const selectedOpt = selectJenis.querySelector(`option[value="${namaJenis}"]`);
+        if (selectedOpt && selectedOpt.dataset.faktor) {
+            faktor = parseFloat(selectedOpt.dataset.faktor);
+        } else {
+            // Fallback jika tidak terdaftar di master data
+            faktor = parseFloat(data.konversi || data.faktor || 0.67);
         }
 
-        if (inputFaktor) inputFaktor.value = faktor;
-        calculateLhpRow(0);
+        if (inputFaktor) inputFaktor.value = faktor.toFixed(2);
+
+        // Ambil Nilai M3
+        const valM3 = parseFloat(data.masuk_m3 ?? data.m3 ?? data.masuk ?? 0);
+
+        // Ambil SM, jika kosong/null hitung dari (M3 / Faktor)
+        let valSM = parseFloat(data.masuk_sm ?? data.sm ?? data.p ?? 0);
+        if ((!valSM || valSM === 0) && valM3 > 0 && faktor > 0) {
+            valSM = valM3 / faktor;
+        }
+
+        // Apply ke Input Form
+        if (inputSM) inputSM.value = valSM.toFixed(2);
+        if (inputM3) inputM3.value = (valSM * faktor).toFixed(2); // Dihitung ulang presisi dengan faktor Master
     }
 
-    // Ubah teks tombol menjadi "Update Data LHP"
+    // 5. Ubah Teks Tombol
     const submitBtn = modal.querySelector("button[type='submit']");
     if (submitBtn) submitBtn.textContent = "Update Data LHP";
 
@@ -3168,12 +3180,12 @@ window.closeLhpModal = function () {
     if (modal) {
         modal.style.display = 'none';
         modal.classList.add('hidden');
-        
+
         // Reset teks tombol simpan ke default
         const submitBtn = modal.querySelector("button[type='submit']");
         if (submitBtn) submitBtn.textContent = "Simpan Data LHP";
     }
-    
+
     // Reset Form Modal
     const form = document.getElementById('form-modal-lhp');
     if (form) form.reset();
@@ -3239,16 +3251,16 @@ window.saveLhpFromModal = async function (e) {
                 .from('stok_kayu')
                 .update(payloadList[0])
                 .eq('id', editId);
-                
+
             if (error) throw error;
             alert("Data LHP berhasil diperbarui!");
-        } 
+        }
         // Jika Mode Input Baru (Insert Data Baru)
         else {
             const { error } = await api
                 .from('stok_kayu')
                 .insert(payloadList);
-                
+
             if (error) throw error;
             alert(`Berhasil menyimpan ${payloadList.length} data LHP!`);
         }
@@ -3320,7 +3332,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.master && state.master['jenis_kayu']) {
                 const itemKayu = state.master['jenis_kayu'].find(
                     k => (k.name && k.name.trim().toLowerCase() === jenis.trim().toLowerCase()) ||
-                         (k.jenis_kayu && k.jenis_kayu.trim().toLowerCase() === jenis.trim().toLowerCase())
+                        (k.jenis_kayu && k.jenis_kayu.trim().toLowerCase() === jenis.trim().toLowerCase())
                 );
                 if (itemKayu) {
                     faktorKonversi = parseFloat(itemKayu.konversi || itemKayu.faktor_konversi || itemKayu.faktor || 0.67);
@@ -3344,11 +3356,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 jenis_kayu: jenis,
                 tpk: tpk,
                 petak: petak,
-                
+
                 // ✅ SIMPAN SM MURNI KE DATABASE
                 masuk_sm: inSM,
                 keluar_sm: outSM,
-                
+
                 // Simpan M3 hasil konversi
                 masuk_m3: inM3,
                 keluar_m3: outM3
@@ -3369,7 +3381,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // MODE INSERT DATA BARU
                     const { error } = await api.from('stok_kayu').insert([payload]);
                     if (error) throw error;
-                    
+
                     // Notifikasi Alert menggunakan SM & M3 yang aktif
                     alert(`Data berhasil disimpan!\n${activeSM} SM x ${faktorKonversi} = ${activeM3.toFixed(2)} M³`);
                 }
@@ -3391,32 +3403,32 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    
-// 💡 DETEKSI KETIKAN "LHP" DI FORM UTAMA (TERPERBARUI)
-// =========================================================
-const inputKetUtama = document.getElementById("input-ket") || document.getElementById("input-keterangan");
 
-if (inputKetUtama) {
-    // Menggunakan event 'change' atau 'blur' agar pengguna selesai mengetik dulu
-    inputKetUtama.addEventListener("change", function (e) {
-        const val = e.target.value.toUpperCase().trim();
-        
-        // Jika kata "LHP" terdeteksi
-        if (val.includes("LHP")) {
-            if (typeof openLhpModal === 'function') {
-                openLhpModal({
-                    tanggal: document.getElementById("input-date")?.value || document.getElementById("input-tanggal")?.value || '',
-                    keterangan: e.target.value,
-                    jenis: document.getElementById("input-jenis")?.value || '',
-                    tpk: document.getElementById("input-tpk")?.value || '',
-                    petak: document.getElementById("input-petak")?.value || ''
-                });
-            } else {
-                alert("Fungsi openLhpModal belum terdefinisi!");
+    // 💡 DETEKSI KETIKAN "LHP" DI FORM UTAMA (TERPERBARUI)
+    // =========================================================
+    const inputKetUtama = document.getElementById("input-ket") || document.getElementById("input-keterangan");
+
+    if (inputKetUtama) {
+        // Menggunakan event 'change' atau 'blur' agar pengguna selesai mengetik dulu
+        inputKetUtama.addEventListener("change", function (e) {
+            const val = e.target.value.toUpperCase().trim();
+
+            // Jika kata "LHP" terdeteksi
+            if (val.includes("LHP")) {
+                if (typeof openLhpModal === 'function') {
+                    openLhpModal({
+                        tanggal: document.getElementById("input-date")?.value || document.getElementById("input-tanggal")?.value || '',
+                        keterangan: e.target.value,
+                        jenis: document.getElementById("input-jenis")?.value || '',
+                        tpk: document.getElementById("input-tpk")?.value || '',
+                        petak: document.getElementById("input-petak")?.value || ''
+                    });
+                } else {
+                    alert("Fungsi openLhpModal belum terdefinisi!");
+                }
             }
-        }
-    });
-}
+        });
+    }
 
     // Inisialisasi status Login
     if (state.isLoggedIn) {
