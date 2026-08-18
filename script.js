@@ -30,6 +30,61 @@ let state = {
     filteredData: [] // Untuk menyimpan hasil pencarian/filter
 };
 
+// Variable untuk menyimpan kode captcha aktif
+let currentCaptchaCode = '';
+
+function generateCaptchaText(length = 5) {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
+
+function renderCaptcha() {
+    const canvas = document.getElementById('captchaCanvas');
+    if (!canvas) return; // Mencegah error jika elemen canvas tidak ada di halaman aktif
+    
+    const ctx = canvas.getContext('2d');
+    currentCaptchaCode = generateCaptchaText(5);
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#f3f4f6';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Distorsi Garis
+    for (let i = 0; i < 6; i++) {
+        ctx.strokeStyle = `rgba(${Math.random()*150}, ${Math.random()*150}, ${Math.random()*150}, 0.4)`;
+        ctx.beginPath();
+        ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
+        ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height);
+        ctx.stroke();
+    }
+
+    // Teks Captcha
+    const charWidth = canvas.width / (currentCaptchaCode.length + 1);
+    for (let i = 0; i < currentCaptchaCode.length; i++) {
+        const char = currentCaptchaCode[i];
+        ctx.save();
+        const x = charWidth * (i + 0.8);
+        const y = 30 + (Math.random() * 4 - 2);
+        const angle = (Math.random() - 0.5) * 0.4;
+
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.font = `bold ${22 + Math.random() * 4}px Arial, sans-serif`;
+        ctx.fillStyle = `rgb(${Math.random()*100}, ${Math.random()*100}, ${Math.random()*100})`;
+        ctx.fillText(char, 0, 0);
+        ctx.restore();
+    }
+}
+
+function validateCaptcha() {
+    const userInput = document.getElementById('captchaInput')?.value.trim() || '';
+    return userInput.toLowerCase() === currentCaptchaCode.toLowerCase();
+}
+
 // 1. Fungsi Buka Modal Master Data & Update Header
 window.openMasterModal = async function (type) {
     state.currentMasterType = type;
@@ -3409,11 +3464,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const inputKetUtama = document.getElementById("input-ket") || document.getElementById("input-keterangan");
 
     if (inputKetUtama) {
-        // Menggunakan event 'change' atau 'blur' agar pengguna selesai mengetik dulu
         inputKetUtama.addEventListener("change", function (e) {
             const val = e.target.value.toUpperCase().trim();
 
-            // Jika kata "LHP" terdeteksi
             if (val.includes("LHP")) {
                 if (typeof openLhpModal === 'function') {
                     openLhpModal({
@@ -3469,5 +3522,38 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    // ==========================================
+    // INISIALISASI CAPTCHA (AMAN & DEFENSE)
+    // ==========================================
+    if (typeof renderCaptcha === 'function') {
+        renderCaptcha();
+    }
+
+    const btnRefresh = document.getElementById('btnRefreshCaptcha');
+    if (btnRefresh) {
+        btnRefresh.addEventListener('click', () => {
+            const input = document.getElementById('captchaInput');
+            if (input) input.value = '';
+            if (typeof renderCaptcha === 'function') renderCaptcha();
+        });
+    }
+
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+
+            if (typeof validateCaptcha === 'function' && !validateCaptcha()) {
+                alert('Kode Captcha salah!');
+                if (typeof renderCaptcha === 'function') renderCaptcha();
+                return;
+            }
+
+            console.log("Captcha valid! Memproses data...");
+            // Jika ada fungsi login bawaan, panggil di sini:
+            // if (typeof handleLogin === 'function') handleLogin();
+        });
+    }
 });
 
