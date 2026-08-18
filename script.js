@@ -45,7 +45,7 @@ function generateCaptchaText(length = 5) {
 function renderCaptcha() {
     const canvas = document.getElementById('captchaCanvas');
     if (!canvas) return; // Mencegah error jika elemen canvas tidak ada di halaman aktif
-    
+
     const ctx = canvas.getContext('2d');
     currentCaptchaCode = generateCaptchaText(5);
 
@@ -55,7 +55,7 @@ function renderCaptcha() {
 
     // Distorsi Garis
     for (let i = 0; i < 6; i++) {
-        ctx.strokeStyle = `rgba(${Math.random()*150}, ${Math.random()*150}, ${Math.random()*150}, 0.4)`;
+        ctx.strokeStyle = `rgba(${Math.random() * 150}, ${Math.random() * 150}, ${Math.random() * 150}, 0.4)`;
         ctx.beginPath();
         ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
         ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height);
@@ -74,7 +74,7 @@ function renderCaptcha() {
         ctx.translate(x, y);
         ctx.rotate(angle);
         ctx.font = `bold ${22 + Math.random() * 4}px Arial, sans-serif`;
-        ctx.fillStyle = `rgb(${Math.random()*100}, ${Math.random()*100}, ${Math.random()*100})`;
+        ctx.fillStyle = `rgb(${Math.random() * 100}, ${Math.random() * 100}, ${Math.random() * 100})`;
         ctx.fillText(char, 0, 0);
         ctx.restore();
     }
@@ -654,6 +654,7 @@ window.updatePetakRincianByTPK = function () {
 // Variable flag untuk mencegah startApp dijalankan bersamaan
 let isAppInitializing = false;
 
+
 async function startApp() {
     // 1. CEK FLAG: Jika sedang dalam proses inisialisasi, hentikan eksekusi ganda
     if (isAppInitializing) {
@@ -665,8 +666,8 @@ async function startApp() {
         isAppInitializing = true; // Tandai bahwa aplikasi mulai loading
         showLoading(true);
 
-        const URL = 'https://fcccuqnyxuwsrddlookt.supabase.co';
-        const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjY2N1cW55eHV3c3JkZGxvb2t0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NDU2NzQsImV4cCI6MjA4NTQyMTY3NH0.w9p0yxWW1CtLm3Gj3uD1z3P1eWQxW_hB288iUwkfCd8';
+        const URL = CONFIG.SUPABASE_URL;
+        const KEY = CONFIG.SUPABASE_KEY;
 
         if (!api && window.supabase) {
             api = window.supabase.createClient(URL, KEY);
