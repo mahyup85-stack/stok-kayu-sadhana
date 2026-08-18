@@ -424,10 +424,20 @@ function showLoading(isLoading) {
 }
 
 // 4. SISIPKAN helper fungsi hitung konversi di sini
+// Helper hitung konversi (Dari M3 ke SM)
 function hitungKonversi(jenisKayu, volumeM3) {
-    // Ambil faktor konversi dari state (jika tidak ada/belum diisi, default = 1)
-    const faktor = (window.state && window.state.konversiKayu) ? (window.state.konversiKayu[jenisKayu] || 1) : 1;
-    return volumeM3 * faktor;
+    if (!volumeM3) return 0;
+
+    // Ambil faktor konversi dari state.konversiKayu (Default fallback 0.59 jika jenis kayu tidak ditemukan)
+    const faktor = (window.state && window.state.konversiKayu && window.state.konversiKayu[jenisKayu])
+        ? parseFloat(window.state.konversiKayu[jenisKayu])
+        : 0.59;
+
+    // Hitung SM = M3 / Faktor Konversi
+    const hasil = volumeM3 / (faktor || 0.59);
+    
+    // Pembulatan 2 digit di belakang koma
+    return Math.round(hasil * 100) / 100;
 }
 
 function updateYearDropdowns() {
@@ -713,38 +723,37 @@ async function loadDataMaster() {
         const { data, error } = await api.from('master_data').select('*');
         if (error) throw error;
 
-        // 1. Pisahkan data ke state (Kode Lama Kamu)
-        state.master.jenis_kayu = data.filter(d => d.type === 'jenis_kayu' || d.type === 'jenis-kayu');
-        state.master.tpk = data.filter(d => d.type === 'tpk');
+        // Ensure state & state.master initialized
+        if (!window.state) window.state = {};
+        if (!window.state.master) window.state.master = {};
 
-        // 2. TAMBAHAN BARU: Simpan Mapping Konversi Kayu
-        state.konversiKayu = {};
-        state.master.jenis_kayu.forEach(item => {
-            // Ambil nama jenis kayu (misal item.nama atau item.nilai)
-            const namaJenis = item.nama || item.nilai || item.jenis_kayu;
-            // Ambil faktor konversi (default 1 jika kolom di Supabase belum diisi)
-            const faktor = parseFloat(item.faktor_konversi || item.konversi || 1);
+        // 1. Pisahkan data ke state
+        window.state.master.jenis_kayu = data.filter(d => d.type === 'jenis_kayu' || d.type === 'jenis-kayu');
+        window.state.master.tpk = data.filter(d => d.type === 'tpk');
 
-            if (namaJenis) {
-                state.konversiKayu[namaJenis] = faktor;
+        // 2. Map Konversi Kayu (Gunakan huruf kecil/trim agar pencarian aman dari typo Kapital)
+        window.state.konversiKayu = {};
+        
+        window.state.master.jenis_kayu.forEach(item => {
+            // Priority 1: item.name (Kolom di Supabase Anda)
+            const namaJenis = (item.name || item.nama || item.jenis_kayu || '').trim();
+            const faktor = parseFloat(item.konversi || item.faktor_konversi);
+
+            if (namaJenis && !isNaN(faktor)) {
+                // Simpan dengan key huruf kecil agar tidak sensitif huruf besar/kecil
+                window.state.konversiKayu[namaJenis.toLowerCase()] = faktor;
             }
         });
 
-        console.log("✅ Data Master Berhasil Dimuat:", {
-            jenis_kayu: state.master.jenis_kayu.length,
-            tpk: state.master.tpk.length
-        });
-        console.log("📊 Mapping Konversi Kayu:", state.konversiKayu);
+        console.log("✅ Mapping Konversi Kayu Sempurna:", window.state.konversiKayu);
 
-        // 3. PANGGIL FUNGSI RENDER (Kode Lama Kamu)
-        renderAllDropdowns();   // Untuk Form Input
-        renderFilterSaldo();    // Untuk Ringkasan Saldo
-
+        // 3. Render Dropdown & UI
+        if (typeof renderAllDropdowns === 'function') renderAllDropdowns();
+        if (typeof renderFilterSaldo === 'function') renderFilterSaldo();
         if (window.sinkronisasiFilterRincian) window.sinkronisasiFilterRincian();
 
     } catch (err) {
-        // Jangan biarkan error render menghentikan proses load data
-        console.error("❌ Gagal render dropdown master:", err.message);
+        console.error("❌ Gagal load master data:", err.message);
     }
 }
 
@@ -1294,32 +1303,23 @@ function logout() {
 
 // Contoh penyesuaian fungsi edit:
 window.editData = function (id) {
-    // 🛡️ Ambil data mutasi dari state
     const listMutasi = (state.filteredData && state.filteredData.length > 0)
         ? state.filteredData
         : (state.data || []);
 
-    // 🛡️ Cari item berdasarkan ID
     const data = listMutasi.find(item => String(item.id) === String(id));
 
     if (!data) {
-        console.error("Gagal menemukan ID:", id, "di dalam listMutasi.");
         alert("Data tidak ditemukan!");
         return;
     }
 
-    // 🎯 PERCABANGAN KHUSUS LHP vs FORM BIASA
     const ketUpper = (data.keterangan || '').toUpperCase();
 
     if (ketUpper.includes("LHP")) {
-        // Jika data LHP, buka Modal Melayang LHP (Panggil fungsi yang kita buat sebelumnya)
-        if (typeof editLhpItem === 'function') {
-            editLhpItem(data);
-        } else {
-            console.error("Fungsi editLhpItem belum terpasang!");
-        }
+        if (typeof editLhpItem === 'function') editLhpItem(data);
     } else {
-        // Jika data mutasi BIASA, isi ke Form Utama seperti biasa
+        // Populasikan nilai form dasar
         document.getElementById('edit-id').value = data.id;
         document.getElementById('input-date').value = data.tanggal || '';
         document.getElementById('input-ket').value = data.keterangan || '';
@@ -1327,21 +1327,20 @@ window.editData = function (id) {
         document.getElementById('input-tpk').value = data.tpk || '';
         document.getElementById('input-petak').value = data.petak || '';
 
-        // AMBIL NILAI SM
-        const inSM = data.masuk_sm ?? (data.masuk_m3 ? Math.round((data.masuk_m3 / 0.67) * 100) / 100 : 0);
-        const outSM = data.keluar_sm ?? (data.keluar_m3 ? Math.round((data.keluar_m3 / 0.67) * 100) / 100 : 0);
+        // 🎯 KUNCI PENYELESAIAN: Hitung dinamis dari M3 pakai hitungKonversi
+        const inSM = data.masuk_m3 ? hitungKonversi(data.jenis_kayu, data.masuk_m3) : (data.masuk_sm || 0);
+        const outSM = data.keluar_m3 ? hitungKonversi(data.jenis_kayu, data.keluar_m3) : (data.keluar_sm || 0);
 
         document.getElementById('input-in-sm').value = inSM;
         document.getElementById('input-out-sm').value = outSM;
 
-        // Ubah UI Form Utama ke mode Edit
+        // Mode Edit UI
         document.getElementById('form-mode-title').innerText = 'Edit Data Mutasi';
         document.getElementById('btn-submit').innerText = 'Update Data';
 
         const btnCancel = document.getElementById('btn-cancel-edit');
         if (btnCancel) btnCancel.classList.remove('hidden');
 
-        // Scroll halus ke form utama
         document.getElementById('form-mode-title')?.scrollIntoView({ behavior: 'smooth' });
     }
 };
@@ -1737,9 +1736,24 @@ function renderMutasiTable(data) {
 
 // 💡 Helper fungsi untuk menghitung hasil konversi (Bisa ditaruh di atas fungsi ini)
 function hitungKonversi(jenisKayu, volumeM3) {
-    if (!window.state || !window.state.konversiKayu) return volumeM3;
-    const faktor = window.state.konversiKayu[jenisKayu] || 1;
-    return volumeM3 * faktor;
+    if (!volumeM3 || isNaN(volumeM3)) return 0;
+
+    const key = String(jenisKayu || '').trim().toLowerCase();
+    
+    // Ambil faktor konversi dari state (jika tidak ada di master_data, default 1 agar tidak merusak data)
+    let faktor = 1;
+
+    if (window.state && window.state.konversiKayu && window.state.konversiKayu[key]) {
+        faktor = window.state.konversiKayu[key];
+    } else {
+        console.warn(`[Konversi Warning] Jenis kayu "${jenisKayu}" tidak ditemukan di master_data!`);
+    }
+
+    // RUMUS: SM = M3 / Faktor Konversi
+    const hasil = parseFloat(volumeM3) / faktor;
+    
+    // Pembulatan 2 desimal
+    return Math.round(hasil * 100) / 100;
 }
 
 function getProcessedRekapData() {
