@@ -435,7 +435,7 @@ function hitungKonversi(jenisKayu, volumeM3) {
 
     // Hitung SM = M3 / Faktor Konversi
     const hasil = volumeM3 / (faktor || 0.59);
-    
+
     // Pembulatan 2 digit di belakang koma
     return Math.round(hasil * 100) / 100;
 }
@@ -733,7 +733,7 @@ async function loadDataMaster() {
 
         // 2. Map Konversi Kayu (Gunakan huruf kecil/trim agar pencarian aman dari typo Kapital)
         window.state.konversiKayu = {};
-        
+
         window.state.master.jenis_kayu.forEach(item => {
             // Priority 1: item.name (Kolom di Supabase Anda)
             const namaJenis = (item.name || item.nama || item.jenis_kayu || '').trim();
@@ -1739,7 +1739,7 @@ function hitungKonversi(jenisKayu, volumeM3) {
     if (!volumeM3 || isNaN(volumeM3)) return 0;
 
     const key = String(jenisKayu || '').trim().toLowerCase();
-    
+
     // Ambil faktor konversi dari state (jika tidak ada di master_data, default 1 agar tidak merusak data)
     let faktor = 1;
 
@@ -1751,7 +1751,7 @@ function hitungKonversi(jenisKayu, volumeM3) {
 
     // RUMUS: SM = M3 / Faktor Konversi
     const hasil = parseFloat(volumeM3) / faktor;
-    
+
     // Pembulatan 2 desimal
     return Math.round(hasil * 100) / 100;
 }
@@ -1759,7 +1759,7 @@ function hitungKonversi(jenisKayu, volumeM3) {
 function getProcessedRekapData() {
     const allData = (typeof state !== 'undefined' && Array.isArray(state.data)) ? state.data : [];
 
-    // 1. Pembacaan ID yang PRESISI sesuai HTML view-rekap (Hanya Bulan, Tahun, TPK, & Jenis)
+    // Helper pembacaan nilai HTML ID yang aman
     const getVal = (id) => document.getElementById(id)?.value?.trim() || "";
 
     const fBFrom = getVal("filter-dari-bulan");
@@ -1769,13 +1769,15 @@ function getProcessedRekapData() {
 
     const fTPK = getVal("filter-tpk");
     const fJenis = getVal("filter-jenis");
+    const fPetak = getVal("filter-petak"); // 🟢 1. TAMBAHKAN PEMBACAAN FILTER PETAK
 
-    // 2. Konversi Rentang Tanggal Filter ke Angka Integer (YYYYMM)
+    // 2. Konversi Rentang Tanggal Filter ke Angka Integer (YYYYMM) dengan Penanganan NaN yang Aman
     const numTFrom = parseInt(fTFrom, 10);
     const numBFrom = parseInt(fBFrom, 10);
     const numTTo = parseInt(fTTo, 10);
     const numBTo = parseInt(fBTo, 10);
 
+    // Jika bulan/tahun tidak dipilih, default ke 0 (awal) atau 999999 (akhir)
     const fromVal = (!isNaN(numTFrom) && !isNaN(numBFrom)) ? (numTFrom * 100 + numBFrom) : 0;
     const toVal = (!isNaN(numTTo) && !isNaN(numBTo)) ? (numTTo * 100 + numBTo) : 999999;
 
@@ -1785,22 +1787,26 @@ function getProcessedRekapData() {
         if (!d.tanggal) return;
 
         // Parsing Tanggal Data Transaksi (Format expected: YYYY-MM-DD)
-        const parts = d.tanggal.split("-");
+        const parts = String(d.tanggal).split("-");
         const y = parseInt(parts[0], 10);
         const m = parseInt(parts[1], 10);
         const dVal = (isNaN(y) || isNaN(m)) ? 0 : (y * 100 + m);
 
-        // --- FILTER STRICT TANGGAL (HANYA PERIODE PILIHAN) ---
-        if (fromVal > 0 && dVal < fromVal) return; // Buang data sebelum bulan/tahun 'dari'
-        if (toVal < 999999 && dVal > toVal) return; // Buang data setelah bulan/tahun 'sampai'
+        // --- FILTER STRICT TANGGAL ---
+        if (fromVal > 0 && dVal < fromVal) return; 
+        if (toVal < 999999 && dVal > toVal) return; 
 
-        // --- FILTER PROPERTIES (HANYA TPK & JENIS) ---
+        // --- FILTER PROPERTIES (TPK, JENIS, & PETAK) ---
         const itemJenis = String(d.jenis_kayu || d.jenis || '').trim();
         const itemTPK = String(d.tpk || '').trim();
-        const itemPetak = String(d.petak || '').trim(); // Tetap diambil untuk ditampilkan di tabel
+        const itemPetak = String(d.petak || '').trim();
 
-        if (fTPK && itemTPK.toLowerCase() !== fTPK.toLowerCase()) return;
-        if (fJenis && itemJenis.toLowerCase() !== fJenis.toLowerCase()) return;
+        // Normalisasi teks (Abaikan spasi ganda & case insensitive)
+        const clean = (str) => String(str || '').replace(/\s+/g, ' ').trim().toLowerCase();
+
+        if (fTPK && clean(itemTPK) !== clean(fTPK)) return;
+        if (fJenis && clean(itemJenis) !== clean(fJenis)) return;
+        if (fPetak && clean(itemPetak) !== clean(fPetak)) return; // 🟢 2. TAMBAHKAN PENYARINGAN PETAK
 
         // --- GROUPING DATA PER (JENIS + TPK + PETAK) ---
         const key = `${itemJenis || '-'}_${itemTPK || '-'}_${itemPetak || '-'}`;
@@ -1809,7 +1815,7 @@ function getProcessedRekapData() {
             grouped[key] = {
                 jenis: itemJenis || '-',
                 tpk: itemTPK || '-',
-                petak: itemPetak || '-', // Cukup di-select / ditampilkan di sini
+                petak: itemPetak || '-',
                 sAwalBAP: 0,
                 sAwalLHP: 0,
                 bapBerjalan: 0,
@@ -1821,11 +1827,11 @@ function getProcessedRekapData() {
         }
 
         const item = grouped[key];
-        const valMasuk = parseFloat(d.masuk_m3 || d.p || 0);
-        const valKeluar = parseFloat(d.keluar_m3 || d.m || 0);
-        const ket = (d.keterangan || "").toUpperCase();
+        const valMasuk = parseFloat(d.masuk_m3 || d.p || 0) || 0;
+        const valKeluar = parseFloat(d.keluar_m3 || d.m || 0) || 0;
+        const ket = String(d.keterangan || "").toUpperCase();
 
-        // Hitung Transaksi Berjalan di Periode Terpilih
+        // Hitung Transaksi Berjalan
         if (ket.includes("KIRIM")) {
             item.kirimBerjalan += valKeluar;
         } else if (ket.includes("LHP")) {
