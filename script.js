@@ -2327,91 +2327,26 @@ function exportRekapExcel() {
 }
 
 
-// ===== EXPORT RINCIAN MUTASI TO XLS (WITH KOP SURAT) =====
-function exportRincianExcel() {
-    const table = document.querySelector("#view-rekap-rincian table");
-    if (!table || table.rows.length <= 1) {
-        alert("Tidak ada data rincian untuk diekspor. Silakan terapkan filter terlebih dahulu.");
-        return;
-    }
+// 1. Siapkan data untuk masing-masing sheet (misalnya berupa array of objects atau array of arrays)
+const dataBAP = [...]; // data untuk BAP
+const dataLHP = [...]; // data untuk LHP
+const dataKirim = [...]; // data untuk KIRIM
 
-    const filterBulan = state?.filter?.dariBulan || "Semua";
-    const filterTahun = state?.filter?.dariTahun || new Date().getFullYear();
-    const tglCetak = new Date().toLocaleDateString('id-ID');
+// 2. Buat worksheet dari masing-masing data
+const wsBAP = XLSX.utils.json_to_sheet(dataBAP);
+const wsLHP = XLSX.utils.json_to_sheet(dataLHP);
+const wsKirim = XLSX.utils.json_to_sheet(dataKirim);
 
-    // Hitung jumlah kolom tabel rincian secara dinamis agar colspan Kop Surat pas
-    const totalCols = table.rows[0]?.cells?.length || 10;
+// 3. Buat workbook baru
+const wb = XLSX.utils.book_new();
 
-    // CSS Style khusus Excel (Border, Font, Alignment)
-    const style = `
-        <style>
-            table { border-collapse: collapse; font-family: Calibri, sans-serif; }
-            th, td { border: 1px solid #cbd5e1; padding: 6px; font-size: 11pt; }
-            th { background-color: #1e293b; color: #ffffff; text-align: center; font-weight: bold; }
-            .kop-title { font-size: 16pt; font-weight: bold; color: #1e293b; }
-            .kop-sub { font-size: 10pt; color: #64748b; font-style: italic; }
-            .report-title { font-size: 14pt; font-weight: bold; color: #0f172a; text-align: center; }
-            .report-sub { font-size: 10pt; color: #475569; text-align: center; }
-            .text-center { text-align: center; }
-            .bold { font-weight: bold; }
-        </style>
-    `;
+// 4. Tambahkan worksheet ke dalam workbook dengan nama sheet masing-masing
+XLSX.utils.book_append_sheet(wb, wsBAP, "BAP");
+XLSX.utils.book_append_sheet(wb, wsLHP, "LHP");
+XLSX.utils.book_append_sheet(wb, wsKirim, "KIRIM");
 
-    // Header Kop Perusahaan & Judul Laporan Rincian
-    const kopHeaderHtml = `
-        <table>
-            <tr><td colspan="${totalCols}" class="kop-title">PT. SADHANA ARIFNUSA</td></tr>
-            <tr><td colspan="${totalCols}" class="kop-sub">Kawasan Pengelolaan Hutan & TPK Terpadu</td></tr>
-            <tr><td colspan="${totalCols}" class="kop-sub" style="border-bottom: 2px solid #1e293b;">Jl. Raya Labuhan Lombok - Sambelia | Telp: -</td></tr>
-            <tr><td colspan="${totalCols}"></td></tr> <!-- Baris Kosong -->
-            <tr><td colspan="${totalCols}" class="report-title">LAPORAN RINCIAN MUTASI STOK KAYU</td></tr>
-            <tr><td colspan="${totalCols}" class="report-sub">Periode: ${filterBulan} ${filterTahun} | Dicetak: ${tglCetak}</td></tr>
-            <tr><td colspan="${totalCols}"></td></tr> <!-- Baris Kosong -->
-        </table>
-    `;
-
-    // Tanda Tangan / Pengesahan
-    const ttdFooterHtml = `
-        <br/>
-        <table>
-            <tr>
-                <td colspan="${totalCols - 3}"></td>
-                <td colspan="3" class="text-center">Disetujui Oleh,</td>
-            </tr>
-            <tr style="height: 50px;">
-                <td colspan="${totalCols - 3}"></td>
-                <td colspan="3"></td>
-            </tr>
-            <tr>
-                <td colspan="${totalCols - 3}"></td>
-                <td colspan="3" class="text-center bold">( GANISPH )</td>
-            </tr>
-        </table>
-    `;
-
-    // Penggabungan Dokumen HTML
-    const fullHtml = `
-        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-        <head>
-            <meta charset="utf-8"/>
-            ${style}
-        </head>
-        <body>
-            ${kopHeaderHtml}
-            ${table.outerHTML}
-            ${ttdFooterHtml}
-        </body>
-        </html>
-    `;
-
-    const fileName = `Rincian_Mutasi_${new Date().getTime()}.xls`;
-    const url = 'data:application/vnd.ms-excel;charset=utf-8,' + encodeURIComponent(fullHtml);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = fileName;
-    link.click();
-}
+// 5. Simpan file Excel
+XLSX.writeFile(wb, "Laporan_Stok_Kayu_Sadhana.xlsx");
 
 // Helper untuk membuat QR Code dalam format Base64 Image
 function generateQRCodeBase64(text) {
@@ -2441,238 +2376,242 @@ function generateQRCodeBase64(text) {
     });
 }
 
-async function exportRekapSaldoPDF() {
-    try {
-        if (typeof showLoading === 'function') showLoading(true);
+export async function exportRekapSaldoPDF() {
+    try {
+        if (typeof showLoading === 'function') showLoading(true);
 
-        const { jsPDF } = window.jspdf || {};
-        if (!jsPDF) {
-            alert("Library jsPDF belum dimuat.");
-            return;
-        }
+        const { jsPDF } = window.jspdf || {};
+        if (!jsPDF) {
+            alert("Library jsPDF belum dimuat.");
+            return;
+        }
 
-        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const marginX = 14;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const marginX = 14;
 
-        // =========================================================
-        // 1. KOP SURAT PERUSAHAAN (HEADER)
-        // =========================================================
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(16);
-        doc.setTextColor(30, 41, 59);
-        doc.text("PT. SADHANA ARIFNUSA", marginX, 15);
+        // HEADER / KOP SURAT
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(14);
+        doc.setTextColor(30, 41, 59);
+        doc.text("PT. SADHANA ARIFNUSA", marginX, 12);
 
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(100, 116, 139);
-        doc.text("Kawasan Pengelolaan Hutan & TPK Terpadu", marginX, 20);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text("Kawasan Pengelolaan Hutan & TPK Terpadu", marginX, 16.5);
 
-        doc.setLineWidth(0.6);
-        doc.setDrawColor(30, 41, 59);
-        doc.line(marginX, 23, pageWidth - marginX, 23);
+        doc.setFontSize(7.5);
+        doc.setTextColor(71, 85, 105);
+        doc.text("Jl. Raya Labuhan Lombok - Sambelia | Telp: -", marginX, 20.5);
 
-        doc.setFontSize(8);
-        doc.text("Jl. Raya Labuhan Lombok - Sambelia | Telp: -", marginX, 27);
+        doc.setLineWidth(0.6);
+        doc.setDrawColor(30, 41, 59);
+        doc.line(marginX, 22.5, pageWidth - marginX, 22.5);
 
-        // =========================================================
-        // 2. JUDUL LAPORAN REKAP SALDO
-        // =========================================================
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
-        doc.setTextColor(15, 23, 42);
-        doc.text("LAPORAN REKAPITULASI SALDO STOK KAYU", pageWidth / 2, 33, { align: "center" });
+        // ==========================================
+        // KONVERSI & PEMBACAAN TEKS FILTER UNTUK HEADER PDF
+        // ==========================================
+        const namaBulanIndo = {
+            "1": "Januari", "01": "Januari",
+            "2": "Februari", "02": "Februari",
+            "3": "Maret", "03": "Maret",
+            "4": "April", "04": "April",
+            "5": "Mei", "05": "Mei",
+            "6": "Juni", "06": "Juni",
+            "7": "Juli", "07": "Juli",
+            "8": "Agustus", "08": "Agustus",
+            "9": "September", "09": "September",
+            "10": "Oktober", "11": "November", "12": "Desember"
+        };
 
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8.5);
-        doc.setTextColor(71, 85, 105);
+        const getOptionText = (id) => {
+            const el = document.getElementById(id);
+            if (!el) return "";
+            if (el.tagName === "SELECT") {
+                const opt = el.options[el.selectedIndex];
+                return opt ? opt.text.trim() : "";
+            }
+            return el.value?.trim() || "";
+        };
 
-        const filterBulan = (typeof state !== 'undefined' && state?.filter?.dariBulan) ? state.filter.dariBulan : "Semua";
-        const filterTahun = (typeof state !== 'undefined' && state?.filter?.dariTahun) ? state.filter.dariTahun : new Date().getFullYear();
-        doc.text(`Periode: ${filterBulan} ${filterTahun} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 38, { align: "center" });
+        const getOptionValue = (id) => {
+            const el = document.getElementById(id);
+            return el ? el.value?.trim() || "" : "";
+        };
 
-        // =========================================================
-        // 3. CARI TABEL REKAP DI LAYAR SECARA OTOMATIS
-        // =========================================================
-        const tableBody = [];
-        let gTotalAwalBap = 0, gTotalAwalLhp = 0, gTotalBap = 0, gTotalLhp = 0, gTotalKirim = 0, gTotalSaldoBap = 0, gTotalSaldoLhp = 0;
+        // Bulan & Tahun Dari
+        const bFromVal = getOptionValue("filter-rekap-bulan-dari") || getOptionValue("filter-dari-bulan");
+        const tFromVal = getOptionValue("filter-rekap-tahun-dari") || getOptionValue("filter-dari-tahun");
+        const bFromText = namaBulanIndo[bFromVal] || getOptionText("filter-rekap-bulan-dari") || getOptionText("filter-dari-bulan");
 
-        const parseDomNum = (text) => {
-            if (!text) return 0;
-            let str = text.trim().replace(/\./g, '').replace(',', '.');
-            let num = parseFloat(str);
-            return isNaN(num) ? 0 : num;
-        };
+        // Bulan & Tahun Sampai
+        const bToVal = getOptionValue("filter-rekap-bulan-sampai") || getOptionValue("filter-sampai-bulan");
+        const tToVal = getOptionValue("filter-rekap-tahun-sampai") || getOptionValue("filter-sampai-tahun");
+        const bToText = namaBulanIndo[bToVal] || getOptionText("filter-rekap-bulan-sampai") || getOptionText("filter-sampai-bulan");
+        const tToText = tToVal; // <-- PERBAIKAN: Deklarasikan tToText menggunakan nilai tToVal
 
-        // Ambil semua tabel yang ada di halaman
-        const allTables = document.querySelectorAll("table");
-        let targetTable = null;
+        // Format Periode
+        let periodeStr = "";
+        if (bFromText && tFromVal && bToText && tToText) {
+            periodeStr = `${bFromText} ${tFromVal} s/d ${bToText} ${tToText}`;
+        } else if (bFromText && bToText) {
+            periodeStr = `${bFromText} s/d ${bToText}`;
+        } else {
+            periodeStr = "Semua Periode";
+        }
 
-        // Cari tabel yang header-nya memuat kata 'Jenis Kayu' atau 'Saldo BAP'
-        allTables.forEach((tbl) => {
-            if (tbl.offsetParent !== null && (tbl.innerText.includes("Jenis Kayu") || tbl.innerText.includes("Saldo BAP"))) {
-                targetTable = tbl;
-            }
-        });
+        let tpkText = getOptionText("filter-rekap-tpk") || getOptionText("filter-tpk") || "Semua TPK";
+        let jenisText = getOptionText("filter-rekap-jenis-kayu") || getOptionText("filter-jenis") || "Semua Jenis";
+        let petakText = getOptionText("filter-rekap-petak") || getOptionText("filter-petak") || "";
 
-        if (!targetTable) {
-            alert("Tabel Rekap Saldo tidak ditemukan di layar!");
-            return;
-        }
+        if (!tpkText || tpkText.includes("--")) tpkText = "Semua TPK";
+        if (!jenisText || jenisText.includes("--")) jenisText = "Semua Jenis";
 
-        const rows = targetTable.querySelectorAll("tbody tr");
-        let rowCount = 0;
+        // Perbaikan: new Date()
+        const now = new Date();
+        const tglCetak = `${now.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`;
 
-        rows.forEach((row) => {
-            const cols = row.querySelectorAll("td");
-            const rowText = row.innerText.toUpperCase();
+        let subHeaderInfo = `Periode: ${periodeStr} | TPK: ${tpkText} | Jenis: ${jenisText}`;
+        if (petakText && !petakText.includes("--") && !petakText.toLowerCase().includes("semua")) {
+            subHeaderInfo += ` | Petak: ${petakText}`;
+        }
+        subHeaderInfo += ` | Dicetak: ${tglCetak}`;
 
-            // Abaikan baris total, kosong, atau pesan 'tidak ada data'
-            if (cols.length < 5 || rowText.includes("TOTAL") || rowText.includes("TIDAK ADA")) return;
+        // JUDUL LAPORAN
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(15, 23, 42);
+        doc.text("LAPORAN REKAPITULASI SALDO STOK KAYU", pageWidth / 2, 28, { align: "center" });
 
-            rowCount++;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(71, 85, 105);
+        doc.text(subHeaderInfo, pageWidth / 2, 33, { align: "center" });
 
-            // Jika tabel layar memiliki 10 kolom (Jenis Kayu, TPK, Petak, dst.)
-            // atau 11 kolom (termasuk kolom 'No' di paling awal)
-            const hasNoCol = cols.length >= 11;
-            const offset = hasNoCol ? 1 : 0;
+        // DATA TABEL
+        const { rows, totals } = getProcessedRekapData();
 
-            const jenisKayu = cols[0 + offset]?.innerText.trim() || '-';
-            const tpk = cols[1 + offset]?.innerText.trim() || '-';
-            const petak = cols[2 + offset]?.innerText.trim() || '-';
-            const saldoAwalBap = parseDomNum(cols[3 + offset]?.innerText);
-            const saldoAwalLhp = parseDomNum(cols[4 + offset]?.innerText);
-            const bap = parseDomNum(cols[5 + offset]?.innerText);
-            const lhp = parseDomNum(cols[6 + offset]?.innerText);
-            const kirim = parseDomNum(cols[7 + offset]?.innerText);
-            const saldoBap = parseDomNum(cols[8 + offset]?.innerText);
-            const saldoLhp = parseDomNum(cols[9 + offset]?.innerText);
+        if (!rows || rows.length === 0) {
+            alert("Tidak ada data untuk dieksport ke PDF!");
+            return;
+        }
 
-            // Akumulasi Total
-            gTotalAwalBap += saldoAwalBap;
-            gTotalAwalLhp += saldoAwalLhp;
-            gTotalBap += bap;
-            gTotalLhp += lhp;
-            gTotalKirim += kirim;
-            gTotalSaldoBap += saldoBap;
-            gTotalSaldoLhp += saldoLhp;
+        const formatPDFNum = (val) => {
+            let num = parseFloat(val) || 0;
+            if (Math.abs(num) < 0.0001) num = 0;
+            return num.toFixed(2);
+        };
 
-            tableBody.push([
-                rowCount,
-                jenisKayu,
-                tpk,
-                petak,
-                saldoAwalBap.toFixed(2),
-                saldoAwalLhp.toFixed(2),
-                bap.toFixed(2),
-                lhp.toFixed(2),
-                kirim.toFixed(2),
-                saldoBap.toFixed(2),
-                saldoLhp.toFixed(2)
-            ]);
-        });
+        const tableBody = rows.map((r, i) => [
+            i + 1,
+            r.jenis || '-',
+            r.tpk || '-',
+            r.petak || '-',
+            formatPDFNum(r.sAwalBAP),
+            formatPDFNum(r.sAwalLHP),
+            formatPDFNum(r.bapBerjalan),
+            formatPDFNum(r.lhpBerjalan),
+            formatPDFNum(r.kirimBerjalan),
+            formatPDFNum(r.sBAP),
+            formatPDFNum(r.sLHP)
+        ]);
 
-        if (tableBody.length === 0) {
-            alert("Tidak ada baris data yang bisa di-export.");
-            return;
-        }
+        tableBody.push([
+            { content: 'TOTAL KESELURUHAN', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
+            { content: formatPDFNum(totals?.totalSAwalBAP), styles: { fontStyle: 'bold', fillColor: [241, 245, 249], halign: 'right' } },
+            { content: formatPDFNum(totals?.totalSAwalLHP), styles: { fontStyle: 'bold', fillColor: [241, 245, 249], halign: 'right' } },
+            { content: formatPDFNum(totals?.totalBapBerjalan), styles: { fontStyle: 'bold', fillColor: [241, 245, 249], halign: 'right' } },
+            { content: formatPDFNum(totals?.totalLhpBerjalan), styles: { fontStyle: 'bold', fillColor: [241, 245, 249], halign: 'right' } },
+            { content: formatPDFNum(totals?.totalKirimBerjalan), styles: { fontStyle: 'bold', fillColor: [241, 245, 249], halign: 'right' } },
+            { content: formatPDFNum(totals?.totalGrandBAP), styles: { fontStyle: 'bold', fillColor: [241, 245, 249], halign: 'right' } },
+            { content: formatPDFNum(totals?.totalGrandLHP), styles: { fontStyle: 'bold', fillColor: [241, 245, 249], halign: 'right' } }
+        ]);
 
-        // Baris Grand Total Rekap (11 Kolom)
-        tableBody.push([
-            { content: 'TOTAL KESELURUHAN', colSpan: 4, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
-            { content: gTotalAwalBap.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
-            { content: gTotalAwalLhp.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
-            { content: gTotalBap.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
-            { content: gTotalLhp.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
-            { content: gTotalKirim.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
-            { content: gTotalSaldoBap.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
-            { content: gTotalSaldoLhp.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
-        ]);
+        doc.autoTable({
+            startY: 37,
+            head: [[
+                'No', 'Jenis Kayu', 'TPK', 'Petak',
+                'Saldo Awal BAP (m³)', 'Saldo Awal LHP (m³)',
+                'BAP (m³)', 'LHP (m³)', 'Kirim (m³)',
+                'Saldo BAP (m³)', 'Saldo LHP (m³)'
+            ]],
+            body: tableBody,
+            theme: 'grid',
+            headStyles: {
+                fillColor: [30, 41, 59],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                halign: 'center',
+                fontSize: 8.5
+            },
+            bodyStyles: { fontSize: 8, textColor: [51, 65, 85] },
+            columnStyles: {
+                0: { halign: 'center', cellWidth: 10 },
+                1: { halign: 'left' },
+                2: { halign: 'center', cellWidth: 25 },
+                3: { halign: 'center', cellWidth: 20 },
+                4: { halign: 'right', cellWidth: 24 },
+                5: { halign: 'right', cellWidth: 24 },
+                6: { halign: 'right', cellWidth: 20 },
+                7: { halign: 'right', cellWidth: 20 },
+                8: { halign: 'right', cellWidth: 20 },
+                9: { halign: 'right', cellWidth: 24, fontStyle: 'bold' },
+                10: { halign: 'right', cellWidth: 24, fontStyle: 'bold' }
+            },
+            margin: { left: marginX, right: marginX }
+        });
 
-        // =========================================================
-        // 4. GENERATE TABEL PDF AUTO-TABLE
-        // =========================================================
-        doc.autoTable({
-            startY: 44,
-            head: [[
-                'No',
-                'Jenis Kayu',
-                'TPK',
-                'Petak',
-                'Saldo Awal BAP (m³)',
-                'Saldo Awal LHP (m³)',
-                'BAP (m³)',
-                'LHP (m³)',
-                'Kirim (m³)',
-                'Saldo BAP (m³)',
-                'Saldo LHP (m³)'
-            ]],
-            body: tableBody,
-            theme: 'grid',
-            headStyles: {
-                fillColor: [30, 41, 59],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                halign: 'center',
-                fontSize: 8.5
-            },
-            bodyStyles: { fontSize: 8, textColor: [51, 65, 85] },
-            columnStyles: {
-                0: { halign: 'center', cellWidth: 10 },
-                1: { halign: 'left' },
-                2: { halign: 'center', cellWidth: 25 },
-                3: { halign: 'center', cellWidth: 20 },
-                4: { halign: 'right', cellWidth: 25 },
-                5: { halign: 'right', cellWidth: 25 },
-                6: { halign: 'right', cellWidth: 22 },
-                7: { halign: 'right', cellWidth: 22 },
-                8: { halign: 'right', cellWidth: 22 },
-                9: { halign: 'right', cellWidth: 25, fontStyle: 'bold' },
-                10: { halign: 'right', cellWidth: 25, fontStyle: 'bold' }
-            },
-            margin: { left: marginX, right: marginX }
-        });
+        // FOOTER & SIGNATURE
+        let finalY = doc.lastAutoTable.finalY + 10;
+        if (finalY > 160) {
+            doc.addPage();
+            finalY = 20;
+        }
 
-        // =========================================================
-        // 5. FOOTER & TANDA TANGAN
-        // =========================================================
-        let finalY = doc.lastAutoTable.finalY + 10;
-        if (finalY > 160) {
-            doc.addPage();
-            finalY = 20;
-        }
+        const docID = `REKAP-SADHANA-${Date.now().toString(36).toUpperCase()}`;
+        const verifyUrl = `https://stok-kayu-sadhana.vercel.app/verify?id=${docID}`;
 
-        const docID = `REKAP-SADHANA-${Date.now().toString(36).toUpperCase()}`;
-        const verifyUrl = `https://stok-kayu-sadhana.vercel.app/verify?id=${docID}`;
+        try {
+            const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verifyUrl)}`;
+            const response = await fetch(qrApiUrl);
+            const blob = await response.blob();
 
-        if (typeof generateQRCodeBase64 === 'function') {
-            const qrBase64 = await generateQRCodeBase64(verifyUrl);
-            if (qrBase64) {
-                doc.addImage(qrBase64, 'PNG', marginX, finalY, 18, 18);
-            }
-        }
+            const base64QR = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result);
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(blob);
+            });
 
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "bold");
-        doc.text("DOKUMEN REKAPITULASI RESMI", marginX + 22, finalY + 4);
-        doc.setFont("helvetica", "normal");
-        doc.text(`ID Dokumen: ${docID}`, marginX + 22, finalY + 8);
-        doc.text("Pindai QR Code untuk verifikasi keaslian saldo.", marginX + 22, finalY + 12);
+            if (base64QR) {
+                doc.addImage(base64QR, 'PNG', marginX, finalY, 18, 18);
+            }
+        } catch (qrErr) {
+            console.warn("Gagal membuat QR Code otomatis:", qrErr);
+        }
 
-        const rightAlignX = pageWidth - marginX - 45;
-        doc.text("Disetujui Oleh,", rightAlignX, finalY + 4);
-        doc.setFont("helvetica", "bold");
-        doc.text("( GANISPH )", rightAlignX, finalY + 20);
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "bold");
+        doc.text("DOKUMEN REKAPITULASI RESMI", marginX + 22, finalY + 4);
+        doc.setFont("helvetica", "normal");
+        doc.text(`ID Dokumen: ${docID}`, marginX + 22, finalY + 8);
+        doc.text("Pindai QR Code untuk verifikasi keaslian saldo.", marginX + 22, finalY + 12);
 
-        doc.save(`Rekap_Saldo_Stok_Kayu_${new Date().toISOString().slice(0, 10)}.pdf`);
+        const rightAlignX = pageWidth - marginX - 45;
+        doc.text("Disetujui Oleh,", rightAlignX, finalY + 4);
+        doc.setFont("helvetica", "bold");
+        doc.text("( GANISPH )", rightAlignX, finalY + 20);
 
-    } catch (err) {
-        console.error("Gagal export PDF rekap:", err);
-        alert("Gagal membuat PDF Rekap: " + err.message);
-    } finally {
-        if (typeof showLoading === 'function') showLoading(false);
-    }
-}
+        // Perbaikan: new Date()
+        doc.save(`Rekap_Saldo_Stok_Kayu_${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (err) {
+        console.error("Gagal export PDF rekap:", err);
+        alert("Gagal membuat PDF Rekap: " + err.message);
+    } finally {
+        if (typeof showLoading === 'function') showLoading(false);
+    }
+} 
 
 // Global Binding
 window.exportRekapSaldoPdf = exportRekapSaldoPDF;
@@ -2684,7 +2623,7 @@ async function exportRincianPDF() {
 
         const { jsPDF } = window.jspdf || {};
         if (!jsPDF) {
-            alert("Library jsPDF belum dimuat. Pastikan script jsPDF sudah terpasang.");
+            alert("Library jsPDF belum dimuat!");
             return;
         }
 
@@ -2692,69 +2631,72 @@ async function exportRincianPDF() {
         const pageWidth = doc.internal.pageSize.getWidth();
         const marginX = 14;
 
-        // =========================================================
-        // 1. KOP SURAT PERUSAHAAN (HEADER)
-        // =========================================================
+        // Header Perusahaan
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(16);
+        doc.setFontSize(14);
         doc.setTextColor(30, 41, 59);
-        doc.text("PT. SADHANA ARIFNUSA", marginX, 15);
+        doc.text("PT. SADHANA ARIFNUSA", marginX, 12);
 
+        // 2. Sub-Judul Perusahaan
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
+        doc.setFontSize(8.5);
         doc.setTextColor(100, 116, 139);
-        doc.text("Kawasan Pengelolaan Hutan & TPK Terpadu", marginX, 20);
+        doc.text("Kawasan Pengelolaan Hutan & TPK Terpadu", marginX, 16.5);
 
+        // 3. Teks Alamat (Di Atas Garis)
+        doc.setFontSize(7.5);
+        doc.setTextColor(71, 85, 105);
+        doc.text("Jl. Raya Labuhan Lombok - Sambelia | Telp: -", marginX, 20.5);
+
+        // 4. Garis Pemisah Kop Surat (Di Bawah Alamat)
         doc.setLineWidth(0.6);
         doc.setDrawColor(30, 41, 59);
         doc.line(marginX, 22, pageWidth - marginX, 22);
 
-        doc.setFontSize(8);
-        doc.text("Jl. Raya Labuhan Lombok - Sambelia | Telp: -", marginX, 26);
-
-        // =========================================================
-        // 2. JUDUL LAPORAN RINCIAN MUTASI
-        // =========================================================
+        // Judul Laporan
         doc.setFont("helvetica", "bold");
         doc.setFontSize(13);
         doc.setTextColor(15, 23, 42);
         doc.text("LAPORAN RINCIAN MUTASI STOK KAYU", pageWidth / 2, 33, { align: "center" });
 
+        // === PERBAIKAN: Ambil teks filter dari HTML secara langsung ===
+        const getElText = (id) => {
+            const el = document.getElementById(id);
+            if (!el) return "";
+            if (el.tagName === "SELECT") {
+                return el.options[el.selectedIndex]?.text || "";
+            }
+            return el.value || "";
+        };
+
+        const bFromText = getElText("filter-rincian-bulan-dari") || "Awal";
+        const tFromText = getElText("filter-rincian-tahun-dari") || "";
+        const bToText = getElText("filter-rincian-bulan-sampai") || "Akhir";
+        const tToText = getElText("filter-rincian-tahun-sampai") || "";
+        const tpkText = getElText("filter-rincian-tpk") || "Semua TPK";
+        const jenisText = getElText("filter-rincian-jenis-kayu") || "Semua Jenis";
+
+        const periodeStr = `${bFromText} ${tFromText} s/d ${bToText} ${tToText}`.trim();
+
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.5);
         doc.setTextColor(71, 85, 105);
+        doc.text(`Periode: ${periodeStr} | TPK: ${tpkText} | Jenis: ${jenisText} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 38, { align: "center" });
 
-        // Membaca state filter dengan aman
-        const currentFilter = (typeof state !== 'undefined' && state?.filter) ? state.filter : {};
-        const filterBulan = currentFilter.dariBulan || "Semua";
-        const filterTahun = currentFilter.dariTahun || new Date().getFullYear();
-        const filterTPK = currentFilter.tpk || "Semua TPK";
-
-        doc.text(`Periode: ${filterBulan} ${filterTahun} | TPK: ${filterTPK} | Dicetak: ${new Date().toLocaleDateString('id-ID')}`, pageWidth / 2, 38, { align: "center" });
-
-        // =========================================================
-        // 3. AMBIL & OLAH DATA DARI getProcessedRincianData()
-        // =========================================================
+        // Ambil Data Rincian Terproses
         const processed = getProcessedRincianData();
-        if (!processed) {
-            alert("Tidak dapat memuat data rincian!");
-            return;
-        }
-
-        const { filtered: dataMutasi } = processed;
-
-        if (!dataMutasi || dataMutasi.length === 0) {
+        if (!processed || !processed.filtered || processed.filtered.length === 0) {
             alert("Tidak ada data mutasi untuk diexport!");
             return;
         }
 
+        const { filtered: dataMutasi } = processed;
         const tableBody = [];
-        let runningSaldo = 0; // SALDO DIMOULAI DARI 0 (SAMA DENGAN RENDER WEB)
+        let runningSaldo = 0;
         let totalMasukUtama = 0;
         let totalKeluarUtama = 0;
         let rowCount = 0;
 
-        // Iterasi Data Transaksi Mutasi
         dataMutasi.forEach((d) => {
             const valP = parseFloat(d.p || d.masuk_m3 || 0);
             const valM = parseFloat(d.m || d.keluar_m3 || 0);
@@ -2768,11 +2710,9 @@ async function exportRincianPDF() {
                 mskTampil = 0; klrTampil = valM;
                 mskHitung = 0; klrHitung = valM;
             } else if (ketUpper.includes("BAP")) {
-                // BAP JADI ADM (Tampil di PDF, tapi TIDAK DIHITUNG ke saldo)
                 mskTampil = valP; klrTampil = 0;
                 mskHitung = 0; klrHitung = 0;
             } else if (ketUpper.includes("LHP")) {
-                // LHP JADI MASUK UTAMA (Tampil dan DIHITUNG ke saldo)
                 mskTampil = valP; klrTampil = 0;
                 mskHitung = valP; klrHitung = 0;
             } else {
@@ -2801,7 +2741,7 @@ async function exportRincianPDF() {
             ]);
         });
 
-        // Baris Grand Total Mutasi Periode
+        // Baris Total
         tableBody.push([
             { content: 'GRAND TOTAL MUTASI PERIODE INI', colSpan: 6, styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
             { content: totalMasukUtama.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } },
@@ -2809,21 +2749,11 @@ async function exportRincianPDF() {
             { content: runningSaldo.toFixed(2), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
         ]);
 
-        // =========================================================
-        // 4. GENERATE TABEL PDF (jsPDF AutoTable)
-        // =========================================================
         doc.autoTable({
             startY: 42,
             head: [[
-                'No',
-                'Tanggal',
-                'Keterangan / No. Dokumen',
-                'Jenis Kayu',
-                'TPK',
-                'Petak',
-                'Masuk (m³)',
-                'Keluar (m³)',
-                'Saldo (m³)'
+                'No', 'Tanggal', 'Keterangan / No. Dokumen', 'Jenis Kayu',
+                'TPK', 'Petak', 'Masuk (m³)', 'Keluar (m³)', 'Saldo (m³)'
             ]],
             body: tableBody,
             theme: 'grid',
@@ -2849,9 +2779,6 @@ async function exportRincianPDF() {
             margin: { left: marginX, right: marginX }
         });
 
-        // =========================================================
-        // 5. QR CODE VERIFIKASI & TANDA TANGAN (STAMP & FOOTER)
-        // =========================================================
         let finalY = doc.lastAutoTable.finalY + 10;
 
         if (finalY > 160) {
@@ -2900,6 +2827,7 @@ async function exportRincianPDF() {
         if (typeof showLoading === 'function') showLoading(false);
     }
 }
+
 
 // Global Exposure & Aliasing
 window.exportRincianPDF = exportRincianPDF;
