@@ -34,8 +34,8 @@ import "./components/RekapSaldo.js";
 import "./components/FilterControls.js";
 import "./components/RincianMutasi.js";
 import "./components/Pengaturan.js";
-import './components/mutasiController.js';
-import './components/tableRenderer.js';
+import './components/MutasiController.js';
+import './components/TableRenderer.js';
 
 
 // ================================================================
