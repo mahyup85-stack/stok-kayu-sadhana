@@ -1,0 +1,131 @@
+<div class="card"
+    style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-bottom: 20px;">
+    <h4 style="margin-bottom: 15px; font-weight: 700; color: #1e293b;">Filter Rincian Mutasi</h4>
+
+    <!-- Bagian 1: Grid untuk 6 Filter Utama (Bulan, Tahun, TPK, Jenis Kayu) -->
+    <div class="form-grid"
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 15px;">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label>Dari Bulan</label>
+            <select id="filter-rincian-bulan-dari"
+                style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+                <option value="">Pilih Bulan</option>
+                <option value="01">Januari</option>
+                <option value="02">Februari</option>
+                <option value="03">Maret</option>
+                <option value="04">April</option>
+                <option value="05">Mei</option>
+                <option value="06">Juni</option>
+                <option value="07">Juli</option>
+                <option value="08">Agustus</option>
+                <option value="09">September</option>
+                <option value="10">Oktober</option>
+                <option value="11">November</option>
+                <option value="12">Desember</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label>Dari Tahun</label>
+            <select id="filter-rincian-tahun-dari"
+                style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;"></select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label>Sampai Bulan</label>
+            <select id="filter-rincian-bulan-sampai"
+                style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+                <option value="">Pilih Bulan</option>
+                <option value="01">Januari</option>
+                <option value="02">Februari</option>
+                <option value="03">Maret</option>
+                <option value="04">April</option>
+                <option value="05">Mei</option>
+                <option value="06">Juni</option>
+                <option value="07">Juli</option>
+                <option value="08">Agustus</option>
+                <option value="09">September</option>
+                <option value="10">Oktober</option>
+                <option value="11">November</option>
+                <option value="12">Desember</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label>Sampai Tahun</label>
+            <select id="filter-rincian-tahun-sampai"
+                style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;"></select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label>TPK</label>
+            <select id="filter-rincian-tpk" onchange="updateRincianPetakByTPK(this)"
+                style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+                <option value="">-- Semua TPK --</option>
+            </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+            <label>Jenis Kayu</label>
+            <select id="filter-rincian-jenis-kayu"
+                style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+                <option value="">-- Semua Jenis --</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Bagian 2: Baris Bawah (Petak, Keterangan lebih pendek, dan Tombol Aksi Sejajar) -->
+    <div style="display: flex; align-items: flex-end; gap: 15px; flex-wrap: wrap;">
+
+        <!-- Kotak Petak -->
+        <div class="form-group" style="margin-bottom: 0; width: 180px;">
+            <label
+                style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px;">PETAK</label>
+            <select id="filter-rincian-petak" onchange="renderRincian()"
+                style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;">
+                <option value="">-- Semua Petak --</option>
+            </select>
+        </div>
+
+        <!-- Kotak Keterangan (Lebar diperpendek menjadi 280px agar tidak terlalu panjang) -->
+        <div class="form-group" style="margin-bottom: 0; width: 200px;">
+            <label
+                style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px;">KETERANGAN</label>
+            <input type="text" id="filter-rincian-ket" placeholder="Cari Ket..."
+                style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;">
+        </div>
+
+        <!-- Tombol Aksi (Teks Dua Baris & Rapat di sebelah Keterangan) -->
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+            <button type="button" onclick="window.triggerFilterUpdate()" class="btn-filter"
+                style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 15px 12px; background-color: #0d6efd; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 11px; line-height: 1.2;">
+                Terapkan<br>Filter
+            </button>
+            <button type="button" onclick="exportRincianExcel()" class="btn-excel"
+                style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 15px 12px; background-color: #198754; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 11px; line-height: 1.2;">
+                Export<br>Excel
+            </button>
+            <button type="button" onclick="exportRincianPDF()" class="btn-pdf"
+                style="display: inline-flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 15px 12px; background-color: #945056; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 11px; line-height: 1.2;">
+                Export<br>PDF
+            </button>
+        </div>
+
+    </div>
+    <!-- Tabel Data Rincian Mutasi -->
+    <div class="scroll-table-container" style="margin-top: 15px;">
+        <table class="data-table-rincian" style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th>Tanggal</th>
+                    <th>Keterangan</th>
+                    <th>Jenis</th>
+                    <th>TPK</th>
+                    <th>Petak</th>
+                    <th class="text-center">Masuk (M³)</th>
+                    <th class="text-center">Keluar (M³)</th>
+                    <th class="text-center">Saldo (M³)</th>
+                </tr>
+            </thead>
+            <tbody id="rincian-table-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<div id="pagination-rincian"></div>
+</div>

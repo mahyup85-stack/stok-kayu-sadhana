@@ -1,0 +1,46 @@
+<main class="main-content" style="flex: 1; width: 100%; max-width: 100%; display: flex; flex-direction: column; box-sizing: border-box;">
+    
+    <!-- Area Scroll Konten Utama -->
+    <div class="content-scroll" style="flex: 1; overflow-y: auto; padding: 20px;">
+        
+        <!-- View Dashboard -->
+        <div id="view-dashboard" class="view-section" style="display: none;">...</div>
+
+        <!-- View Pengaturan & Form Kelola Sandi -->
+        <div id="view-pengaturan" class="view-section" style="display: block;">
+            
+            <div id="view-kelola-sandi" class="sub-view-section" style="display: block;">
+                <h3>Kelola Akun &amp; Sandi</h3>
+                <form id="form-change-pass" onsubmit="handleAccountChange(event)">
+                    <div class="mb-3">
+                        <label>Username Baru</label>
+                        <input type="text" id="new-user" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label>Password Baru</label>
+                        <div class="input-group">
+                            <input type="password" id="new-pass" class="form-control" required>
+                            <span class="btn btn-outline-secondary" onclick="togglePassword('new-pass', this)" style="cursor: pointer;">👁️</span>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Simpan Perubahan Akun</button>
+                </form>
+            </div>
+
+            <div id="view-backup-setting" class="sub-view-section hidden" style="display: none;">
+                <h3>Backup &amp; Restore Data</h3>
+                <div class="mb-4">
+                    <p>Unduh seluruh data aplikasi ke dalam format JSON.</p>
+                    <button type="button" class="btn btn-success" onclick="backupData()">Download Backup (.json)</button>
+                </div>
+                <hr>
+                <div class="mb-3">
+                    <p>Pulihkan data dari file backup JSON.</p>
+                    <input type="file" id="restore-file" class="form-control" accept=".json" onchange="restoreData(event)">
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</main>

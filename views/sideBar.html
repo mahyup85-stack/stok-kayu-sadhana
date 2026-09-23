@@ -1,0 +1,59 @@
+<aside>
+    <div class="logo-area">
+        <img src="gambar/logo.png" alt="logo"
+            style="width: 32px; height: 32px; object-fit: contain; background: white; border-radius: 4px; padding: 2px;">
+        <span style="font-weight: bold; margin-left: 10px;">Sadhana App</span>
+    </div>
+
+    <nav style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
+        <button type="button" onclick="window.switchView('dashboard')" class="nav-btn">
+            📊 Kartu Stok
+        </button>
+
+        <!-- Menu Induk Rekapitulasi -->
+        <button type="button" onclick="window.toggleSubmenu('rekap')" class="nav-btn">
+            📈 Rekapitulasi
+        </button>
+        <div id="rekap-submenu" class="submenu">
+            <button type="button" onclick="window.switchView('rekapsaldo')" class="sub-link">
+                • Rekap Saldo
+            </button>
+            <button type="button" onclick="window.switchView('rincianmutasi')" class="sub-link">
+                • Rincian Mutasi
+            </button>
+        </div>
+
+        <!-- Menu Induk Master Data -->
+        <button type="button" onclick="window.toggleSubmenu('master')" class="nav-btn">
+            📁 Master Data
+        </button>
+        <div id="master-submenu" class="submenu">
+            <button type="button" onclick="window.switchView('masterdata')" class="sub-link">
+                • Jenis Kayu
+            </button>
+            <button type="button" onclick="window.switchView('tpk')" class="sub-link">
+                • TPK
+            </button>
+        </div>
+
+        <!-- Menu Induk Pengaturan -->
+        <button type="button" onclick="window.toggleSubmenu('pengaturan')" class="nav-btn">
+            ⚙️ Pengaturan
+        </button>
+        <div id="pengaturan-submenu" class="submenu">
+            <button type="button" onclick="window.switchView('kelola-sandi')" class="sub-link">
+                • Kelola Akun
+            </button>
+            <button type="button" onclick="window.switchView('backup-setting')" class="sub-link">
+                • Backup & Restore
+            </button>
+        </div>
+    </nav>
+
+    <div style="padding: 20px;">
+        <button onclick="logout()"
+            style="width:100%; background:#ef4444; color:white; border:none; padding:10px; border-radius:8px; cursor:pointer; font-weight: bold;">
+            Keluar
+        </button>
+    </div>
+</aside>
