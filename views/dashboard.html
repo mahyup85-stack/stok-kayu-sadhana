@@ -1,0 +1,197 @@
+<div id="view-dashboard">
+    <!-- Form Input Mutasi -->
+    <div class="card"
+        style="background: #ffffff; border-radius: 12px; padding: 15px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); margin-bottom: 24px;">
+        <h3 style="margin-top: 0; margin-bottom: 15px; color: #1e3a8a; font-size: 1.1rem; font-weight: 700;">Input
+            Mutasi</h3>
+
+        <form id="stock-form"
+            style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; align-items: end;">
+            <input type="hidden" id="edit-id" value="" />
+
+            <div style="grid-column: span 1;">
+                <label
+                    style="display: block; font-size: 11px; font-weight: 700; color: #065f46; margin-bottom: 6px; text-transform: uppercase;">TANGGAL</label>
+                <input type="date" id="input-date" required
+                    style="width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;" />
+            </div>
+
+            <div style="grid-column: span 1;">
+                <label
+                    style="display: block; font-size: 11px; font-weight: 700; color: #065f46; margin-bottom: 6px; text-transform: uppercase;">KETERANGAN</label>
+                <input type="text" id="input-ket" placeholder="BAP, LHP, atau Kirim" required
+                    style="width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;" />
+            </div>
+
+            <div style="grid-column: span 1;">
+                <label
+                    style="display: block; font-size: 11px; font-weight: 700; color: #065f46; margin-bottom: 6px; text-transform: uppercase;">JENIS
+                    KAYU</label>
+                <select id="input-jenis-kayu" required
+                    style="width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: #fff;"></select>
+            </div>
+
+            <div style="grid-column: span 1;">
+                <label
+                    style="display: block; font-size: 11px; font-weight: 700; color: #065f46; margin-bottom: 6px; text-transform: uppercase;">TPK</label>
+                <select id="input-tpk" required
+                    style="width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; background: #fff;"></select>
+            </div>
+
+            <div style="grid-column: span 1;">
+                <label
+                    style="display: block; font-size: 11px; font-weight: 700; color: #065f46; margin-bottom: 6px; text-transform: uppercase;">PETAK</label>
+                <input type="text" id="input-petak" placeholder="Nomor Petak"
+                    style="width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;" />
+            </div>
+
+            <div style="grid-column: span 1;">
+                <label
+                    style="display: block; font-size: 11px; font-weight: 700; color: #065f46; margin-bottom: 6px; text-transform: uppercase;">MASUK
+                    (SM)</label>
+                <input type="number" id="input-in-sm" step="0.01" value="0"
+                    style="width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;" />
+            </div>
+
+            <div style="grid-column: span 1;">
+                <label
+                    style="display: block; font-size: 11px; font-weight: 700; color: #065f46; margin-bottom: 6px; text-transform: uppercase;">KELUAR
+                    (SM)</label>
+                <input type="number" id="input-out-sm" step="0.01" value="0"
+                    style="width: 100%; padding: 8px 10px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px;" />
+            </div>
+
+            <div style="grid-column: span 2; display: flex; gap: 8px;">
+                <button type="submit" id="btn-submit"
+                    style="background-color: #065f46; color: white; border: none; padding: 15px 24px; border-radius: 6px; font-weight: 600; cursor: pointer;">Simpan</button>
+                <button type="button" id="btn-cancel-edit" class="hidden" onclick="cancelEdit()"
+                    style="background: #fff; border: 1px solid #d1d5db; padding: 9px 16px; border-radius: 6px; cursor: pointer;">Batal</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Area Tabel & Pencarian -->
+    <div class="card"
+        style="background: #ffffff; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+        <div
+            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+            <h3 style="margin: 0; color: #1e3a8a; font-size: 1.1rem; font-weight: 700;">Data Mutasi</h3>
+
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <div style="position: relative; width: 240px;">
+                    <span
+                        style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #888; font-size: 14px; pointer-events: none;"></span>
+                    <input type="text" id="search-input" placeholder="Cari data mutasi..."
+                        onkeyup="window.handleSearch ? window.handleSearch(this.value) : null"
+                        style="width: 100%; padding: 8px 12px 8px 12px; border: 1px solid rgb(221, 221, 221); border-radius: 15px; font-size: 0.875rem; outline: none; transition: border 0.3s;"
+                        onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='#ddd'">
+                </div>
+                <button onclick="window.exportToCSV()"
+                    style="background-color: #10b981; color: white; border: none; padding: 7px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer;">Export
+                    CSV</button>
+                <button onclick="window.deleteAllData()"
+                    style="background-color: #ef4444; color: white; border: none; padding: 7px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer;">Hapus
+                    Semua</button>
+            </div>
+        </div>
+
+        <!-- Bagian Pembungkus Tabel Data Mutasi -->
+        <div class="table-container" style="max-height: 450px; overflow-y: auto; position: relative;">
+            <table class="table" id="dashboard-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" id="select-all"></th>
+                        <th>Tanggal</th>
+                        <th>Keterangan</th>
+                        <th>Jenis</th>
+                        <th>TPK</th>
+                        <th>Petak</th>
+                        <th>Masuk (M³)</th>
+                        <th>Keluar (M³)</th>
+                        <th>Aksi</th>
+                    </tr>
+                </thead>
+                <tbody id="dashboard-table-body">
+                    <!-- Baris data akan dirender secara dinamis di sini -->
+                </tbody>
+            </table>
+        </div>
+        <div id="pagination-container" class="pagination-wrapper" </div>
+        </div>
+    </div>
+
+    <!-- Modal Pop-up LHP Melayang -->
+    <div id="modal-lhp" class="modal-backdrop hidden"
+        style="position: fixed; top: 0; right: 0; bottom: 0; left: var(--sidebar-width, 250px); background: rgba(0, 0, 0, 0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px;">
+
+        <div class="modal-content"
+            style="background: #fff; border-radius: 12px; padding: 24px; width: 100%; max-width: 850px; max-height: 90vh; overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+
+            <div
+                style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #f0f0f0; padding-bottom: 12px; margin-bottom: 15px;">
+                <h3 style="margin: 0; color: #1b4d3e; font-size: 1.2rem; display: flex; align-items: center; gap: 8px;">
+                    📋 Input Detail LHP
+                </h3>
+                <button type="button" onclick="closeLhpModal()"
+                    style="background: none; border: none; font-size: 1.8rem; cursor: pointer; color: #888;">&times;</button>
+            </div>
+
+            <form id="form-modal-lhp" onsubmit="saveLhpFromModal(event)">
+                <input type="hidden" id="modal-lhp-id" value="">
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 15px;">
+                    <div>
+                        <label style="font-weight: bold; font-size: 0.8rem; color: #444;">TANGGAL</label>
+                        <input type="date" id="modal-lhp-date" class="form-control" required
+                            style="width:100%; padding: 8px; border:1px solid #ccc; border-radius:6px; margin-top:4px;">
+                    </div>
+                    <div>
+                        <label style="font-weight: bold; font-size: 0.8rem; color: #444;">KETERANGAN</label>
+                        <input type="text" id="modal-lhp-ket" class="form-control" value="LHP" required
+                            style="width:100%; padding: 8px; border:1px solid #ccc; border-radius:6px; margin-top:4px;">
+                    </div>
+                    <div>
+                        <label style="font-weight: bold; font-size: 0.8rem; color: #444;">TPK</label>
+                        <select id="modal-lhp-tpk" class="form-control" required
+                            style="width:100%; padding: 8px; border:1px solid #ccc; border-radius:6px; margin-top:4px;"></select>
+                    </div>
+                </div>
+                <h4
+                    style="margin: 15px 0 10px 0; color: #333; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center;">
+                    Rincian Laporan Hasil Produksi (LHP)
+                    <!-- Tambahkan tombol ini agar user bisa menambah baris manual jika diperlukan -->
+                    <button type="button" onclick="window.addLhpRowModal()"
+                        style="padding: 4px 10px; font-size: 0.75rem; background: #2f855a; color: #fff; border: none; border-radius: 4px; cursor: pointer;">+
+                        Tambah Baris</button>
+                </h4>
+
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="background: #f8fafc; text-align: left; color: #475569;">
+                                <th style="padding: 8px; border: 1px solid #e2e8f0; width: 18%;">Petak</th>
+                                <th style="padding: 8px; border: 1px solid #e2e8f0; width: 32%;">Jenis Kayu</th>
+                                <th style="padding: 8px; border: 1px solid #e2e8f0; width: 15%;">Stapel Meter</th>
+                                <th style="padding: 8px; border: 1px solid #e2e8f0; width: 15%;">Konversi</th>
+                                <th style="padding: 8px; border: 1px solid #e2e8f0; width: 15%;">Meter Kubik</th>
+                                <th style="padding: 8px; border: 1px solid #e2e8f0; width: 5%; text-align: center;">Aksi
+                                </th> <!-- Tambahkan kolom aksi untuk tombol hapus X -->
+                            </tr>
+                        </thead>
+                        <tbody id="lhp-rows-container">
+                            <!-- Baris di-render via JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                    <button type="button" onclick="closeLhpModal()"
+                        style="padding: 9px 20px; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; font-weight: 500;">Batal</button>
+                    <button type="submit"
+                        style="padding: 9px 20px; border-radius: 6px; border: none; background: #1b4d3e; color: #fff; font-weight: bold; cursor: pointer;">Simpan
+                        Data LHP</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

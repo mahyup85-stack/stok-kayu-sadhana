@@ -1,0 +1,145 @@
+<div class="card"
+    style="background: #ffffff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 20px;">
+    <h4 style="margin-bottom: 15px; font-weight: 700; color: #1e293b;">Filter Rekap Saldo</h4>
+
+    <!-- 1. Baris Atas: Bulan, Tahun, TPK, Jenis (Grid otomatis menyesuaikan) -->
+    <div
+        style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 15px;">
+
+        <!-- Dari Bulan -->
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px;">Dari
+                Bulan</label>
+            <select id="filter-dari-bulan" onchange="renderRekapSaldo()"
+                style="width: 100%; padding: 12px 15px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+                <option value="">Pilih Bulan</option>
+                <option value="01">Januari</option>
+                <option value="02">Februari</option>
+                <option value="03">Maret</option>
+                <option value="04">April</option>
+                <option value="05">Mei</option>
+                <option value="06">Juni</option>
+                <option value="07">Juli</option>
+                <option value="08">Agustus</option>
+                <option value="09">September</option>
+                <option value="10">Oktober</option>
+                <option value="11">November</option>
+                <option value="12">Desember</option>
+            </select>
+        </div>
+
+        <!-- Dari Tahun -->
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px;">Dari
+                Tahun</label>
+            <select id="filter-dari-tahun"
+                style="width: 100%; padding: 12px 15px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;"></select>
+        </div>
+
+        <!-- Sampai Bulan -->
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px;">Sampai
+                Bulan</label>
+            <select id="filter-sampai-bulan" onchange="renderRekapSaldo()"
+                style="width: 100%; padding: 12px 15px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+                <option value="">Pilih Bulan</option>
+                <option value="01">Januari</option>
+                <option value="02">Februari</option>
+                <option value="03">Maret</option>
+                <option value="04">April</option>
+                <option value="05">Mei</option>
+                <option value="06">Juni</option>
+                <option value="07">Juli</option>
+                <option value="08">Agustus</option>
+                <option value="09">September</option>
+                <option value="10">Oktober</option>
+                <option value="11">November</option>
+                <option value="12">Desember</option>
+            </select>
+        </div>
+
+        <!-- Sampai Tahun -->
+        <div class="form-group" style="margin-bottom: 0;">
+            <label style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px;">Sampai
+                Tahun</label>
+            <select id="filter-sampai-tahun" onchange="renderRekapSaldo()"
+                style="width: 100%; padding: 12px 15px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;"></select>
+        </div>
+
+        <!-- TPK -->
+        <div class="form-group" style="margin-bottom: 0;">
+            <label
+                style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px;">TPK</label>
+            <select id="filter-tpk" onchange="updatePetakByTPK(); renderRekapSaldo()"
+                style="width: 100%; padding: 12px 15px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+                <option value="">-- Semua TPK --</option>
+            </select>
+        </div>
+
+        <!-- Jenis -->
+        <div class="form-group" style="margin-bottom: 0;">
+            <label
+                style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px;">Jenis</label>
+            <select id="filter-rekap-jenis-kayu" onchange="renderRekapSaldo()"
+                style="width: 100%; padding: 12px 15px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+                <option value="">-- Semua Jenis --</option>
+            </select>
+        </div>
+
+    </div>
+
+    <!-- 2. Baris Bawah: Petak dan Tombol Aksi (Dibuat Sebaris Berdampingan) -->
+    <div style="display: grid; grid-template-columns: 180px 1fr; gap: 15px; align-items: flex-end;">
+
+        <!-- Kotak Petak -->
+        <div class="form-group" style="margin-bottom: 0;">
+            <label
+                style="display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 5px;">Petak</label>
+            <select id="filter-petak" onchange="renderRekapSaldo()"
+                style="width: 100%; padding: 12px 15px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px;">
+                <option value="">-- Semua Petak --</option>
+            </select>
+        </div>
+
+        <!-- Tombol Aksi -->
+        <div style="display: flex; align-items: center; gap: 8px; justify-content: flex-start;">
+            <button type="button" onclick="window.triggerFilterUpdate(), renderRekapSaldo()" class="btn-filter"
+                style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 15px 12px; background-color: #0d6efd; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; font-size: 11px;">
+                Terapkan<br>Filter
+            </button>
+            <button type="button" onclick="exportToExcel()" class="btn-excel"
+                style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 15px 12px; background-color: #198754; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; font-size: 11px;">
+                Export<br>Excel
+            </button>
+            <button type="button" onclick="exportToPDF()" class="btn-pdf"
+                style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 15px 12px; background-color: #945056; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; white-space: nowrap; font-size: 11px;">
+                Export<br>PDF
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- Tabel Data Rekap Saldo -->
+<div class="scroll-table-container" style="margin-top: 15px;">
+    <table class="data-table-rekap" style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr>
+                <th>Jenis Kayu</th>
+                <th>TPK</th>
+                <th>Petak</th>
+                <th class="text-center">Saldo Awal BAP (M³)</th>
+                <th class="text-center">Saldo Awal LHP (M³)</th>
+                <th class="text-center">BAP (M³)</th>
+                <th class="text-center">LHP (M³)</th>
+                <th class="text-center">Kirim (M³)</th>
+                <th class="text-center">Saldo BAP (M³)</th>
+                <th class="text-center">Saldo LHP (M³)</th>
+            </tr>
+        </thead>
+        <tbody id="rekap-table-body"></tbody>
+    </table>
+</div>
+
+<div id="pagination-rekap"></div>
+</div>
