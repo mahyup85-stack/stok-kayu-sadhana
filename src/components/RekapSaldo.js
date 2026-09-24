@@ -1,5 +1,5 @@
 import { state } from '../state/store.js';
-import { showLoading } from '../utils/helpers.js';
+import { showLoading, round2 } from '../utils/helpers.js';
 
 // HELPER BANTUAN UNTUK MEMBACA NILAI DARI DOM
 const getElValue = (id) => {
@@ -57,7 +57,8 @@ export function getProcessedRekapData() {
     let fJenis = getElValue("filter-rekap-jenis-kayu") || getElText("filter-rekap-jenis-kayu") || getElValue("filter-jenis") || getElText("filter-jenis");
     let fPetak = getElValue("filter-petak") || getElText("filter-petak");
 
-    console.log("🛠️ FILTER DIBACA -> TPK:", fTPK, "| Jenis:", fJenis, "| Petak:", fPetak);
+    // Helper pembulatan ketat 2 desimal untuk menghindari floating-point error
+    const round2 = (num) => Math.round((parseFloat(num) || 0) * 100) / 100;
 
     const numTFrom = parseInt(fTFrom, 10);
     const numBFrom = parseInt(fBFrom, 10);
@@ -67,7 +68,6 @@ export function getProcessedRekapData() {
     const fromVal = (!isNaN(numTFrom) && !isNaN(numBFrom)) ? (numTFrom * 100 + numBFrom) : 0;
     const toVal = (!isNaN(numTTo) && !isNaN(numBTo)) ? (numTTo * 100 + numBTo) : 999999;
 
-    // Normalisasi teks untuk perbandingan tanpa merusak karakter utama
     const clean = (str) => String(str || '')
         .replace(/--/g, '')
         .replace(/\s+/g, '')
@@ -84,7 +84,6 @@ export function getProcessedRekapData() {
         const m = parseInt(parts[1], 10);
         const dVal = (isNaN(y) || isNaN(m)) ? 0 : (y * 100 + m);
 
-        // Filter Tanggal Periode
         if (fromVal > 0 && dVal < fromVal) return;
         if (toVal < 999999 && dVal > toVal) return;
 
@@ -92,19 +91,16 @@ export function getProcessedRekapData() {
         const itemTPK = String(d.tpk || '').trim();
         const itemPetak = String(d.petak || '').trim();
 
-        // 1. FILTER TPK
         const cleanFTPK = clean(fTPK);
         if (cleanFTPK && !cleanFTPK.includes("semua") && !cleanFTPK.includes("pilih")) {
             if (clean(itemTPK) !== cleanFTPK) return;
         }
 
-        // 2. FILTER JENIS KAYU
         const cleanFJenis = clean(fJenis);
         if (cleanFJenis && !cleanFJenis.includes("semua") && !cleanFJenis.includes("pilih")) {
             if (clean(itemJenis) !== cleanFJenis) return;
         }
 
-        // 3. FILTER PETAK
         const cleanFPetak = clean(fPetak);
         if (cleanFPetak && !cleanFPetak.includes("semua") && !cleanFPetak.includes("pilih")) {
             if (clean(itemPetak) !== cleanFPetak) return;
@@ -127,12 +123,13 @@ export function getProcessedRekapData() {
         const valKeluar = parseFloat(d.keluar_m3 || d.m || 0) || 0;
         const ket = String(d.keterangan || "").toUpperCase();
 
+        // Terapkan round2 pada setiap akumulasi nilai
         if (ket.includes("KIRIM")) {
-            item.kirimBerjalan += valKeluar;
+            item.kirimBerjalan = round2(item.kirimBerjalan + valKeluar);
         } else if (ket.includes("LHP")) {
-            item.lhpBerjalan += valMasuk;
+            item.lhpBerjalan = round2(item.lhpBerjalan + valMasuk);
         } else {
-            item.bapBerjalan += valMasuk;
+            item.bapBerjalan = round2(item.bapBerjalan + valMasuk);
         }
     });
 
@@ -144,16 +141,17 @@ export function getProcessedRekapData() {
     };
 
     Object.values(grouped).forEach(item => {
-        item.sBAP = item.bapBerjalan - item.lhpBerjalan;
-        item.sLHP = item.lhpBerjalan - item.kirimBerjalan;
+        // Hitung saldo akhir dengan pembulatan presisi
+        item.sBAP = round2(item.bapBerjalan - item.lhpBerjalan);
+        item.sLHP = round2(item.lhpBerjalan - item.kirimBerjalan);
 
-        totals.totalSAwalBAP += item.sAwalBAP;
-        totals.totalSAwalLHP += item.sAwalLHP;
-        totals.totalBapBerjalan += item.bapBerjalan;
-        totals.totalLhpBerjalan += item.lhpBerjalan;
-        totals.totalKirimBerjalan += item.kirimBerjalan;
-        totals.totalGrandBAP += item.sBAP;
-        totals.totalGrandLHP += item.sLHP;
+        totals.totalSAwalBAP = round2(totals.totalSAwalBAP + item.sAwalBAP);
+        totals.totalSAwalLHP = round2(totals.totalSAwalLHP + item.sAwalLHP);
+        totals.totalBapBerjalan = round2(totals.totalBapBerjalan + item.bapBerjalan);
+        totals.totalLhpBerjalan = round2(totals.totalLhpBerjalan + item.lhpBerjalan);
+        totals.totalKirimBerjalan = round2(totals.totalKirimBerjalan + item.kirimBerjalan);
+        totals.totalGrandBAP = round2(totals.totalGrandBAP + item.sBAP);
+        totals.totalGrandLHP = round2(totals.totalGrandLHP + item.sLHP);
 
         rows.push(item);
     });

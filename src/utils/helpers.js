@@ -1,6 +1,7 @@
 import { state } from '../state/store.js';
 
 
+export const round2 = (num) => Math.round((parseFloat(num) || 0) * 100) / 100;
 export function formatSaldo(value) {
     const num = parseFloat(value);
     if (isNaN(num)) return "0.00";
