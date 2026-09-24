@@ -632,6 +632,11 @@ window.openLhpModal = function (initialData = {}) {
 };
 
 window.loadJenisKayuOptionsForIndex = async function (rowElement, selectedVal = "", currentKonversi = 0) {
+    // 🛡️ Pengaman untuk mencegah error jika baris sudah tidak ada di DOM
+    if (!rowElement || !rowElement.parentNode) {
+        return;
+    }
+
     const client = initSupabase();
     if (!client) return;
 
@@ -643,6 +648,11 @@ window.loadJenisKayuOptionsForIndex = async function (rowElement, selectedVal = 
             .order("name", { ascending: true });
 
         if (error) throw error;
+
+        // Cek ulang apakah rowElement masih ada di DOM setelah proses async (await) selesai
+        if (!rowElement || !rowElement.parentNode) {
+            return;
+        }
 
         const select = rowElement.querySelector(".lhp-jenis-kayu");
         const inputKonversi = rowElement.querySelector(".lhp-faktor");
@@ -734,6 +744,15 @@ window.editLhpItem = async function (data) {
             });
         }
 
+        // --- TAMBAHKAN PENANDA DATA ASLI DI SINI ---
+        const modalIdEl = document.getElementById("modal-lhp-id");
+        if (modalIdEl) {
+            modalIdEl.dataset.originalKet = ketLhp;
+            modalIdEl.dataset.originalTgl = tanggalLhp;
+            modalIdEl.dataset.originalTpk = tpkLhp;
+        }
+        // -------------------------------------------
+
         const container = document.getElementById("lhp-rows-container");
         if (container) {
             container.innerHTML = "";
@@ -795,212 +814,112 @@ window.closeLhpModal =
 // ================================================================
 // SAVE LHP
 // ================================================================
+window.saveLhpFromModal = async function (event) {
+    if (event) {
+        event.preventDefault();
+    }
 
-window.saveLhpFromModal =
-    async function (event) {
-        if (event) {
-            event.preventDefault();
+    if (state.isSubmitting) {
+        return;
+    }
+
+    const id = document.getElementById("modal-lhp-id")?.value || "";
+
+    // Ambil nilai header LHP
+    const tanggal = document.getElementById("modal-lhp-date")?.value || "";
+    const keterangan = document.getElementById("modal-lhp-ket")?.value || "LHP";
+    const tpk = document.getElementById("modal-lhp-tpk")?.value || "";
+
+    if (!tanggal || !tpk) {
+        alert("Harap pilih TPK dan tanggal terlebih dahulu.");
+        return;
+    }
+
+    // Ambil nilai referensi lama sebelum diedit (untuk menghapus bundel LHP lama jika keterangan/tanggal/tpk diubah)
+    const originalKet = document.getElementById("modal-lhp-id")?.dataset?.originalKet || keterangan;
+    const originalTgl = document.getElementById("modal-lhp-id")?.dataset?.originalTgl || tanggal;
+    const originalTpk = document.getElementById("modal-lhp-id")?.dataset?.originalTpk || tpk;
+
+    const rows = document.querySelectorAll("#lhp-rows-container tr");
+    const payloadList = [];
+
+    rows.forEach(row => {
+        const petak = row.querySelector(".lhp-petak-row")?.value.trim() || "-";
+        const jenis = row.querySelector(".lhp-jenis-kayu")?.value || "";
+        const masukSM = parseFloat(row.querySelector(".lhp-in-sm")?.value) || 0;
+        const masukM3 = parseFloat(row.querySelector(".lhp-in-m3")?.value) || 0;
+
+        if (jenis && masukSM > 0) {
+            payloadList.push({
+                tanggal,
+                keterangan,
+                tpk,
+                petak,
+                jenis_kayu: jenis,
+                masuk_sm: masukSM,
+                masuk_m3: masukM3,
+                keluar_sm: 0,
+                keluar_m3: 0
+            });
+        }
+    });
+
+    if (payloadList.length === 0) {
+        alert("Pilih minimal 1 jenis kayu dan isi jumlah SM.");
+        return;
+    }
+
+    const client = initSupabase();
+    if (!client) {
+        alert("Koneksi Supabase tidak ditemukan.");
+        return;
+    }
+
+    state.isSubmitting = true;
+
+    try {
+        if (id) {
+            // MODE EDIT MULTI-BARIS:
+            // 1. Hapus semua baris lama yang tergabung dalam LHP tersebut berdasarkan data aslinya
+            const { error: deleteError } = await client
+                .from("stok_kayu")
+                .delete()
+                .eq("tanggal", originalTgl)
+                .eq("keterangan", originalKet)
+                .eq("tpk", originalTpk);
+
+            if (deleteError) throw deleteError;
+
+            // 2. Masukkan seluruh baris baru dari payloadList secara sekaligus (bulk insert)
+            const { data, error: insertError } = await client
+                .from("stok_kayu")
+                .insert(payloadList)
+                .select();
+
+            if (insertError) throw insertError;
+
+            alert("Data LHP berhasil diperbarui.");
+        } else {
+            // MODE TAMBAH BARU: Masukkan semua baris sekaligus
+            const { data, error } = await client
+                .from("stok_kayu")
+                .insert(payloadList)
+                .select();
+
+            if (error) throw error;
+            alert("Data LHP berhasil disimpan.");
         }
 
-        if (state.isSubmitting) {
-            return;
+        window.closeLhpModal();
+
+        if (typeof window.renderDashboardTable === 'function') {
+            window.renderDashboardTable();
         }
 
-        const id =
-            document.getElementById(
-                "modal-lhp-id"
-            )?.value || "";
-
-        const tanggal =
-            document.getElementById(
-                "modal-lhp-date"
-            )?.value || "";
-
-        const keterangan =
-            document.getElementById(
-                "modal-lhp-ket"
-            )?.value || "LHP";
-
-        const tpk =
-            document.getElementById(
-                "modal-lhp-tpk"
-            )?.value || "";
-
-        if (!tanggal || !tpk) {
-            alert(
-                "Harap pilih TPK dan tanggal terlebih dahulu."
-            );
-            return;
-        }
-
-        const rows =
-            document.querySelectorAll(
-                "#lhp-rows-container tr"
-            );
-
-        const payloadList = [];
-
-        rows.forEach(row => {
-            const petak =
-                row.querySelector(
-                    ".lhp-petak-row"
-                )?.value.trim() || "-";
-
-            const jenis =
-                row.querySelector(
-                    ".lhp-jenis-kayu"
-                )?.value || "";
-
-            const masukSM =
-                parseFloat(
-                    row.querySelector(
-                        ".lhp-in-sm"
-                    )?.value
-                ) || 0;
-
-            const konversi =
-                parseFloat(
-                    row.querySelector(
-                        ".lhp-faktor"
-                    )?.value
-                ) || 0;
-
-            const masukM3 =
-                parseFloat(
-                    row.querySelector(
-                        ".lhp-in-m3"
-                    )?.value
-                ) || 0;
-
-            if (
-                jenis &&
-                masukSM > 0
-            ) {
-                payloadList.push({
-                    tanggal,
-                    keterangan,
-                    tpk,
-                    petak,
-                    jenis_kayu: jenis,
-                    masuk_sm: masukSM,
-                    konversi: konversi,
-                    masuk_m3: masukM3,
-                    keluar_sm: 0,
-                    keluar_m3: 0
-                });
-            }
-        });
-
-        if (
-            payloadList.length === 0
-        ) {
-            alert(
-                "Pilih minimal 1 jenis kayu dan isi jumlah SM."
-            );
-            return;
-        }
-
-        const client =
-            initSupabase();
-
-        if (!client) {
-            alert(
-                "Koneksi Supabase tidak ditemukan."
-            );
-            return;
-        }
-
-        state.isSubmitting = true;
-
-        try {
-            if (id) {
-                const {
-                    data,
-                    error
-                } = await client
-                    .from("stok_kayu")
-                    .update(payloadList[0])
-                    .eq("id", id)
-                    .select()
-                    .single();
-
-                if (error) {
-                    throw error;
-                }
-
-                state.updateItem(
-                    id,
-                    data
-                );
-
-                if (payloadList.length > 1) {
-                    const additionalPayloads = payloadList.slice(1);
-                    const { data: insertedExtra, error: errorExtra } = await client
-                        .from("stok_kayu")
-                        .insert(additionalPayloads)
-                        .select();
-
-                    if (!errorExtra && Array.isArray(insertedExtra)) {
-                        insertedExtra.reverse().forEach(item => {
-                            state.addItem(item);
-                        });
-                    }
-                }
-
-                alert(
-                    "Data LHP berhasil diperbarui."
-                );
-            } else {
-                const {
-                    data,
-                    error
-                } = await client
-                    .from("stok_kayu")
-                    .insert(
-                        payloadList
-                    )
-                    .select();
-
-                if (error) {
-                    throw error;
-                }
-
-                if (
-                    Array.isArray(data)
-                ) {
-                    data
-                        .slice()
-                        .reverse()
-                        .forEach(item => {
-                            state.addItem(item);
-                        });
-                }
-
-                alert(
-                    `Berhasil menyimpan ${payloadList.length} data LHP.`
-                );
-            }
-
-            window.closeLhpModal();
-
-            if (typeof window.renderDashboardTable === 'function') {
-                window.renderDashboardTable();
-            }
-
-        } catch (error) {
-            console.error(
-                "Gagal menyimpan LHP:",
-                error
-            );
-
-            alert(
-                "Gagal memproses data LHP: " +
-                (
-                    error.message ||
-                    error
-                )
-            );
-        } finally {
-            state.isSubmitting = false;
-        }
-    };
+    } catch (error) {
+        console.error("Gagal menyimpan LHP:", error);
+        alert("Gagal memproses data LHP: " + (error.message || error));
+    } finally {
+        state.isSubmitting = false;
+    }
+}

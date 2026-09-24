@@ -20,8 +20,9 @@ import {
     deleteData,
     deleteAllData,
     handleSearch,
-    loadComponent,
+    loadComponent
 } from "./utils/helpers.js";
+import { round2 } from './utils/helpers.js';
 import { switchView } from "./utils/navigation.js";
 import "./utils/idleTimer.js";
 // ================================================================
