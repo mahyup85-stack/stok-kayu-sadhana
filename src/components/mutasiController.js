@@ -3,7 +3,10 @@ import { state } from '../state/store.js';
 window.editData = async function (id) {
     const activeState = window.state || {};
     const dataList = activeState.hasAppliedFilter ? activeState.filteredData : (activeState.data || []);
-
+    
+    if (window.state) {
+        window.state.editingId = id;
+    }
     // Cari data berdasarkan ID
     const item = dataList.find(data => String(data.id || data.id_mutasi) === String(id));
     if (!item) {
@@ -45,6 +48,8 @@ window.editData = async function (id) {
     const keluarSm = faktor > 0 ? keluarM3 / faktor : keluarM3;
 
     setElementValue("edit-id", id);
+    setElementValue("mutasi-id", id);
+    setElementValue("id", id);
     setElementValue("input-date", item.tanggal || item.created_at || '');
     setElementValue("input-ket", item.keterangan || item.ket || '');
     setElementValue("input-jenis-kayu", item.jenis_kayu || item.jenis || '');
@@ -68,9 +73,6 @@ window.editData = async function (id) {
 
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
-
-// 2. Pemantau Input Ket: Otomatis buka popup LHP saat mengetik "LHP" pada input baru
-
 
 // 3. Fungsi Batal Edit
 window.cancelEdit = function () {

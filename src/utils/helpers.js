@@ -253,21 +253,6 @@ window.showConfirm = async function (title, text, confirmText = 'Ya, Hapus!') {
 // ------------------------------------------------------------------
 // 2. CHECKBOX MANAGER (SINGLE & SELECT ALL)
 // ------------------------------------------------------------------
-
-export const handleRowCheckboxChange = function (checkbox) {
-    if (!window.state.selectedIds) window.state.selectedIds = [];
-    const val = String(checkbox.value);
-
-    if (checkbox.checked) {
-        if (!window.state.selectedIds.includes(val)) {
-            window.state.selectedIds.push(val);
-        }
-    } else {
-        window.state.selectedIds = window.state.selectedIds.filter(id => id !== val);
-    }
-};
-window.handleRowCheckboxChange = handleRowCheckboxChange;
-
 export const toggleSelectAll = function (masterCheckbox) {
     const checkboxes = document.querySelectorAll('.row-checkbox, .item-checkbox');
     if (!window.state.selectedIds) window.state.selectedIds = [];
@@ -695,3 +680,167 @@ export async function loadComponent(containerId, filePath) {
     }
 }
 window.loadComponent = loadComponent;
+
+
+// 1. Fungsi Utama Hapus
+export async function handleSmartDelete() {
+    console.log("=== TOMBOL SMART DELETE DIKLIK ===");
+
+    const activeState = window.state;
+    if (!activeState) {
+        alert("Error: State aplikasi tidak ditemukan!");
+        return;
+    }
+
+    const selectedIds = activeState.selectedIds || [];
+    console.log("ID yang akan dihapus:", selectedIds);
+
+    if (selectedIds.length === 0) {
+        // Menggunakan Swal jika tersedia, fallback ke alert biasa
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Perhatian',
+                text: 'Belum ada baris data yang dicentang!',
+                confirmButtonColor: '#3085d6'
+            });
+        } else {
+            alert("⚠️ Belum ada baris data yang dicentang!");
+        }
+        return;
+    }
+
+    // 🌟 Konfirmasi menggunakan SweetAlert2 (Dijamin tidak diblokir browser)
+    let isConfirmed = true;
+    if (typeof Swal !== 'undefined') {
+        const result = await Swal.fire({
+            title: 'Konfirmasi Hapus',
+            text: `Apakah Anda yakin ingin menghapus ${selectedIds.length} data terpilih?`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Ya, Hapus!',
+            cancelButtonText: 'Batal'
+        });
+        isConfirmed = result.isConfirmed;
+    } else {
+        // Fallback jika SweetAlert belum terpasang
+        isConfirmed = confirm(`Hapus ${selectedIds.length} data terpilih?`);
+    }
+
+    if (!isConfirmed) {
+        console.log("Penghapusan dibatalkan oleh pengguna.");
+        return;
+    }
+
+    try {
+        const client = window.supabaseClient;
+        if (!client) {
+            alert("Koneksi Supabase belum siap.");
+            return;
+        }
+
+        console.log("Mengirim perintah DELETE ke Supabase...");
+        const { error } = await client
+            .from("stok_kayu")
+            .delete()
+            .in("id", selectedIds);
+
+        if (error) throw error;
+
+        // 1. Hapus data dari memori lokal agar langsung hilang tanpa refresh
+        if (Array.isArray(activeState.data)) {
+            activeState.data = activeState.data.filter(
+                item => !selectedIds.includes(String(item.id))
+            );
+        }
+        if (Array.isArray(activeState.filteredData)) {
+            activeState.filteredData = activeState.filteredData.filter(
+                item => !selectedIds.includes(String(item.id))
+            );
+        }
+
+        // 2. Reset state & update UI tombol
+        activeState.selectedIds = [];
+        if (typeof window.updateSmartDeleteButtonUI === "function") {
+            window.updateSmartDeleteButtonUI();
+        }
+
+        // 3. Render ulang tabel dashboard
+        if (typeof window.renderDashboardTable === "function") {
+            window.renderDashboardTable();
+        }
+
+        // Notifikasi sukses dengan SweetAlert
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil!',
+                text: 'Data terpilih telah berhasil dihapus.',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        } else {
+            alert("✅ Data berhasil dihapus!");
+        }
+
+    } catch (err) {
+        console.error("Gagal hapus:", err);
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal!',
+                text: 'Gagal menghapus data: ' + err.message
+            });
+        } else {
+            alert("Gagal menghapus data: " + err.message);
+        }
+    }
+}
+
+// Pastikan terdaftar global
+window.handleSmartDelete = handleSmartDelete;
+
+// 2. Fungsi untuk memperbarui teks dan warna tombol secara dinamis
+export function updateSmartDeleteButtonUI() {
+    const btn = document.getElementById("btn-smart-delete");
+    if (!btn) {
+        console.warn("Tombol #btn-smart-delete tidak ditemukan di DOM!");
+        return;
+    }
+
+    const activeState = window.state || {};
+    const selectedIds = activeState.selectedIds || [];
+
+    if (selectedIds.length > 0) {
+        btn.style.backgroundColor = "#f59e0b";
+        btn.textContent = `Hapus Terpilih (${selectedIds.length})`;
+    } else {
+        btn.style.backgroundColor = "#ef4444";
+        btn.textContent = "Hapus Semua";
+    }
+}
+
+// 3. Handler Checkbox Baris
+export function handleRowCheckboxChange(checkbox) {
+    if (!window.state.selectedIds) window.state.selectedIds = [];
+    const val = String(checkbox.value);
+
+    if (checkbox.checked) {
+        if (!window.state.selectedIds.includes(val)) {
+            window.state.selectedIds.push(val);
+        }
+    } else {
+        window.state.selectedIds = window.state.selectedIds.filter(id => id !== val);
+    }
+
+    if (typeof updateSmartDeleteButtonUI === "function") {
+        updateSmartDeleteButtonUI();
+    }
+}
+
+// Daftarkan juga ke window agar aman jika dipanggil lewat atribut HTML (onchange/onclick)
+window.handleRowCheckboxChange = handleRowCheckboxChange;
+window.updateSmartDeleteButtonUI = updateSmartDeleteButtonUI;
+window.handleSmartDelete = handleSmartDelete;
