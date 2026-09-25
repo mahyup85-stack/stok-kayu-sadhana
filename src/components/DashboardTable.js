@@ -86,7 +86,9 @@ window.renderDashboardTable = function () {
         const allChecked = Array.from(rowCheckboxes).every(cb => cb.checked);
         selectAllCheckbox.checked = allChecked;
     }
-
+    if (typeof window.updateSmartDeleteButtonUI === "function") {
+        window.updateSmartDeleteButtonUI();
+    }
     // Perbarui kontrol navigasi pagination di bawah tabel
     if (typeof window.initPermanentPaginationFooter === "function") {
         window.initPermanentPaginationFooter();
@@ -879,8 +881,7 @@ window.saveLhpFromModal = async function (event) {
 
     try {
         if (id) {
-            // MODE EDIT MULTI-BARIS:
-            // 1. Hapus semua baris lama yang tergabung dalam LHP tersebut berdasarkan data aslinya
+            // 1. Hapus baris lama di database
             const { error: deleteError } = await client
                 .from("stok_kayu")
                 .delete()
@@ -890,27 +891,73 @@ window.saveLhpFromModal = async function (event) {
 
             if (deleteError) throw deleteError;
 
-            // 2. Masukkan seluruh baris baru dari payloadList secara sekaligus (bulk insert)
-            const { data, error: insertError } = await client
+            // 2. Masukkan baris baru dan ambil hasilnya (.select())
+            const { data: insertedData, error: insertError } = await client
                 .from("stok_kayu")
                 .insert(payloadList)
                 .select();
 
             if (insertError) throw insertError;
 
+            // 🌟 3. UPDATE STATE GLOBAL DENGAN AMAN
+            if (window.state && Array.isArray(window.state.data)) {
+                // Buat array baru tanpa data lama yang diedit
+                const updatedStoreData = window.state.data.filter(item => {
+                    return !(String(item.tanggal) === String(originalTgl) &&
+                        String(item.keterangan) === String(originalKet) &&
+                        String(item.tpk) === String(originalTpk));
+                });
+
+                // Masukkan data baru hasil insert ke bagian teratas
+                if (Array.isArray(insertedData)) {
+                    updatedStoreData.unshift(...insertedData);
+                }
+
+                // Gunakan method resmi setData agar data & filteredData sinkron sempurna
+                if (typeof window.state.setData === 'function') {
+                    window.state.setData(updatedStoreData);
+                } else {
+                    window.state.data = updatedStoreData;
+                    window.state.filteredData = [...updatedStoreData];
+                    window.state.triggerActiveRender();
+                }
+            }
+
             alert("Data LHP berhasil diperbarui.");
         } else {
-            // MODE TAMBAH BARU: Masukkan semua baris sekaligus
-            const { data, error } = await client
+            // Mode Tambah Baru
+            const { data: insertedData, error } = await client
                 .from("stok_kayu")
                 .insert(payloadList)
                 .select();
 
             if (error) throw error;
+
+            if (window.state && Array.isArray(window.state.data) && Array.isArray(insertedData)) {
+                const updatedStoreData = [...insertedData, ...window.state.data];
+
+                if (typeof window.state.setData === 'function') {
+                    window.state.setData(updatedStoreData);
+                } else {
+                    window.state.data = updatedStoreData;
+                    window.state.filteredData = [...updatedStoreData];
+                    window.state.triggerActiveRender();
+                }
+            }
+
             alert("Data LHP berhasil disimpan.");
         }
 
         window.closeLhpModal();
+
+        if (typeof window.fetchData === 'function') {
+            await window.fetchData();
+        }
+
+        // Trigger render ulang state
+        if (window.state && typeof window.state.triggerActiveRender === 'function') {
+            window.state.triggerActiveRender();
+        }
 
         if (typeof window.renderDashboardTable === 'function') {
             window.renderDashboardTable();
@@ -923,3 +970,122 @@ window.saveLhpFromModal = async function (event) {
         state.isSubmitting = false;
     }
 }
+
+// Di dalam dashboardTable.js (atau file pengendali tabel)
+window.deleteData = async function (id) {
+    const activeState = window.state || {};
+    const dataList = activeState.hasAppliedFilter ? activeState.filteredData : (activeState.data || []);
+
+    const item = dataList.find(data => String(data.id || data.id_mutasi) === String(id));
+    if (!item) {
+        alert("Data tidak ditemukan di state.");
+        return;
+    }
+
+    const ket = String(item.keterangan || item.ket || "").toUpperCase();
+    const isLhp = ket.includes("LHP");
+
+    let confirmMsg = isLhp
+        ? `Data LHP (Tanggal: ${item.tanggal}, TPK: ${item.tpk}) akan dihapus seluruh barisnya. Lanjutkan?`
+        : "Apakah Anda yakin ingin menghapus data ini?";
+
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        const client = initSupabase();
+        if (!client) throw new Error("Koneksi Supabase tidak siap.");
+
+        if (isLhp) {
+            // Jika LHP, hapus berdasarkan bundel (Tanggal, TPK, Keterangan)
+            const { error } = await client
+                .from("stok_kayu")
+                .delete()
+                .eq("tanggal", item.tanggal)
+                .eq("tpk", item.tpk)
+                .eq("keterangan", item.keterangan || item.ket || "LHP");
+
+            if (error) throw error;
+
+            // Bersihkan state lokal untuk seluruh bundel LHP tersebut
+            if (window.state && Array.isArray(window.state.data)) {
+                const updated = window.state.data.filter(d =>
+                    !(String(d.tanggal) === String(item.tanggal) &&
+                        String(d.tpk) === String(item.tpk) &&
+                        String(d.keterangan || d.ket || "") === String(item.keterangan || item.ket || ""))
+                );
+                updateGlobalStateAndRender(updated);
+            }
+        } else {
+            // Jika mutasi biasa, gunakan fungsi deleteStokKayu dari api.js
+            await deleteStokKayu(id);
+
+            // Bersihkan state lokal berdasarkan ID
+            if (window.state && Array.isArray(window.state.data)) {
+                const updated = window.state.data.filter(d => String(d.id || d.id_mutasi) !== String(id));
+                updateGlobalStateAndRender(updated);
+            }
+        }
+
+        alert("Data berhasil dihapus.");
+
+    } catch (err) {
+        console.error("Gagal menghapus:", err);
+        alert("Gagal menghapus data: " + err.message);
+    }
+};
+
+window.deleteSelectedRows = async function () {
+    const activeState = window.state || {};
+    const selectedIds = activeState.selectedIds || [];
+
+    if (selectedIds.length === 0) {
+        alert("Pilih data yang ingin dihapus terlebih dahulu.");
+        return;
+    }
+
+    if (!confirm(`Apakah Anda yakin ingin menghapus ${selectedIds.length} data yang dipilih?`)) {
+        return;
+    }
+
+    const client = window.supabaseClient || window.supabase;
+    if (!client) {
+        alert("Koneksi Supabase tidak siap.");
+        return;
+    }
+
+    try {
+        const { error } = await client
+            .from("stok_kayu")
+            .delete()
+            .in("id", selectedIds);
+
+        if (error) throw error;
+
+        // Hapus dari state lokal
+        selectedIds.forEach(id => {
+            if (typeof activeState.removeItem === 'function') {
+                activeState.removeItem(id);
+            } else if (Array.isArray(activeState.data)) {
+                activeState.data = activeState.data.filter(item => String(item.id) !== String(id));
+            }
+        });
+
+        activeState.selectedIds = [];
+
+        if (typeof window.renderDashboardTable === "function") {
+            window.renderDashboardTable();
+        }
+        if (typeof window.updateSmartDeleteButtonUI === "function") {
+            window.updateSmartDeleteButtonUI();
+        }
+
+        const selectAllCheckbox = document.getElementById("select-all");
+        if (selectAllCheckbox) selectAllCheckbox.checked = false;
+
+        alert("Data terpilih berhasil dihapus.");
+
+    } catch (err) {
+        console.error("Gagal menghapus data massal:", err);
+        alert("Gagal menghapus data: " + (err.message || err));
+    }
+};

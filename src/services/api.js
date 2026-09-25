@@ -156,9 +156,9 @@ export async function fetchData({ showLoader = false, forceRefresh = false } = {
         if (error) throw error;
 
         const newData = Array.isArray(data) ? data : [];
-        
+
         activeState.data = newData;
-        
+
         // Periksa apakah sedang ada filter aktif atau tidak
         if (!activeState.hasAppliedFilter || !activeState.filteredData) {
             activeState.filteredData = [...newData];
@@ -241,6 +241,7 @@ export async function deleteStokKayu(id) {
     if (error) throw error;
     return true;
 }
+
 
 // ================================================================
 // GLOBAL

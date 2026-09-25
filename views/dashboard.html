@@ -89,9 +89,10 @@
                 <button onclick="window.exportToCSV()"
                     style="background-color: #10b981; color: white; border: none; padding: 7px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer;">Export
                     CSV</button>
-                <button onclick="window.deleteAllData()"
-                    style="background-color: #ef4444; color: white; border: none; padding: 7px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer;">Hapus
-                    Semua</button>
+                <button id="btn-smart-delete" onclick="window.handleSmartDelete()"
+                    style="background-color: #ef4444; color: white; border: none; padding: 7px 14px; border-radius: 6px; font-weight: 600; font-size: 13px; cursor: pointer; transition: background 0.3s;">
+                    Hapus Semua
+                </button>
             </div>
         </div>
 

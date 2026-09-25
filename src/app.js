@@ -11,7 +11,7 @@ import {
 import {
     showLoading,
     renderCaptcha,
-    generateCaptcha, // 🌟 Tambahkan di sini
+    generateCaptcha,
     smToM3,
     m3ToSm,
     hitungKonversi,
@@ -20,7 +20,10 @@ import {
     deleteData,
     deleteAllData,
     handleSearch,
-    loadComponent
+    loadComponent,
+    handleRowCheckboxChange,
+    handleSmartDelete,         // 🌟 Tambahkan ini
+    updateSmartDeleteButtonUI  // 🌟 Tambahkan ini juga agar lengkap
 } from "./utils/helpers.js";
 import { round2 } from './utils/helpers.js';
 import { switchView } from "./utils/navigation.js";
@@ -48,6 +51,10 @@ Object.assign(window, {
     exportToCSV,
     deleteData,
     deleteAllData,
+    deleteSelectedRows,
+    handleSmartDelete,
+    updateSmartDeleteButtonUI,
+    handleRowCheckboxChange,
     handleSearch,
     formatSaldo,
     smToM3,
@@ -55,7 +62,7 @@ Object.assign(window, {
     showLoading,
     renderCaptcha,
     generateCaptcha, // 🌟 Tambahkan juga di sini
-    loadComponent
+    loadComponent,
 });
 
 window.showMainApp = async function () {
@@ -191,6 +198,19 @@ document.addEventListener("DOMContentLoaded", async () => {
         await loadComponent(id, path);
     }
     console.log("Kerangka DOM aplikasi selesai dimuat.");
+
+    // Ganti blok event listener klik yang lama dengan ini di app.js
+    document.addEventListener("click", function (event) {
+        const targetBtn = event.target.closest("#btn-smart-delete");
+        if (targetBtn) {
+            event.preventDefault();
+            if (typeof window.handleSmartDelete === "function") {
+                window.handleSmartDelete();
+            } else {
+                console.error("Fungsi window.handleSmartDelete belum terdefinisi!");
+            }
+        }
+    });
 
     // 🌟 2. AKTIFKAN SISTEM PENGAMAN PAGINASI DI SINI 
     // (Karena komponen HTML sudah pasti selesai dimuat oleh perulangan di atas)
