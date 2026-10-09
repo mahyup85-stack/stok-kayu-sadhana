@@ -124,7 +124,15 @@ export function getProcessedRekapData() {
         const ket = String(d.keterangan || "").toUpperCase();
 
         // Terapkan round2 pada setiap akumulasi nilai
-        if (ket.includes("KIRIM")) {
+        if (ket.includes("AFKIR")) {
+            // Jika ada kata AFKIR (baik Afkir BAP maupun Afkir LHP), mengurangi saldo yang bersangkutan
+            const valAfkir = valKeluar || valMasuk;
+            if (ket.includes("LHP")) {
+                item.lhpBerjalan = round2(item.lhpBerjalan - valAfkir);
+            } else {
+                item.bapBerjalan = round2(item.bapBerjalan - valAfkir);
+            }
+        } else if (ket.includes("KIRIM")) {
             item.kirimBerjalan = round2(item.kirimBerjalan + valKeluar);
         } else if (ket.includes("LHP")) {
             item.lhpBerjalan = round2(item.lhpBerjalan + valMasuk);

@@ -604,6 +604,8 @@ export function generateQRCodeBase64(text) {
         }, 100);
     });
 }
+
+window.generateQRCodeBase64 = generateQRCodeBase64;
 export function togglePassword(inputId = "login-password") {
     const input = document.getElementById(inputId);
     if (!input) return;

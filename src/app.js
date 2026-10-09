@@ -315,7 +315,8 @@ document.addEventListener("DOMContentLoaded", async () => {
             const nilaiKet = this.value.toUpperCase();
             const editId = document.getElementById("edit-id")?.value;
 
-            if (nilaiKet.includes("LHP") && !editId) {
+            // Tambahkan pengecekan !nilaiKet.includes("AFKIR") di sini
+            if (nilaiKet.includes("LHP") && !nilaiKet.includes("AFKIR") && !editId) {
                 if (typeof window.openLhpModal === "function") {
                     const tanggalUtama = document.getElementById("input-date")?.value || "";
                     const tpkUtama = document.getElementById("input-tpk")?.value || "";

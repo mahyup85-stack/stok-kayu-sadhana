@@ -284,8 +284,8 @@ export function renderRincian() {
     body.innerHTML = htmlContent;
 
     if (typeof window.initPermanentPaginationFooter === "function") {
-    window.initPermanentPaginationFooter();
-}
+        window.initPermanentPaginationFooter();
+    }
 }
 
 // Global Event Trigger sesuai OnClick pada HTML tombol Anda
@@ -473,7 +473,11 @@ export async function exportRincianPDF() {
             const qrBase64 = await generateQRCodeBase64(verifyUrl);
             if (qrBase64) {
                 doc.addImage(qrBase64, 'PNG', marginX, finalY, 18, 18);
+            } else {
+                console.warn("QR Base64 kosong atau gagal dibuat.");
             }
+        } else {
+            console.warn("Fungsi generateQRCodeBase64 tidak ditemukan!");
         }
 
         doc.setFontSize(8);
