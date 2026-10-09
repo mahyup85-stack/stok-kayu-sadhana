@@ -3,7 +3,7 @@ import { state } from '../state/store.js';
 window.editData = async function (id) {
     const activeState = window.state || {};
     const dataList = activeState.hasAppliedFilter ? activeState.filteredData : (activeState.data || []);
-    
+
     if (window.state) {
         window.state.editingId = id;
     }
@@ -16,8 +16,8 @@ window.editData = async function (id) {
 
     const ket = String(item.keterangan || item.ket || "").toUpperCase();
 
-    // Jika termasuk LHP, panggil fungsi edit LHP
-    if (ket.includes("LHP")) {
+    // Jika termasuk LHP DAN BUKAN Afkir, jalankan fungsi edit LHP khusus
+    if (ket.includes("LHP") && !ket.includes("AFKIR")) {
         if (typeof window.editLhpItem === "function") {
             window.editLhpItem(item);
         } else {
@@ -26,7 +26,6 @@ window.editData = async function (id) {
         }
         return;
     }
-    console.log("DATA ITEM:", item);
 
     // Jika bukan LHP, jalankan form mutasi biasa
     if (typeof window.loadMasterDropdowns === "function") {
