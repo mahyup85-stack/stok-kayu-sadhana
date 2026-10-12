@@ -1,5 +1,5 @@
 // 🔴 Pengaturan Debugging Global
-const IS_DEBUG = false;
+const IS_DEBUG = window.__ENV?.IS_DEBUG === "true" || false; // Default: true untuk pengembangan lokal, false untuk produksi
 
 if (!IS_DEBUG) {
     window._originalConsoleLog = console.log;
