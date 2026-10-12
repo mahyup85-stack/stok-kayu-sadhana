@@ -111,6 +111,51 @@
             <div class="content-scroll"
                 style="width: 100% !important; max-width: 100% !important; flex: 1; display: flex; flex-direction: column; box-sizing: border-box; padding: 20px;">
 
+                <div id="view-lhc" class="view-section" style="padding: 20px;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h2 style="font-size: 22px; font-weight: bold; color: #1f2937;">DATA LHC</h2>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+                        <!-- Pilihan Tahun Kuota LHC -->
+                        <select id="lhc-upload-tahun"
+                            style="width: 130px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; flex-shrink: 0;">
+                            <option value="2026" selected>Tahun 2026</option>
+                            <option value="2025">Tahun 2025</option>
+                            <option value="2024">Tahun 2024</option>
+                            <option value="2027">Tahun 2027</option>
+                        </select>
+
+                        <!-- File Input -->
+                        <input type="file" id="lhc-csv-file" accept=".csv"
+                            style="width: 280px; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; flex-shrink: 0;">
+
+                        <!-- Tombol Impor -->
+                        <button onclick="processUploadLhcCsv()"
+                            style="padding: 9px 20px; background: #059669; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; flex-shrink: 0;">
+                            Impor CSV
+                        </button>
+                    </div>
+
+                    <!-- Tabel Daftar Kuota LHC -->
+                    <div
+                        style="background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                        <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #374151;">Daftar LHC
+                        </h3>
+                        <div style="overflow-x: auto;">
+                            <!-- Perbaikan: Ditambahkan tag table dan tbody dengan id="lhc-table-body" -->
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tbody id="lhc-table-body">
+                                    <tr>
+                                        <td colspan="4" style="text-align: center; color: #888; padding: 20px;">Belum
+                                            ada data kuota LHC</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
                 <div id="view-dashboard"
                     style="width: 100% !important; max-width: 100% !important; display: flex; flex-direction: column; gap: 20px;">
                 </div>

@@ -23,7 +23,9 @@ import {
     loadComponent,
     handleRowCheckboxChange,
     handleSmartDelete,         // 🌟 Tambahkan ini
-    updateSmartDeleteButtonUI  // 🌟 Tambahkan ini juga agar lengkap
+    updateSmartDeleteButtonUI,  // 🌟 Tambahkan ini juga agar lengkap
+    validasiBatasLHPPerJenisKayu,
+    mappingKodeKeTPK
 } from "./utils/helpers.js";
 import { round2 } from './utils/helpers.js';
 import { switchView } from "./utils/navigation.js";
@@ -40,6 +42,7 @@ import "./components/RincianMutasi.js";
 import "./components/Pengaturan.js";
 import './components/mutasiController.js';
 import './components/tableRenderer.js';
+import './components/lhc.js';
 
 
 // ================================================================
@@ -81,6 +84,7 @@ window.showMainApp = async function () {
 
     // 1. Tunggu semua komponen HTML views/ selesai dimuat ke DOM
     await Promise.all([
+        loadComponent("view-lhc", "views/lhc.html"),
         loadComponent("sidebar-container", "views/sidebar.html"),
         loadComponent("view-dashboard", "views/dashboard.html"),
         loadComponent("view-rekapsaldo", "views/rekapsaldo.html"),
@@ -182,8 +186,10 @@ function initStockFormListener() {
     }
 }
 
+
 document.addEventListener("DOMContentLoaded", async () => {
     await loadSavedCredentials();
+
     // 1. Muat kerangka HTML komponen terlebih dahulu
     const components = [
         ["sidebar-container", "views/sidebar.html"],
@@ -191,7 +197,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         ["view-rekapsaldo", "views/rekapsaldo.html"],
         ["view-rincianmutasi", "views/rincianmutasi.html"],
         ["view-masterdata", "views/masterdata.html"],
-        ["view-pengaturan", "views/pengaturan.html"]
+        ["view-pengaturan", "views/pengaturan.html"],
+        ["view-lhc", "views/lhc.html"]
     ];
 
     for (const [id, path] of components) {
@@ -199,7 +206,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
     console.log("Kerangka DOM aplikasi selesai dimuat.");
 
-    // Ganti blok event listener klik yang lama dengan ini di app.js
+    // Event listener untuk smart delete
     document.addEventListener("click", function (event) {
         const targetBtn = event.target.closest("#btn-smart-delete");
         if (targetBtn) {
@@ -212,8 +219,245 @@ document.addEventListener("DOMContentLoaded", async () => {
         }
     });
 
-    // 🌟 2. AKTIFKAN SISTEM PENGAMAN PAGINASI DI SINI 
-    // (Karena komponen HTML sudah pasti selesai dimuat oleh perulangan di atas)
+    // 🌟 2. DEFINISIKAN FUNGSI IMPOR CSV LHC DI LEVEL UTAMA (DI LUAR BLOK APAPUN)
+    // Fungsi Utama: Memproses Upload CSV dan Menyimpan ke Supabase
+    // 1. Fungsi Utama: Memproses Upload CSV dan Menyimpan ke Supabase
+    window.processUploadLhcCsv = async function () {
+        const fileInput = document.getElementById("lhc-csv-file");
+        const tahunSelect = document.getElementById("lhc-upload-tahun");
+        const client = typeof initSupabase === "function" ? initSupabase() : null;
+
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            alert("Silakan pilih file CSV LHC terlebih dahulu!");
+            return;
+        }
+
+        if (!client) {
+            alert("Koneksi Supabase tidak ditemukan.");
+            return;
+        }
+
+        const selectedTahun = tahunSelect ? parseInt(tahunSelect.value, 10) : 2026;
+        const file = fileInput.files[0];
+        const reader = new FileReader();
+
+        reader.onload = async function (e) {
+            const text = e.target.result;
+            const rows = text.split(/\r\n|\n/);
+            const payloadList = [];
+
+            for (let i = 0; i < rows.length; i++) {
+                const row = rows[i].trim();
+                if (!row) continue;
+
+                const cols = row.split(/,|\t|;/).map(col => col.replace(/^"|"$/g, '').trim());
+
+                const blokVal = cols[0] || "";
+                const jenisKayu = cols[1] || "";
+                const volumeLhc = parseFloat(String(cols[2] || "0").replace(/\./g, '').replace(',', '.')) || 0;
+
+                if (blokVal) {
+                    payloadList.push({
+                        tahun: selectedTahun,
+                        blok: blokVal, // Diubah dari tpk ke blok
+                        jenis_kayu: jenisKayu || "-",
+                        volume_lhc: volumeLhc
+                    });
+                }
+            }
+
+            if (payloadList.length === 0) {
+                alert("Tidak ada data valid yang terbaca dari file CSV.");
+                return;
+            }
+
+            const { error } = await client.from("data_lhc").insert(payloadList);
+
+            if (error) {
+                alert("Gagal mengimpor ke Supabase: " + error.message);
+                console.error("Detail Error:", error);
+            } else {
+                alert(`Berhasil mengimpor ${payloadList.length} data kuota LHC untuk tahun ${selectedTahun}!`);
+                fileInput.value = "";
+                if (typeof window.loadLhcTable === "function") {
+                    await window.loadLhcTable();
+                }
+            }
+        };
+
+        reader.readAsText(file);
+    };
+
+    // Fungsi untuk Memuat dan Merender Daftar Kuota LHC dengan Struktur Folder Bersarang (Tahun -> Blok)
+    // Fungsi untuk Memuat dan Merender Daftar Kuota LHC dengan Struktur Folder Bersarang (Tahun -> Blok) dan Total Volume di Bawah
+    window.loadLhcTable = async function () {
+        const client = typeof initSupabase === "function" ? initSupabase() : null;
+        const tableBody = document.getElementById("lhc-table-body");
+
+        if (!tableBody) return;
+
+        if (!client) {
+            tableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #ef4444; padding: 20px;">Koneksi Supabase tidak ditemukan.</td></tr>`;
+            return;
+        }
+
+        const { data, error } = await client
+            .from("data_lhc")
+            .select("*")
+            .order("tahun", { ascending: false })
+            .order("blok", { ascending: true })
+            .order("jenis_kayu", { ascending: true });
+
+        if (error) {
+            console.error("Gagal memuat data LHC:", error.message);
+            tableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #ef4444; padding: 20px;">Gagal memuat data: ${error.message}</td></tr>`;
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            tableBody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #888; padding: 20px;">Belum ada data kuota LHC</td></tr>`;
+            return;
+        }
+
+        // 1. Kelompokkan data bertingkat: Tahun -> Prefix Blok
+        const nestedData = {};
+        data.forEach(item => {
+            const tahun = item.tahun ? String(item.tahun).trim() : "Tanpa Tahun";
+            const rawBlok = (item.blok || "").trim();
+            const prefixMatch = rawBlok.match(/^[A-Za-z]+/);
+            const prefixBlok = prefixMatch ? prefixMatch[0].toUpperCase() : "LAINNYA";
+
+            if (!nestedData[tahun]) {
+                nestedData[tahun] = {};
+            }
+            if (!nestedData[tahun][prefixBlok]) {
+                nestedData[tahun][prefixBlok] = [];
+            }
+            nestedData[tahun][prefixBlok].push(item);
+        });
+
+        let html = "";
+        let tahunIndex = 0;
+
+        // 2. Loop Berdasarkan Tahun (Folder Utama)
+        for (const [tahun, blokMap] of Object.entries(nestedData)) {
+            tahunIndex++;
+            const tahunRowClass = `tahun-folder-${tahunIndex}`;
+
+            let totalVolumeTahun = 0;
+            Object.values(blokMap).forEach(items => {
+                items.forEach(item => {
+                    totalVolumeTahun += Number(item.volume_lhc) || 0;
+                });
+            });
+
+            // Folder Tahun Utama
+            html += `
+            <tr style="background: rgb(246, 250, 250); font-weight: bold; cursor: pointer; user-select: none; border-bottom: 2px solid rgba(249, 250, 250, 0.98);" 
+                onclick="toggleFolderGroup('${tahunRowClass}')">
+                <td colspan="4" style="padding: 14px 15px; color: #0f172a; font-size: 15px;">
+                    📂 Tahun ${tahun} &nbsp;<span style="font-weight: normal; font-size: 13px; color: #cdb5e1;"></span>
+                </td>
+            </tr>
+        `;
+
+            // Kontainer di dalam Folder Tahun
+            html += `
+            <tr class="${tahunRowClass}" style="display: none;">
+                <td colspan="4" style="padding: 0; background: #f8fafc; border: none;">
+                    <table style="width: 100%; border-collapse: collapse; margin: 0;">
+                        <tbody>
+        `;
+
+            let blokIndex = 0;
+            // Loop Berdasarkan Blok di dalam Tahun tersebut
+            for (const [prefixBlok, items] of Object.entries(blokMap)) {
+                blokIndex++;
+                const blokRowClass = `blok-sub-${tahunIndex}-${blokIndex}`;
+
+                let totalVolumeBlok = 0;
+                items.forEach(item => {
+                    totalVolumeBlok += Number(item.volume_lhc) || 0;
+                });
+
+                // Sub-Folder Blok
+                html += `
+                <tr style="background: #f1f5f9; font-weight: 600; cursor: pointer; user-select: none; border-bottom: 1px solid #e2e8f0;" 
+                    onclick="toggleFolderGroup('${blokRowClass}')">
+                    <td colspan="4" style="padding: 12px 15px 12px 35px; color: #1e293b;">
+                        📁 Blok ${prefixBlok} &nbsp;
+                    </td>
+                </tr>
+            `;
+
+                // Tabel Rincian Data di dalam Sub-Folder Blok
+                html += `
+                <tr class="${blokRowClass}" style="display: none;">
+                    <td colspan="4" style="padding: 0; background: #ffffff; border: none;">
+                        <table style="width: 100%; border-collapse: collapse; margin: 0;">
+                            <thead>
+                                <tr style="background: #f8fafc; color: #475569; font-size: 13px; border-bottom: 1px solid #e2e8f0;">
+                                    <th style="padding: 8px 15px 8px 50px; text-align: left; width: 20%;">Tahun</th>    
+                                    <th style="padding: 8px 15px; text-align: left; width: 30%;">Blok</th>
+                                    <th style="padding: 8px 15px; text-align: left; width: 30%;">Jenis Kayu</th>
+                                    <th style="padding: 8px 15px; text-align: right; width: 20%;">Volume LHC (m³)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+
+                items.forEach(item => {
+                    const vol = Number(item.volume_lhc) || 0;
+                    html += `
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 8px 15px 8px 50px; color: #475569; font-weight: 500;">${item.tahun}</td>
+                        <td style="padding: 8px 15px; color: #1e293b;">${item.blok}</td>
+                        <td style="padding: 8px 15px; color: #1e293b;">${item.jenis_kayu}</td>
+                        <td style="padding: 8px 15px; color: #0f172a; text-align: right; font-weight: 500;">${vol.toLocaleString('id-ID')}</td>
+                    </tr>
+                `;
+                });
+
+                // Baris Total Volume di bagian bawah tabel rincian blok
+                html += `
+                                <tr style="background: #f8fafc; font-weight: bold; border-top: 1px solid #cbd5e1;">
+                                    <td colspan="3" style="padding: 10px 15px 10px 50px; text-align: right; color: #1e293b;">Total Blok ${prefixBlok}</td>
+                                    <td style="padding: 10px 15px; text-align: right; color: #1e293b;">${totalVolumeBlok.toLocaleString('id-ID')}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+            `;
+            }
+
+            html += `
+                        </tbody>
+                    </table>
+                </td>
+            </tr>
+        `;
+        }
+
+        tableBody.innerHTML = html;
+    };
+
+    // Fungsi interaksi Buka/Tutup folder bersarang
+    window.toggleFolderGroup = function (rowClass) {
+        if (typeof event !== 'undefined' && event) {
+            event.stopPropagation();
+        }
+        const row = document.querySelector(`.${rowClass}`);
+        if (!row) return;
+
+        if (row.style.display === "none" || row.style.display === "") {
+            row.style.display = "table-row";
+        } else {
+            row.style.display = "none";
+        }
+    };
+
+    // 🌟 3. SISTEM PENGAMAN PAGINASI
     const container = document.getElementById("pagination-container");
     if (container) {
         const observer = new MutationObserver(() => {
@@ -234,14 +478,14 @@ document.addEventListener("DOMContentLoaded", async () => {
         console.warn("Elemen #pagination-container belum ditemukan saat DOMContentLoaded.");
     }
 
-    // 3. Cek Status Login & Tampilkan Aplikasi Utama jika sudah login
+    // 4. Cek Status Login & Tampilkan Aplikasi Utama jika sudah login
     if (window.state && window.state.isLoggedIn) {
         if (typeof window.showMainApp === "function") {
             window.showMainApp();
         }
     }
 
-    // 4. Inisialisasi Captcha & Tombol Refresh
+    // 5. Inisialisasi Captcha & Tombol Refresh
     if (typeof generateCaptcha === "function") {
         generateCaptcha();
     }
@@ -259,32 +503,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     const loginForm = document.getElementById("login-form");
     if (loginForm) {
         loginForm.addEventListener("submit", function (e) {
-            e.preventDefault(); // Wajib untuk mencegah reload
+            e.preventDefault();
 
-            // Panggil fungsi validasi ketat
             const isValid = typeof window.validateCaptcha === "function" ? window.validateCaptcha() : false;
 
             if (!isValid) {
                 alert("Kode Captcha salah atau tidak valid! Silakan masukkan kode dengan benar.");
-
-                // Buat captcha baru
                 if (typeof generateCaptcha === "function") {
                     generateCaptcha();
                 }
-
-                // Kosongkan input captcha agar user harus ketik ulang
                 const inputEl = document.getElementById("captcha-input");
                 if (inputEl) {
                     inputEl.value = "";
                     inputEl.focus();
                 }
-
-                return; // ⛔ HENTIKAN PROSES TOTAL, JANGAN LANJUT LOGIN!
+                return;
             }
 
-            // ==========================================
-            // JIKA CAPTCHA BENAR, BARU LANJUTKAN CEK LOGIN
-            // ==========================================
             const usernameInput = document.getElementById("login-user")?.value || "";
             const passwordInput = document.getElementById("login-pass")?.value || "";
 
@@ -306,6 +541,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
     }
 
+    // 6. Listener Input Keterangan LHP
     const inputKet = document.getElementById("input-ket") ||
         document.getElementById("keterangan") ||
         document.getElementById("ket");
@@ -315,7 +551,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             const nilaiKet = this.value.toUpperCase();
             const editId = document.getElementById("edit-id")?.value;
 
-            // Tambahkan pengecekan !nilaiKet.includes("AFKIR") di sini
             if (nilaiKet.includes("LHP") && !nilaiKet.includes("AFKIR") && !editId) {
                 if (typeof window.openLhpModal === "function") {
                     const tanggalUtama = document.getElementById("input-date")?.value || "";
@@ -336,7 +571,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 });
 
-// 🌟 Window load tetap di luar dan berdiri sendiri
+// Window load tetap di luar dan berdiri sendiri
 window.addEventListener("load", () => {
     console.log("Halaman selesai dimuat sepenuhnya (window load).");
 });

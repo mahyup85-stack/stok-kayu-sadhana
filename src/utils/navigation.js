@@ -3,7 +3,11 @@ export const switchView = function (viewName) {
 
     // Simpan nilai asli sebelum diubah-ubah
     const originalView = viewName;
-
+    if (viewName === 'lhc') {
+        if (typeof window.loadLhcTable === "function") {
+            window.loadLhcTable();
+        }
+    }
     // Normalisasi awal untuk kelola-sandi dan backup-setting
     if (viewName === "kelola-sandi" || viewName === "backup-setting") {
         viewName = "pengaturan";
@@ -49,6 +53,7 @@ export const switchView = function (viewName) {
     const titleEl = document.getElementById("current-view-title");
     if (titleEl) {
         const titles = {
+            "lhc": "DATA LHC",
             "dashboard": "KARTU STOK",
             "rekapsaldo": "REKAP SALDO",
             "rincianmutasi": "RINCIAN MUTASI",
@@ -94,7 +99,7 @@ export const switchView = function (viewName) {
         if (typeof window.loadMasterDropdowns === 'function') window.loadMasterDropdowns();
     }
 
-// 8. Eksekusi render data spesifik dengan timeout secukupnya
+    // 8. Eksekusi render data spesifik dengan timeout secukupnya
     setTimeout(() => {
         if (viewName === "dashboard") {
             const activeState = window.state || {};
@@ -102,10 +107,10 @@ export const switchView = function (viewName) {
                 activeState.filteredData = [...(activeState.data || [])];
             }
             if (typeof window.renderDashboardTable === "function") window.renderDashboardTable();
-            
+
             // 🌟 TAMBAHKAN PEMANGGILAN INI AGAR PAGINASI MUNCUL SAAT DASHBOARD DIBUKA:
             if (typeof window.renderPaginationControls === "function") window.renderPaginationControls();
-            
+
             if (typeof window.loadMasterDropdowns === "function") window.loadMasterDropdowns();
         } else if (viewName === "rekapsaldo" && typeof window.renderRekapSaldo === "function") {
             window.renderRekapSaldo();

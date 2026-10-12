@@ -846,3 +846,58 @@ export function handleRowCheckboxChange(checkbox) {
 window.handleRowCheckboxChange = handleRowCheckboxChange;
 window.updateSmartDeleteButtonUI = updateSmartDeleteButtonUI;
 window.handleSmartDelete = handleSmartDelete;
+
+// Di dalam utils/helpers.js
+
+export const mappingKodeKeTPK = function(kodeLHC) {
+    const kode = String(kodeLHC).trim().toUpperCase();
+
+    if (kode.startsWith("PB")) {
+        return "TPK Plambek";
+    } else if (kode.startsWith("SK") || kode.startsWith("SENG")) {
+        return "TPK Sengkurik";
+    } else if (kode.startsWith("MN") || kode.startsWith("MANG")) {
+        return "TPK Mangkung";
+    }
+    return "TPK Utama";
+};
+
+export const validasiBatasLHPPerJenisKayu = async function(inputBaru) {
+    const tahunTransaksi = new Date(inputBaru.tanggal).getFullYear();
+
+    const client = typeof initSupabase === "function" ? initSupabase() : null;
+    if (!client) return true;
+
+    const { data: dataLHC, error: errLHC } = await client
+        .from('kuota_lhc')
+        .select('volume_lhc')
+        .eq('tahun', tahunTransaksi)
+        .eq('jenis_kayu', inputBaru.jenis)
+        .eq('tpk', inputBaru.tpk);
+
+    if (errLHC || !dataLHC || dataLHC.length === 0) {
+        alert(`Peringatan: Data kuota LHC untuk jenis kayu "${inputBaru.jenis}" di TPK "${inputBaru.tpk}" belum tersedia untuk tahun ${tahunTransaksi}!`);
+        return false;
+    }
+
+    const totalLHC = dataLHC.reduce((sum, item) => sum + item.volume_lhc, 0);
+    const batasMaksimumLHP = totalLHC * 0.05;
+
+    const { data: akumulasiLama } = await client
+        .from('stok_kayu')
+        .select('masuk_m3')
+        .eq('jenis_kayu', inputBaru.jenis)
+        .eq('tpk', inputBaru.tpk)
+        .filter('tanggal', 'gte', `${tahunTransaksi}-01-01`)
+        .filter('tanggal', 'lte', `${tahunTransaksi}-12-31`);
+
+    let totalLHPBerjalan = akumulasiLama ? akumulasiLama.reduce((sum, item) => sum + (item.masuk_m3 || 0), 0) : 0;
+    let totalSetelahInput = totalLHPBerjalan + parseFloat(inputBaru.masuk);
+
+    if (totalSetelahInput > batasMaksimumLHP) {
+        alert(`GAGAL: Total LHP ${inputBaru.jenis} di ${inputBaru.tpk} (${totalSetelahInput.toFixed(2)} m³) melampaui batas maksimal 5% dari total LHC (${batasMaksimumLHP.toFixed(2)} m³) untuk tahun ${tahunTransaksi}!`);
+        return false;
+    }
+
+    return true;
+};
