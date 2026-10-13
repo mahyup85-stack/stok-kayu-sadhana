@@ -129,7 +129,7 @@ export async function loadDataMaster() {
 }
 
 // ================================================================
-// FETCH DATA STOK (DIKEMBALIKAN KE TABEL stok_kayu)
+// FETCH DATA STOK (DENGAN PAGINATION OTOMATIS SUPABASE ANTI-LIMIT)
 // ================================================================
 
 export async function fetchData({ showLoader = false, forceRefresh = false } = {}) {
@@ -140,7 +140,6 @@ export async function fetchData({ showLoader = false, forceRefresh = false } = {
 
     if (!forceRefresh && activeState.data && activeState.data.length > 0) {
         console.log("Menggunakan data yang sudah ada di memori, total:", activeState.data.length);
-        // Cukup panggil renderDashboardTable saja (karena di dalamnya sudah merender paginasi)
         if (typeof window.renderDashboardTable === "function") window.renderDashboardTable();
         return activeState.data;
     }
@@ -148,14 +147,38 @@ export async function fetchData({ showLoader = false, forceRefresh = false } = {
     if (showLoader) showLoading(true);
 
     try {
-        const { data, error } = await client
-            .from("stok_kayu")
-            .select("*")
-            .order("tanggal", { ascending: false });
+        let allData = [];
+        let page = 0;
+        const pageSize = 1000;
+        let fetchMore = true;
 
-        if (error) throw error;
+        // Loop otomatis mengambil data per 1000 baris sampai habis
+        while (fetchMore) {
+            const start = page * pageSize;
+            const end = start + pageSize - 1;
 
-        const newData = Array.isArray(data) ? data : [];
+            const { data, error } = await client
+                .from("stok_kayu")
+                .select("*")
+                .order("tanggal", { ascending: false })
+                .range(start, end);
+
+            if (error) throw error;
+
+            if (data && data.length > 0) {
+                allData = allData.concat(data);
+                // Jika data yang didapat kurang dari pageSize, berarti sudah halaman terakhir
+                if (data.length < pageSize) {
+                    fetchMore = false;
+                } else {
+                    page++;
+                }
+            } else {
+                fetchMore = false;
+            }
+        }
+
+        const newData = Array.isArray(allData) ? allData : [];
 
         activeState.data = newData;
 
@@ -171,17 +194,15 @@ export async function fetchData({ showLoader = false, forceRefresh = false } = {
             activeState.currentPage = 1;
         }
 
-        // 🌟 HANYA panggil renderDashboardTable. 
-        // Jangan panggil renderPaginationControls() di sini agar tidak terjadi dobel render/timpa.
         if (typeof window.renderDashboardTable === "function") {
             window.renderDashboardTable();
         }
 
-        console.log("Data berhasil dimuat dari server ke state:", activeState.data.length);
+        console.log("Semua data berhasil dimuat penuh dari server ke state, total:", activeState.data.length);
         return newData;
 
     } catch (error) {
-        console.error("Gagal mengambil data stok_kayu:", error);
+        console.error("Gagal mengambil data stok_kayu secara utuh:", error);
         throw error;
     } finally {
         if (showLoader) showLoading(false);

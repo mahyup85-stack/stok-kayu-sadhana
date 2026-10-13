@@ -23,9 +23,8 @@ import {
     loadComponent,
     handleRowCheckboxChange,
     handleSmartDelete,         // 🌟 Tambahkan ini
-    updateSmartDeleteButtonUI,  // 🌟 Tambahkan ini juga agar lengkap
-    validasiBatasLHPPerJenisKayu,
-    mappingKodeKeTPK
+    updateSmartDeleteButtonUI  // 🌟 Tambahkan ini juga agar lengkap
+
 } from "./utils/helpers.js";
 import { round2 } from './utils/helpers.js';
 import { switchView } from "./utils/navigation.js";
@@ -41,8 +40,6 @@ import "./components/FilterControls.js";
 import "./components/RincianMutasi.js";
 import "./components/Pengaturan.js";
 import './components/mutasiController.js';
-import './components/tableRenderer.js';
-import './components/lhc.js';
 
 
 // ================================================================
@@ -67,6 +64,36 @@ Object.assign(window, {
     generateCaptcha, // 🌟 Tambahkan juga di sini
     loadComponent,
 });
+// Fungsi untuk memuat pengaturan dinamis ke frontend
+async function loadAppSettings() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('app_settings')
+            .select('key, value');
+
+        if (error) throw error;
+
+        data.forEach(item => {
+            const element = document.getElementById(item.key);
+            if (element) {
+                if (item.key === 'announcement_text') {
+                    element.innerHTML = `
+                        <span style="display: inline-block; width: 8px; height: 8px; background-color: #22c55e; border-radius: 50%; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);"></span>
+                        <span>${item.value}</span>
+                    `;
+                } else {
+                    element.textContent = item.value;
+                }
+            }
+        });
+
+    } catch (err) {
+        console.error('Gagal memuat pengaturan aplikasi:', err.message);
+    }
+}
+
+// Panggil fungsi saat halaman selesai dimuat
+document.addEventListener('DOMContentLoaded', loadAppSettings);
 
 window.showMainApp = async function () {
     const loginScreen = document.getElementById("login-screen");
@@ -84,7 +111,6 @@ window.showMainApp = async function () {
 
     // 1. Tunggu semua komponen HTML views/ selesai dimuat ke DOM
     await Promise.all([
-        loadComponent("view-lhc", "views/lhc.html"),
         loadComponent("sidebar-container", "views/sidebar.html"),
         loadComponent("view-dashboard", "views/dashboard.html"),
         loadComponent("view-rekapsaldo", "views/rekapsaldo.html"),
@@ -127,6 +153,7 @@ window.showMainApp = async function () {
             if (typeof window.renderRincian === "function") {
                 window.renderRincian();
             }
+            if (typeof loadDataMaster === "function") await loadDataMaster();
         }
     } catch (error) {
         console.error("Gagal memuat data dari Supabase:", error);

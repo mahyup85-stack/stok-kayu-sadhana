@@ -94,17 +94,37 @@
         </div>
     </div> <!-- TOGGLE / TAG PENUTUP INI SEBELUMNYA HILANG -->
 
+    <!-- AREA UTAMA APLIKASI -->
     <div id="app-container" class="hidden">
-        <!-- Wadah Sidebar (Jangan beri class hidden di sini) -->
+        <!-- Wadah Sidebar -->
         <div id="sidebar-container"></div>
 
         <!-- Area Utama -->
         <main class="main-content"
-            style="flex: 1; width: 100%; max-width: 100%; display: flex; flex-direction: column; box-sizing: border-box;">
+            style="flex: 1; width: 100%; max-width: 100%; display: flex; flex-direction: column; box-sizing: border-box; background: #f8fafc;">
+
+            <!-- HEADER UTAMA MODERN -->
             <header
-                style="display: flex; justify-content: space-between; align-items: center; padding: 15px 10px; background: #fff; border-bottom: 0.5px solid #ddd;">
-                <div class="main-header">
-                    <h1 id="current-view-title" style="font-size: 1.5rem;">KARTU STOK</h1>
+                style="display: flex; justify-content: space-between; align-items: center; padding: 18px 24px; background: #ffffff; border-bottom: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <!-- Judul Halaman Aktif (Kartu Stok / Data LHC, dll) -->
+                    <h1 id="current-view-title"
+                        style="font-size: 1.25rem; font-weight: 700; color: #0f172a; margin: 0; letter-spacing: -0.02em;">
+                        KARTU STOK
+                    </h1>
+                    <!-- Nama Aplikasi Kecil di Samping -->
+                    <span id="app_title"
+                        style="font-size: 0.8rem; color: #64748b; font-weight: 500; border-left: 2px solid #cbd5e1; padding-left: 12px;">
+                        Sistem Manajemen Stok Kayu
+                    </span>
+                </div>
+
+                <!-- BANNER PENGUMUMAN DINAMIS (Pill Badge Modern di Kanan) -->
+                <div id="announcement_text"
+                    style="display: inline-flex; align-items: center; gap: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 6px 14px; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                    <span
+                        style="display: inline-block; width: 8px; height: 8px; background-color: #22c55e; border-radius: 50%; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);"></span>
+                    <span>Memuat pengumuman...</span>
                 </div>
             </header>
 
@@ -112,11 +132,6 @@
                 style="width: 100% !important; max-width: 100% !important; flex: 1; display: flex; flex-direction: column; box-sizing: border-box; padding: 20px;">
 
                 <div id="view-lhc" class="view-section" style="padding: 20px;">
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h2 style="font-size: 22px; font-weight: bold; color: #1f2937;">DATA LHC</h2>
-                    </div>
-
                     <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
                         <!-- Pilihan Tahun Kuota LHC -->
                         <select id="lhc-upload-tahun"
