@@ -1,10 +1,8 @@
-// ================================================================
 // DETEKSI ENVIRONMENT OTOMATIS (LOCAL vs VERCEL)
-// ================================================================
 
-const isLocal = window.location.hostname === 'localhost' || 
-                window.location.hostname === '127.0.0.1' ||
-                window.location.hostname.includes('192.168.');
+const isLocal = window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.includes('192.168.');
 
 // 🔴 Otomatis: true jika di local host, false jika di Vercel / Production
 const IS_DEBUG = isLocal;
@@ -14,15 +12,16 @@ if (!IS_DEBUG) {
     console.log = function () { };
 }
 
-// Konfigurasi URL & Key untuk masing-masing environment
+// Konfigurasi URL & Key
 const DEV_CONFIG = {
-    SUPURL: 'https://smjfyhrohjprpafytocv.supabase.co', 
-    SUPKEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtamZ5aHJvaGpwcnBhZnl0b2N2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3TpI4MzY2NDAsImV4cCI6MjEwNzQxMjY0MH0.4_cw7ILoLpC9LGPgJTlXL2jqLVzBcAPlKQcxN7HmU4g' 
+    SUPURL: 'https://smjfyhrohjprpafytocv.supabase.co',
+    SUPKEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtamZ5aHJvaGpwcnBhZnl0b2N2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4MzY2NDAsImV4cCI6MjEwNzQxMjY0MH0.4_cw7ILoLpC9LGPgJTlXL2jqLVzBcAPlKQcxN7HmU4g'
 };
 
 const PROD_CONFIG = {
-    SUPURL: window.__ENV?.SUPABASE_URL || 'https://fcccuqnyxuwsrddlookt.supabase.co',
-    SUPKEY: window.__ENV?.SUPABASE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZjY2N1cW55eHV3c3JkZGxvb2t0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NDU2NzQsImV4cCI6MjA4NTQyMTY3NH0.w9p0yxWW1CtLm3Gj3uD1z3P1eWQxW_hB288iUwkfCd8'
+    // Pastikan URL dan Key produksi ini disalin ulang dari Dashboard Supabase Project Utama Anda
+    SUPURL: 'https://fcccuqnyxuwsrddlookt.supabase.co',
+    SUPKEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNmM2N1cW55eHV3c3JkZGxvb2t0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4NDU2NzQsImV4cCI6MjA4NTQyMTY3NH0.w9p0yxWW1CtLm3Gj3uD1z3P1eWQxW_hB288iUwkfCd8'
 };
 
 export const config = {

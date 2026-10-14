@@ -69,19 +69,51 @@ async function loadAppSettings() {
     try {
         const { data, error } = await supabaseClient
             .from('app_settings')
-            .select('key, value');
+            .select('key, value, start_date, end_date');
 
         if (error) throw error;
+
+        const today = new Date().toISOString().split('T')[0]; // Format 'YYYY-MM-DD'
 
         data.forEach(item => {
             const element = document.getElementById(item.key);
             if (element) {
+                // Penanganan khusus untuk pengumuman (berdasarkan tanggal aktif)
                 if (item.key === 'announcement_text') {
-                    element.innerHTML = `
-                        <span style="display: inline-block; width: 8px; height: 8px; background-color: #22c55e; border-radius: 50%; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);"></span>
-                        <span>${item.value}</span>
-                    `;
-                } else {
+                    const hasValidDates = item.start_date && item.end_date;
+                    const isWithinRange = hasValidDates && (today >= item.start_date && today <= item.end_date);
+
+                    if (isWithinRange) {
+                        element.style.display = '';
+                        element.innerHTML = `
+                            <span style="display: inline-block; width: 8px; height: 8px; background-color: #22c55e; border-radius: 50%; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);"></span>
+                            <span>${item.value}</span>
+                        `;
+                    } else {
+                        element.innerHTML = '';
+                        element.style.display = 'none';
+                    }
+                }
+                // Penanganan untuk judul utama (app_title) atau pengaturan teks lainnya
+                else if (item.key === 'app_title') {
+                    // Jika nilai kosong, bernilai '-' , atau tanggal start_date diisi tapi belum masuk waktunya
+                    if (!item.value || item.value.trim() === '') {
+                        element.style.display = 'none';
+                    } else {
+                        // Cek juga jika app_title ingin dibatasi tanggal aktifnya (opsional)
+                        const hasValidDates = item.start_date && item.end_date;
+                        const isWithinRange = !hasValidDates || (today >= item.start_date && today <= item.end_date);
+
+                        if (isWithinRange) {
+                            element.style.display = '';
+                            element.textContent = item.value;
+                        } else {
+                            element.style.display = 'none';
+                        }
+                    }
+                }
+                // Pengaturan teks biasa lainnya
+                else {
                     element.textContent = item.value;
                 }
             }
