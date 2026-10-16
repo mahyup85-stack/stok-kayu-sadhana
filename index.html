@@ -120,7 +120,7 @@
                 </div>
 
                 <!-- BANNER PENGUMUMAN DINAMIS (Pill Badge Modern di Kanan) -->
-                <div id="announcement_text"
+                <div id="announcement_text" class="attention-badge"
                     style="display: inline-flex; align-items: center; gap: 8px; background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; padding: 6px 14px; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
                     <span
                         style="display: inline-block; width: 8px; height: 8px; background-color: #22c55e; border-radius: 50%; box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);"></span>
@@ -132,25 +132,61 @@
                 style="width: 100% !important; max-width: 100% !important; flex: 1; display: flex; flex-direction: column; box-sizing: border-box; padding: 20px;">
 
                 <div id="view-lhc" class="view-section" style="padding: 20px;">
-                    <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
-                        <!-- Pilihan Tahun Kuota LHC -->
-                        <select id="lhc-upload-tahun"
-                            style="width: 130px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; background: #fff; flex-shrink: 0;">
-                            <option value="2026" selected>Tahun 2026</option>
-                            <option value="2025">Tahun 2025</option>
-                            <option value="2024">Tahun 2024</option>
-                            <option value="2027">Tahun 2027</option>
-                        </select>
 
-                        <!-- File Input -->
-                        <input type="file" id="lhc-csv-file" accept=".csv"
-                            style="width: 280px; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; flex-shrink: 0;">
+                    <!-- Kotak Kartu Pembatas yang Modern & Rapi -->
+                    <div
+                        style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;">
 
-                        <!-- Tombol Impor -->
-                        <button onclick="processUploadLhcCsv()"
-                            style="padding: 9px 20px; background: #059669; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; flex-shrink: 0;">
-                            Impor CSV
-                        </button>
+                        <!-- Bagian Kanan: Kontrol Form (Inline & Compact) -->
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+
+                            <!-- Pilihan Tahun (Diperpendek & Sejajar) -->
+                            <select id="lhc-upload-tahun"
+                                style="width: 100px; padding: 9px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; background: #f8fafc; color: #1e293b; cursor: pointer; outline: none;">
+                                <option value="2027">2027</option>
+                                <option value="2026" selected>2026</option>
+                                <option value="2025">2025</option>
+                                <option value="2024">2024</option>
+                                <option value="2023">2023</option>
+                                <option value="2022">2022</option>
+                                <option value="2021">2021</option>
+                                <option value="2020">2020</option>
+                                <option value="2019">2019</option>
+                                <option value="2018">2018</option>
+                                <option value="2017">2017</option>
+                                <option value="2016">2016</option>
+                            </select>
+
+                            <!-- Wrapper Berkas & Tombol Telusuri -->
+                            <div
+                                style="display: flex; align-items: center; gap: 8px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; padding: 4px 10px;">
+                                <input type="file" id="lhc-csv-file" accept=".csv" style="display: none;"
+                                    onchange="updateFileName(this)">
+
+                                <button type="button" onclick="document.getElementById('lhc-csv-file').click()"
+                                    style="padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #ffffff; cursor: pointer; font-size: 13px; font-weight: 500; color: #334155; transition: background 0.2s;">
+                                    📁 Telusuri...
+                                </button>
+
+                                <span id="lhc-file-name"
+                                    style="font-size: 13px; color: #64748b; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    Tidak ada berkas dipilih.
+                                </span>
+
+                                <button type="button" id="lhc-clear-file" onclick="clearLhcFile()"
+                                    style="display: none; background: none; border: none; color: #ef4444; font-weight: bold; font-size: 14px; cursor: pointer; padding: 0 4px;"
+                                    title="Hapus file">
+                                    ✕
+                                </button>
+                            </div>
+
+                            <!-- Tombol Impor -->
+                            <button onclick="processUploadLhcCsv()"
+                                style="padding: 10px 18px; background: #059669; color: white; border: none; border-radius: 8px; font-weight: 600; font-size: 14px; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: background 0.2s;">
+                                Impor CSV
+                            </button>
+
+                        </div>
                     </div>
 
                     <!-- Tabel Daftar Kuota LHC -->
@@ -158,6 +194,7 @@
                         style="background: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                         <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px; color: #374151;">Daftar LHC
                         </h3>
+                        <div id="lhc-table-container"></div>
                         <div style="overflow-x: auto;">
                             <!-- Perbaikan: Ditambahkan tag table dan tbody dengan id="lhc-table-body" -->
                             <table style="width: 100%; border-collapse: collapse;">
