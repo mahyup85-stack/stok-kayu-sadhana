@@ -127,6 +127,43 @@ async function loadAppSettings() {
 // Panggil fungsi saat halaman selesai dimuat
 document.addEventListener('DOMContentLoaded', loadAppSettings);
 
+// Fungsi untuk mengunduh data blok tertentu ke dalam file Excel (.xlsx)
+window.downloadBlokExcel = function (tahun, namaBlok, dataBlokArray) {
+    if (!dataBlokArray || dataBlokArray.length === 0) {
+        alert("Tidak ada data untuk blok ini.");
+        return;
+    }
+
+    // Format data agar rapi saat masuk ke Excel
+    const formattedData = dataBlokArray.map(item => ({
+        "Tahun": item.tahun,
+        "Blok": item.blok,
+        "Jenis Kayu": item.jenis_kayu,
+        "Volume LHC (m³)": item.volume_lhc
+    }));
+
+    // Buat worksheet dan workbook baru
+    const worksheet = XLSX.utils.json_to_sheet(formattedData);
+    const workbook = XLSX.utils.book_new();
+
+    // Beri nama sheet sesuai nama blok (dibersihkan dari karakter terlarang Excel)
+    const sheetName = namaBlok.replace(/[\/\\\?\*\[\]:]/g, "_");
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+
+    // Sesuaikan lebar kolom otomatis
+    const maxLen = 15;
+    worksheet['!cols'] = [
+        { wch: 10 }, // Tahun
+        { wch: 15 }, // Blok
+        { wch: 25 }, // Jenis Kayu
+        { wch: 18 }  // Volume LHC
+    ];
+
+    // Simpan file dengan nama dinamis (Contoh: LHC_2026_Blok_BM.xlsx)
+    const fileName = `LHC_${tahun}_${namaBlok.replace(/\s+/g, '_')}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+};
+
 window.showMainApp = async function () {
     const loginScreen = document.getElementById("login-screen");
     const appContainer = document.getElementById("app-container");
@@ -198,7 +235,7 @@ window.showMainApp = async function () {
 };
 
 // Fungsi helper untuk memasang listener form secara aman
-function initStockFormListener() {
+window.initStockFormListener = function () {
     const stockForm = document.getElementById("stock-form");
     if (stockForm && !stockForm.dataset.listenerAttached) {
         stockForm.dataset.listenerAttached = "true"; // Mencegah duplikasi listener
@@ -279,7 +316,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
 
     // 🌟 2. DEFINISIKAN FUNGSI IMPOR CSV LHC DI LEVEL UTAMA (DI LUAR BLOK APAPUN)
-    // Fungsi Utama: Memproses Upload CSV dan Menyimpan ke Supabase
     // 1. Fungsi Utama: Memproses Upload CSV dan Menyimpan ke Supabase
     window.processUploadLhcCsv = async function () {
         const fileInput = document.getElementById("lhc-csv-file");
@@ -313,7 +349,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
                 const blokVal = cols[0] || "";
                 const jenisKayu = cols[1] || "";
-                const volumeLhc = parseFloat(String(cols[2] || "0").replace(/\./g, '').replace(',', '.')) || 0;
+                let rawVol = String(cols[2] || "0").trim();
+                rawVol = rawVol.replace(/^"|"$/g, '').trim();
+                rawVol = rawVol.replace(',', '.');
+                let volumeLhc = parseFloat(rawVol) || 0;
 
                 if (blokVal) {
                     payloadList.push({
@@ -330,24 +369,44 @@ document.addEventListener("DOMContentLoaded", async () => {
                 return;
             }
 
-            const { error } = await client.from("data_lhc").insert(payloadList);
+            try {
+                // 1. Kirim data ke Supabase menggunakan INSERT
+                const { data, error } = await client.from("data_lhc").insert(payloadList);
 
-            if (error) {
-                alert("Gagal mengimpor ke Supabase: " + error.message);
-                console.error("Detail Error:", error);
-            } else {
+                // 2. Cek apakah ada error dari database (misal karena duplikat data)
+                if (error) {
+                    // Tampilkan alert ramah pengguna saat data ditolak karena kembar/duplikat
+                    alert("Gagal mengimpor CSV. Data tersebut sudah ada di dalam database.");
+                    return;
+                }
+
+                // 3. Jika berhasil:
                 alert(`Berhasil mengimpor ${payloadList.length} data kuota LHC untuk tahun ${selectedTahun}!`);
+
+                // Bersihkan input file & tombol 'X'
                 fileInput.value = "";
+                if (typeof clearLhcFile === "function") {
+                    clearLhcFile();
+                }
+
+                // Muat ulang tabel data LHC di layar
                 if (typeof window.loadLhcTable === "function") {
                     await window.loadLhcTable();
                 }
+
+            } catch (err) {
+                // Menangkap error tak terduga
+                alert("Terjadi kesalahan saat memproses data.");
             }
+
+        };
+
+        reader.onerror = function () {
+            alert("Gagal membaca file CSV. Silakan coba lagi.");
         };
 
         reader.readAsText(file);
-    };
-
-    // Fungsi untuk Memuat dan Merender Daftar Kuota LHC dengan Struktur Folder Bersarang (Tahun -> Blok)
+    }
     // Fungsi untuk Memuat dan Merender Daftar Kuota LHC dengan Struktur Folder Bersarang (Tahun -> Blok) dan Total Volume di Bawah
     window.loadLhcTable = async function () {
         const client = typeof initSupabase === "function" ? initSupabase() : null;
@@ -515,6 +574,32 @@ document.addEventListener("DOMContentLoaded", async () => {
             row.style.display = "none";
         }
     };
+
+    // Fungsi saat file dipilih
+    window.updateFileName = function (input) {
+        const fileNameSpan = document.getElementById("lhc-file-name");
+        const clearBtn = document.getElementById("lhc-clear-file");
+
+        if (input.files && input.files.length > 0) {
+            fileNameSpan.textContent = input.files[0].name;
+            fileNameSpan.style.color = "#0f172a";
+            clearBtn.style.display = "inline-block"; // Munculkan tombol silang
+        } else {
+            clearBtn.style.display = "none";
+        }
+    }
+
+    // Fungsi untuk menghapus file yang terpilih
+    window.clearLhcFile = function () {
+        const fileInput = document.getElementById("lhc-csv-file");
+        const fileNameSpan = document.getElementById("lhc-file-name");
+        const clearBtn = document.getElementById("lhc-clear-file");
+
+        fileInput.value = ""; // Reset input file
+        fileNameSpan.textContent = "Tidak ada berkas dipilih.";
+        fileNameSpan.style.color = "#475569";
+        clearBtn.style.display = "none"; // Sembunyikan kembali tombol silang
+    }
 
     // 🌟 3. SISTEM PENGAMAN PAGINASI
     const container = document.getElementById("pagination-container");
